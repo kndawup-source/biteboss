@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "71.0";
+  const BITEBOSS_BUILD = "71.1";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
 if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -866,6 +866,35 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     }
   }
 
+  function updateChallengeCommand(list = stores){
+    const rows = Array.isArray(list) ? list : [];
+    const count = $("#challengeNearbyCount");
+    const target = $("#challengeNextTarget");
+    const meta = $("#challengeNextMeta");
+    const gps = $("#challengeGpsState");
+    if(count) count.textContent = String(rows.length);
+
+    const next = rows[0] || null;
+    if(target) target.textContent = next?.name ? String(next.name) : "주변 매장 탐색 중";
+    if(meta){
+      if(next){
+        const distance = Number(next.distance_m ?? next.distance ?? 0);
+        const mode = takeoverModeFromStore(next);
+        const modeLabel = ({retake:"RETAKE",hot:"HOT",challenge:"CHALLENGE",takeover:"TAKEOVER"})[mode] || "TAKEOVER";
+        meta.textContent = `${modeLabel}${distance > 0 ? ` · ${Math.round(distance)}m` : ""}`;
+      }else{
+        meta.textContent = lastPosition ? "주변 도전 대상을 찾는 중입니다." : "GPS 위치를 확인하고 있습니다.";
+      }
+    }
+    if(gps){
+      const accuracy = Number(lastPosition?.coords?.accuracy || 0);
+      if(presenceBlockedReason === "MEMBER_LOGIN_REQUIRED") gps.textContent = "LOGIN";
+      else if(!lastPosition) gps.textContent = "SEARCH";
+      else if(accuracy && accuracy > Number(config.gps_max_accuracy_m || 80)) gps.textContent = "HOLD";
+      else gps.textContent = "READY";
+    }
+  }
+
   function renderStores(list = stores){
     const box = $("#storeList");
     if(!box) return;
@@ -873,6 +902,7 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     box.innerHTML = list.map(storeCard).join("") ||
       `<div class="app-state">검색 결과가 없습니다.</div>`;
 
+    updateChallengeCommand(list);
 
     const loginNotice = $("#storesLoginNotice");
     loginNotice?.classList.toggle("hidden", presenceBlockedReason !== "MEMBER_LOGIN_REQUIRED");
@@ -2292,11 +2322,15 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     const retakes=Array.isArray(data?.retakes)?data.retakes:fallbackRetakes;
     const hot=Array.isArray(data?.hot)?data.hot:fallbackHot;
     const newcomer=data?.new_player_protected===true;
-    if(!retakes.length&&!hot.length&&!newcomer){ box.classList.add("hidden"); box.innerHTML=""; return; }
     const items=[];
     if(retakes[0]) items.push(`<button type="button" data-pulse-store="${escapeAttr(retakes[0].store_id)}"><span>RETAKE</span><strong>${escapeHtml(retakes[0].store_name||"빼앗긴 매장")}</strong><small>다시 가져오기</small></button>`);
     if(hot[0]) items.push(`<button type="button" data-pulse-store="${escapeAttr(hot[0].store_id)}"><span>HOT</span><strong>${escapeHtml(hot[0].store_name||"인기 매장")}</strong><small>${Number(hot[0].challenges_24h||0)}명 도전</small></button>`);
     if(newcomer) items.push(`<div class="game-pulse-info"><span>NEW BOSS</span><strong>첫 점령 가이드</strong><small>초반에는 쉬운 매장을 우선 추천합니다.</small></div>`);
+    if(!items.length){
+      const next=stores[0];
+      if(next) items.push(`<button type="button" data-pulse-store="${escapeAttr(next.id)}"><span>NEXT</span><strong>${escapeHtml(next.name||"가장 가까운 매장")}</strong><small>현장에 들어가면 자동으로 카운트가 시작됩니다.</small></button>`);
+      items.push(`<div class="game-pulse-info"><span>LIVE</span><strong>${playerSession?.authenticated ? "READY TO TAKE OVER" : "LOGIN TO TAKE OVER"}</strong><small>${playerSession?.authenticated ? "GPS 반경 안에서 점령 세션이 시작됩니다." : "로그인 후 현장 점령을 시작할 수 있습니다."}</small></div>`);
+    }
     box.innerHTML=items.join(""); box.classList.remove("hidden");
     $$('[data-pulse-store]',box).forEach(btn=>btn.addEventListener('click',()=>openStoreDetail(btn.dataset.pulseStore)));
   }

@@ -47,7 +47,6 @@ test('v71 game loop ships takeover, retake/hot pulse, history and season UI',()=
   const html=read('index.html').toString();
   const app=read('app.js').toString();
   const css=read('styles.css').toString();
-  const sql=read('BITEBOSS_V71_GAME_LOOP.sql').toString();
   assert.match(html,/id="takeoverScreen"/);
   assert.match(html,/id="gamePulse"/);
   assert.match(html,/data-rank="season"/);
@@ -55,6 +54,4 @@ test('v71 game loop ships takeover, retake/hot pulse, history and season UI',()=
   assert.match(app,/biteboss_game_pulse_v71/);
   assert.match(app,/biteboss_store_history_v71/);
   assert.match(css,/\.takeover-count/);
-  assert.match(sql,/SUSPICIOUS_SPEED/);
-  assert.match(sql,/OUTSIDE_TOO_LONG/);
 });

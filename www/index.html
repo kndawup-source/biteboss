@@ -9,7 +9,7 @@
   <meta property="og:title" content="BiteBoss" />
   <meta property="og:description" content="주변 매장을 발견하고 도전해 보스를 차지하세요." />
   <meta property="og:type" content="website" />
-  <meta name="biteboss-build" content="71.0" />
+  <meta name="biteboss-build" content="71.1" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -18,8 +18,8 @@
   <link rel="preconnect" href="https://imumpyumchvctrpmfngr.supabase.co" crossorigin />
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
   <link rel="preconnect" href="https://unpkg.com" crossorigin />
-  <link rel="manifest" href="./manifest.webmanifest?v=71.0" />
-  <link rel="stylesheet" href="./styles.css?v=71.0" />
+  <link rel="manifest" href="./manifest.webmanifest?v=71.1" />
+  <link rel="stylesheet" href="./styles.css?v=71.1" />
 </head>
 <body class="user-app home-active">
 <div id="app" class="app-shell">
@@ -65,9 +65,30 @@
   <main class="page" id="page-stores">
     <section class="inner-page challenge-page">
       <div class="inner-head challenge-head">
-        <h2>도전</h2>
-        <p>가까운 매장을 찾아 점령해 보세요.</p>
+        <div>
+          <span class="challenge-kicker">LIVE TAKEOVER</span>
+          <h2>도전</h2>
+        </div>
+        <p>가까운 매장에 들어가면 점령 카운트가 시작됩니다.</p>
       </div>
+
+      <section class="takeover-command" aria-label="점령 상태">
+        <div class="takeover-command-primary">
+          <span>NEXT TARGET</span>
+          <strong id="challengeNextTarget">주변 매장 탐색 중</strong>
+          <small id="challengeNextMeta">GPS 위치를 확인하고 있습니다.</small>
+        </div>
+        <div class="takeover-command-stat">
+          <span>NEARBY</span>
+          <strong id="challengeNearbyCount">0</strong>
+          <small>도전 가능</small>
+        </div>
+        <div class="takeover-command-stat">
+          <span>STATUS</span>
+          <strong id="challengeGpsState">READY</strong>
+          <small>현장 자동 점령</small>
+        </div>
+      </section>
 
       <p id="storesLoginNotice" class="challenge-login-note hidden">로그인하면 현장에서 자동 점령을 시작할 수 있습니다.</p>
 
@@ -205,12 +226,26 @@
 
 <section id="takeoverScreen" class="takeover-screen hidden" aria-live="polite" aria-atomic="true">
   <div class="takeover-screen-inner">
-    <span id="takeoverEyebrow" class="takeover-eyebrow">TAKING OVER</span>
-    <strong id="takeoverStoreName" class="takeover-store-name">매장</strong>
-    <div id="takeoverCount" class="takeover-count">00:20</div>
-    <p id="takeoverStatus" class="takeover-status">매장 안에서 위치를 유지하세요.</p>
-    <div class="takeover-progress" aria-hidden="true"><span id="takeoverProgressBar"></span></div>
-    <button id="takeoverCancelBtn" class="takeover-cancel" type="button">점령 취소</button>
+    <div class="takeover-topline">
+      <span>BITEBOSS</span>
+      <span>LIVE</span>
+    </div>
+    <div class="takeover-title-block">
+      <span id="takeoverEyebrow" class="takeover-eyebrow">TAKING OVER</span>
+      <strong id="takeoverStoreName" class="takeover-store-name">매장</strong>
+    </div>
+    <div class="takeover-count-wrap">
+      <span class="takeover-count-label">SECONDS LEFT</span>
+      <div id="takeoverCount" class="takeover-count">00:20</div>
+    </div>
+    <div class="takeover-bottom">
+      <p id="takeoverStatus" class="takeover-status">매장 안에서 위치를 유지하세요.</p>
+      <div class="takeover-progress" aria-hidden="true"><span id="takeoverProgressBar"></span></div>
+      <div class="takeover-signal-row" aria-hidden="true">
+        <span>GPS LOCK</span><span>SERVER TIMER</span><span>LIVE SESSION</span>
+      </div>
+      <button id="takeoverCancelBtn" class="takeover-cancel" type="button">점령 취소</button>
+    </div>
   </div>
 </section>
 
@@ -222,6 +257,6 @@
   </div>
 </div>
 
-<script src="./bootstrap.js?v=71.0"></script>
+<script src="./bootstrap.js?v=71.1"></script>
 </body>
 </html>

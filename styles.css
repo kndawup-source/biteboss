@@ -7924,9 +7924,87 @@ body.user-app .crew-profile-detail .organization-detail-section{
 }
 
 /* ============================================================
-   BiteBoss v71.0 — takeover game loop
-   Canonical additions. Do not append feature overrides below this block.
+   BiteBoss v71.1 — game loop / takeover UI
+   Canonical block. No feature overrides below this section.
    ============================================================ */
+.challenge-head{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(180px,.7fr);
+  gap:24px;
+  align-items:end;
+}
+.challenge-head>div{min-width:0}
+.challenge-kicker{
+  display:block;
+  margin:0 0 8px;
+  font-size:10px;
+  line-height:1;
+  font-weight:900;
+  letter-spacing:.16em;
+}
+.challenge-head h2{margin:0}
+.challenge-head p{
+  margin:0 0 2px;
+  max-width:28rem;
+  color:var(--muted);
+  font-size:12px;
+  line-height:1.45;
+  text-align:right;
+}
+.takeover-command{
+  display:grid;
+  grid-template-columns:minmax(0,1.8fr) minmax(92px,.55fr) minmax(92px,.55fr);
+  margin:20px 0 18px;
+  border-top:1px solid #000;
+  border-bottom:1px solid #000;
+  background:#000;
+  color:#fff;
+}
+.takeover-command>div{
+  min-width:0;
+  min-height:118px;
+  padding:16px 14px;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  box-sizing:border-box;
+}
+.takeover-command>div+div{border-left:1px solid #2b2b2b}
+.takeover-command span{
+  color:#8d8d8d;
+  font-size:9px;
+  font-weight:900;
+  letter-spacing:.14em;
+}
+.takeover-command-primary strong{
+  margin-top:auto;
+  padding-top:22px;
+  color:#fff;
+  font-size:24px;
+  line-height:1;
+  font-weight:950;
+  letter-spacing:-.045em;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.takeover-command-primary small,
+.takeover-command-stat small{
+  margin-top:7px;
+  color:#858585;
+  font-size:10px;
+  line-height:1.3;
+  font-weight:700;
+}
+.takeover-command-stat strong{
+  margin-top:auto;
+  color:#fff;
+  font-size:30px;
+  line-height:.9;
+  font-weight:950;
+  letter-spacing:-.05em;
+  font-variant-numeric:tabular-nums;
+}
 .takeover-screen{
   position:fixed;
   inset:0;
@@ -7941,52 +8019,80 @@ body.user-app .crew-profile-detail .organization-detail-section{
 .takeover-screen-inner{
   width:100%;
   min-height:100%;
-  padding:max(34px,env(safe-area-inset-top)) 24px max(28px,env(safe-area-inset-bottom));
-  display:flex;
-  flex-direction:column;
-  align-items:flex-start;
+  padding:max(26px,env(safe-area-inset-top)) 22px max(24px,env(safe-area-inset-bottom));
+  display:grid;
+  grid-template-rows:auto auto minmax(0,1fr) auto;
   box-sizing:border-box;
 }
-.takeover-eyebrow{
-  margin-top:4px;
-  font-size:13px;
+.takeover-topline{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding-bottom:14px;
+  border-bottom:1px solid #2a2a2a;
+  color:#8e8e8e;
+  font-size:10px;
   line-height:1;
   font-weight:900;
-  letter-spacing:.12em;
+  letter-spacing:.16em;
+}
+.takeover-topline span:last-child{color:#fff}
+.takeover-title-block{padding-top:18px}
+.takeover-eyebrow{
+  display:block;
+  font-size:12px;
+  line-height:1;
+  font-weight:900;
+  letter-spacing:.14em;
 }
 .takeover-store-name{
-  margin-top:14px;
+  display:block;
+  margin-top:10px;
   max-width:100%;
-  font-size:clamp(26px,8vw,44px);
-  line-height:1.02;
-  font-weight:900;
-  letter-spacing:-.045em;
+  font-size:clamp(28px,8vw,46px);
+  line-height:.98;
+  font-weight:950;
+  letter-spacing:-.05em;
   overflow-wrap:anywhere;
 }
+.takeover-count-wrap{
+  min-height:0;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  padding:34px 0 28px;
+}
+.takeover-count-label{
+  margin-bottom:14px;
+  color:#747474;
+  font-size:9px;
+  font-weight:900;
+  letter-spacing:.16em;
+}
 .takeover-count{
-  margin:auto 0;
   width:100%;
-  font-size:clamp(92px,29vw,180px);
-  line-height:.82;
+  font-size:clamp(104px,31vw,196px);
+  line-height:.76;
   font-weight:950;
-  letter-spacing:-.075em;
+  letter-spacing:-.085em;
   font-variant-numeric:tabular-nums;
   white-space:nowrap;
   text-align:left;
 }
-.takeover-count.is-hold{opacity:.36}
+.takeover-count.is-hold{opacity:.28}
 .takeover-count.is-final{animation:bitebossFinalSecond .9s steps(1,end) infinite}
+.takeover-bottom{align-self:end}
 .takeover-status{
-  margin:0 0 18px;
+  margin:0 0 16px;
   max-width:34rem;
-  font-size:16px;
+  font-size:15px;
   line-height:1.35;
-  font-weight:800;
-  letter-spacing:-.02em;
+  font-weight:850;
+  letter-spacing:-.025em;
 }
 .takeover-progress{
   width:100%;
-  height:2px;
+  height:3px;
   background:#292929;
   overflow:hidden;
 }
@@ -7997,40 +8103,49 @@ body.user-app .crew-profile-detail .organization-detail-section{
   background:#fff;
   transition:width .25s linear;
 }
+.takeover-signal-row{
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px 16px;
+  padding-top:12px;
+  color:#666;
+  font-size:9px;
+  font-weight:900;
+  letter-spacing:.1em;
+}
 .takeover-cancel{
-  margin-top:20px;
-  min-height:48px;
+  margin-top:22px;
+  min-height:44px;
   padding:0;
   border:0;
   background:transparent;
-  color:#8e8e8e;
-  font:800 14px/1 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-  text-decoration:underline;
-  text-underline-offset:4px;
+  color:#777;
+  font:800 13px/1 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  text-align:left;
 }
 body.takeover-active{overflow:hidden;touch-action:none}
-@keyframes bitebossFinalSecond{50%{opacity:.45}}
+@keyframes bitebossFinalSecond{50%{opacity:.34}}
 @media (prefers-reduced-motion:reduce){
   .takeover-count.is-final{animation:none}
   .takeover-progress>span{transition:none}
 }
-
 .game-pulse{
   display:grid;
   grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:1px;
-  margin:0 0 18px;
-  border-top:1px solid #d8d8d8;
-  border-bottom:1px solid #d8d8d8;
-  background:#d8d8d8;
+  gap:0;
+  margin:0 0 20px;
+  border-top:1px solid #111;
+  border-bottom:1px solid #111;
+  background:#fff;
 }
 .game-pulse.hidden{display:none}
 .game-pulse>button,.game-pulse-info{
   min-width:0;
-  min-height:92px;
-  padding:14px 12px;
+  min-height:106px;
+  padding:15px 14px;
   border:0;
   border-radius:0;
+  border-right:1px solid #dedede;
   background:#fff;
   color:#000;
   text-align:left;
@@ -8038,51 +8153,64 @@ body.takeover-active{overflow:hidden;touch-action:none}
   flex-direction:column;
   justify-content:space-between;
 }
+.game-pulse>*:last-child{border-right:0}
 .game-pulse>button{cursor:pointer}
 .game-pulse span,.game-pulse-info span{
-  font-size:10px;
-  font-weight:900;
-  letter-spacing:.12em;
+  font-size:9px;
+  font-weight:950;
+  letter-spacing:.15em;
 }
 .game-pulse strong,.game-pulse-info strong{
-  margin-top:10px;
-  font-size:15px;
-  line-height:1.1;
-  font-weight:900;
-  letter-spacing:-.03em;
+  margin-top:auto;
+  padding-top:16px;
+  font-size:18px;
+  line-height:1.05;
+  font-weight:950;
+  letter-spacing:-.035em;
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
 }
 .game-pulse small,.game-pulse-info small{
-  margin-top:5px;
-  font-size:11px;
-  line-height:1.2;
+  margin-top:7px;
+  font-size:10px;
+  line-height:1.35;
   color:#777;
   font-weight:700;
 }
-.conquest-history-list{border-top:1px solid #dedede}
+.conquest-history-list{border-top:1px solid #111}
 .conquest-history-list>div{
-  min-height:54px;
+  min-height:58px;
   display:grid;
-  grid-template-columns:minmax(64px,.8fr) minmax(0,1.6fr) auto;
+  grid-template-columns:minmax(68px,.75fr) minmax(0,1.6fr) auto;
   align-items:center;
-  gap:10px;
+  gap:12px;
   border-bottom:1px solid #dedede;
 }
 .conquest-history-list span,.conquest-history-list small{
-  font-size:11px;
+  font-size:10px;
   color:#777;
-  font-weight:750;
+  font-weight:800;
 }
 .conquest-history-list strong{
   min-width:0;
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
-  font-size:14px;
-  font-weight:900;
+  font-size:15px;
+  font-weight:950;
 }
-@media (max-width:520px){
+@media (max-width:640px){
+  .challenge-head{grid-template-columns:1fr;gap:8px}
+  .challenge-head p{text-align:left}
+  .takeover-command{grid-template-columns:minmax(0,1fr) 86px}
+  .takeover-command-primary{grid-column:1/-1;border-bottom:1px solid #2b2b2b}
+  .takeover-command>div:nth-child(2){border-left:0}
+  .takeover-command>div{min-height:92px}
+  .takeover-command-primary{min-height:116px!important}
+  .takeover-command-primary strong{font-size:25px}
+  .takeover-command-stat strong{font-size:26px}
   .game-pulse{grid-template-columns:1fr}
+  .game-pulse>button,.game-pulse-info{border-right:0;border-bottom:1px solid #dedede}
+  .game-pulse>*:last-child{border-bottom:0}
 }
