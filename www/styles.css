@@ -7924,537 +7924,566 @@ body.user-app .crew-profile-detail .organization-detail-section{
 }
 
 /* ============================================================
-   BiteBoss v71.2 — Editorial live territory system
-   Canonical game UI. Black / white, no decorative cards.
+   BiteBoss v72.0 — Editorial game system
+   Canonical user UI. Paper / ink / signal red. No glass, no gradients,
+   no decorative cards. The interface is a scoreboard, not a dashboard.
    ============================================================ */
-.challenge-page{
-  --game-ink:#050505;
-  --game-paper:#f7f7f5;
-  --game-line:#d8d8d4;
-  --game-muted:#747474;
+
+/* ---------- app theme ---------- */
+body.user-app{
+  --bb-paper:#f2f2ee;
+  --bb-paper-2:#e9e9e4;
+  --bb-ink:#080808;
+  --bb-muted:#777772;
+  --bb-line:#c9c9c2;
+  --bb-signal:#d5232f;
 }
+body.user-app:not(.home-active){
+  --bg:var(--bb-paper);
+  --surface:var(--bb-paper);
+  --surface-2:var(--bb-paper-2);
+  --line:var(--bb-line);
+  --line-strong:#aeadA6;
+  --text:var(--bb-ink);
+  --muted:var(--bb-muted);
+  --faint:#a0a09a;
+  background:var(--bb-paper);
+  color:var(--bb-ink);
+}
+body.user-app:not(.home-active) .page{background:var(--bb-paper)}
+body.user-app:not(.home-active) .inner-page{padding-top:calc(30px + var(--safe-top));}
+
+/* ---------- editorial page headers ---------- */
+body.user-app:not(.home-active) .inner-head,
 .challenge-head{
-  display:grid;
-  grid-template-columns:minmax(0,1fr) minmax(220px,.72fr);
-  gap:32px;
-  align-items:end;
-  margin-bottom:22px;
-  padding-bottom:18px;
-  border-bottom:1px solid #111;
+  margin:0 0 26px;
+  padding:0 0 20px;
+  border-bottom:2px solid var(--bb-ink);
 }
-.challenge-head-title{min-width:0}
-.challenge-kicker{
+.page-kicker,.challenge-kicker{
   display:block;
   margin:0 0 12px;
-  color:#777;
+  color:var(--bb-muted);
   font-size:9px;
   line-height:1;
   font-weight:900;
-  letter-spacing:.19em;
+  letter-spacing:.18em;
+  text-transform:uppercase;
 }
+body.user-app:not(.home-active) .inner-head h2,
 .challenge-head h2{
   margin:0;
-  font-size:clamp(48px,8vw,78px)!important;
-  line-height:.78!important;
+  color:var(--bb-ink);
+  font-size:clamp(46px,8vw,70px)!important;
+  line-height:.82!important;
   font-weight:950!important;
-  letter-spacing:-.075em!important;
+  letter-spacing:-.07em!important;
 }
+body.user-app:not(.home-active) .inner-head p,
 .challenge-head p{
-  margin:0 0 1px;
-  max-width:32rem;
-  color:#676767;
-  font-size:12px;
-  line-height:1.5;
-  text-align:right;
+  max-width:34rem;
+  margin:13px 0 0;
+  color:var(--bb-muted)!important;
+  font-size:12px!important;
+  line-height:1.55;
 }
+.challenge-head{display:block}
+.challenge-head-title{min-width:0}
+
+/* ---------- buttons: one clear hierarchy ---------- */
+body.user-app:not(.home-active) .primary-btn,
+body.user-app:not(.home-active) .promo-action,
+body.user-app:not(.home-active) .crew-primary-action,
+body.user-app:not(.home-active) .claim-store-btn,
+body.user-app:not(.home-active) .primary-store-action{
+  min-height:50px;
+  padding:0 18px;
+  border:1px solid var(--bb-ink)!important;
+  border-radius:0!important;
+  background:var(--bb-ink)!important;
+  color:#fff!important;
+  box-shadow:none!important;
+  font-size:12px;
+  font-weight:900;
+  letter-spacing:-.01em;
+}
+body.user-app:not(.home-active) .secondary-btn,
+body.user-app:not(.home-active) .crew-secondary-action{
+  min-height:48px;
+  padding:0 18px;
+  border:1px solid var(--bb-ink)!important;
+  border-radius:0!important;
+  background:transparent!important;
+  color:var(--bb-ink)!important;
+  box-shadow:none!important;
+  font-size:12px;
+  font-weight:850;
+}
+body.user-app:not(.home-active) .text-btn,
+body.user-app:not(.home-active) .crew-text-action{
+  color:var(--bb-muted);
+  font-size:11px;
+  font-weight:800;
+}
+body.user-app:not(.home-active) button:active{transform:none!important}
+body.user-app:not(.home-active) button:focus-visible,
+body.user-app:not(.home-active) a:focus-visible,
+body.user-app:not(.home-active) input:focus-visible{
+  outline:2px solid var(--bb-ink);
+  outline-offset:3px;
+}
+
+/* ---------- home controls: visibly new, but hero stays intact ---------- */
+body.user-app .boss-home-actions{gap:1px!important}
+body.user-app .boss-home-action{
+  min-height:62px!important;
+  height:62px!important;
+  border:1px solid rgba(255,255,255,.92)!important;
+  border-radius:0!important;
+  background:rgba(0,0,0,.86)!important;
+  color:#fff!important;
+  box-shadow:none!important;
+  backdrop-filter:none!important;
+}
+body.user-app .boss-home-action.primary{
+  min-height:68px!important;
+  height:68px!important;
+  background:#fff!important;
+  color:#050505!important;
+  border-color:#fff!important;
+}
+body.user-app .boss-home-action-label{
+  font-size:16px!important;
+  font-weight:950!important;
+  letter-spacing:-.035em!important;
+}
+
+/* ---------- bottom navigation: thin utility rail ---------- */
+body.user-app .bottom-nav{
+  height:calc(58px + var(--app-bottom-inset, var(--safe-bottom)))!important;
+  padding:0 8px var(--app-bottom-inset, var(--safe-bottom))!important;
+  border-top:1px solid #262626!important;
+  background:#050505!important;
+  backdrop-filter:none!important;
+}
+body.user-app .nav-btn{
+  min-height:58px!important;
+  display:grid!important;
+  grid-template-rows:22px 12px;
+  align-content:center;
+  justify-items:center;
+  gap:2px!important;
+  padding:0!important;
+  color:#646464!important;
+}
+body.user-app .nav-btn.active{color:#fff!important}
+body.user-app .nav-icon{width:20px!important;height:20px!important}
+body.user-app .nav-icon svg{stroke-width:1.45!important}
+body.user-app .nav-label{
+  font-size:8px!important;
+  line-height:1!important;
+  font-weight:850!important;
+  letter-spacing:.02em!important;
+  text-transform:none!important;
+}
+body.user-app:not(.home-active) .bottom-nav{
+  border-top-color:var(--bb-ink)!important;
+  background:var(--bb-paper)!important;
+}
+body.user-app:not(.home-active) .nav-btn{color:#9a9a94!important}
+body.user-app:not(.home-active) .nav-btn.active{color:var(--bb-ink)!important}
+
+/* ---------- forms ---------- */
+body.user-app:not(.home-active) .input{
+  color:var(--bb-ink)!important;
+  border-bottom:1px solid var(--bb-ink)!important;
+  background:transparent!important;
+}
+body.user-app:not(.home-active) .input::placeholder{color:#9c9c96!important}
+body.user-app:not(.home-active) .search-box{margin:0 0 12px}
+body.user-app:not(.home-active) .search-box .input{
+  height:54px;
+  padding:0!important;
+  border-radius:0!important;
+  font-size:17px!important;
+  font-weight:800;
+}
+
+/* ---------- challenge / live territory ---------- */
+.challenge-page{--game-ink:var(--bb-ink);--game-paper:var(--bb-paper);--game-line:var(--bb-line);--game-muted:var(--bb-muted)}
 .takeover-command{
-  position:relative;
   display:grid;
-  grid-template-columns:72px minmax(0,1.8fr) minmax(96px,.5fr) minmax(112px,.58fr);
-  margin:0 0 12px;
-  border:1px solid #0a0a0a;
-  background:#050505;
-  color:#fff;
-  overflow:hidden;
+  grid-template-columns:64px minmax(0,1.7fr) 104px 112px;
+  margin:0 0 20px;
+  border:0;
+  border-top:2px solid var(--bb-ink);
+  border-bottom:2px solid var(--bb-ink);
+  background:transparent;
+  color:var(--bb-ink);
 }
 .takeover-command-index{
-  min-height:154px;
-  padding:17px 14px!important;
+  min-height:148px;
+  padding:16px 12px!important;
   display:flex!important;
   align-items:flex-end!important;
-  justify-content:flex-start!important;
-  border-right:1px solid #2b2b2b;
-  color:#5c5c5c;
-  font-size:26px;
-  line-height:.85;
+  border-right:1px solid var(--bb-ink);
+  color:#9a9a94;
+  font-size:28px;
+  line-height:.8;
   font-weight:950;
-  letter-spacing:-.06em;
-  font-variant-numeric:tabular-nums;
+  letter-spacing:-.07em;
 }
 .takeover-command>div:not(.takeover-command-index){
   min-width:0;
-  min-height:154px;
-  padding:17px 16px;
+  min-height:148px;
+  padding:16px;
   display:flex;
   flex-direction:column;
   justify-content:space-between;
-  box-sizing:border-box;
 }
-.takeover-command>div+div:not(.takeover-command-primary){border-left:1px solid #2b2b2b}
-.takeover-command span{
-  color:#777;
-  font-size:9px;
-  line-height:1;
-  font-weight:950;
-  letter-spacing:.16em;
-}
+.takeover-command>div+div:not(.takeover-command-primary){border-left:1px solid var(--bb-ink)}
+.takeover-command span{color:var(--bb-muted);font-size:8px;font-weight:950;letter-spacing:.16em}
 .takeover-command-primary strong{
   margin-top:auto;
-  padding-top:34px;
-  color:#fff;
-  font-size:clamp(28px,4.4vw,42px);
+  padding-top:30px;
+  color:var(--bb-ink);
+  font-size:clamp(26px,5vw,42px);
   line-height:.9;
   font-weight:950;
-  letter-spacing:-.06em;
+  letter-spacing:-.055em;
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
 }
-.takeover-command-primary small,
-.takeover-command-stat small{
-  margin-top:9px;
-  color:#777;
-  font-size:10px;
-  line-height:1.25;
-  font-weight:750;
-}
+.takeover-command-primary small,.takeover-command-stat small{margin-top:8px;color:var(--bb-muted);font-size:9px;font-weight:750}
 .takeover-command-stat strong{
   margin-top:auto;
-  color:#fff;
-  font-size:34px;
+  color:var(--bb-ink);
+  font-size:32px;
   line-height:.82;
   font-weight:950;
   letter-spacing:-.06em;
   font-variant-numeric:tabular-nums;
   white-space:nowrap;
 }
-.challenge-login-note{
-  margin:0!important;
-  padding:11px 0 13px!important;
-  border-bottom:1px solid var(--game-line)!important;
-  color:#666!important;
-  font-size:11px!important;
-}
-.challenge-search{
-  margin:0!important;
-  padding:18px 0 12px;
-  border-bottom:1px solid #111;
-}
-.challenge-search .input{
-  height:50px!important;
-  padding:0!important;
-  border:0!important;
-  border-radius:0!important;
-  background:transparent!important;
-  box-shadow:none!important;
-  color:#000!important;
-  font-size:18px!important;
-  font-weight:800!important;
-  letter-spacing:-.025em;
-}
-.challenge-search .input::placeholder{color:#aaa}
-.challenge-search .input:focus{outline:0!important}
+.challenge-login-note{margin:-8px 0 18px!important;color:var(--bb-signal)!important;font-size:10px!important}
+.challenge-search{margin:0!important;padding:0 0 14px;border-bottom:1px solid var(--bb-line)}
 
-/* priority actions */
 .game-pulse{
   display:grid;
   grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:0;
-  margin:0 0 10px;
-  border-bottom:1px solid #111;
-  background:#fff;
+  margin:0 0 6px;
+  border-bottom:2px solid var(--bb-ink);
+  background:transparent;
 }
 .game-pulse.hidden{display:none}
 .game-pulse>button,.game-pulse-info{
-  position:relative;
-  min-width:0;
-  min-height:124px;
-  padding:18px 16px 16px 0;
+  min-height:116px;
+  padding:16px 16px 16px 0;
   border:0;
+  border-right:1px solid var(--bb-line);
   border-radius:0;
-  border-right:1px solid #d8d8d4;
-  background:#fff;
-  color:#000;
+  background:transparent;
+  color:var(--bb-ink);
   text-align:left;
   display:flex;
   flex-direction:column;
   justify-content:space-between;
 }
 .game-pulse>*:nth-child(even){padding-left:16px;padding-right:0;border-right:0}
-.game-pulse>button{cursor:pointer}
-.game-pulse span,.game-pulse-info span{
-  color:#777;
-  font-size:9px;
-  line-height:1;
-  font-weight:950;
-  letter-spacing:.17em;
-}
+.game-pulse span,.game-pulse-info span{color:var(--bb-muted);font-size:8px;font-weight:950;letter-spacing:.16em}
 .game-pulse strong,.game-pulse-info strong{
   margin-top:auto;
-  padding-top:22px;
+  padding-top:18px;
   font-size:22px;
-  line-height:.96;
+  line-height:.95;
   font-weight:950;
   letter-spacing:-.045em;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
 }
-.game-pulse small,.game-pulse-info small{
-  margin-top:8px;
-  color:#777;
-  font-size:10px;
-  line-height:1.35;
-  font-weight:700;
-}
+.game-pulse small,.game-pulse-info small{margin-top:7px;color:var(--bb-muted);font-size:9px;font-weight:700}
 
-/* target list becomes an editorial scoreboard, not generic cards */
-body.user-app #page-stores .challenge-store-list{
-  margin:0!important;
-  border-top:0!important;
-}
+body.user-app #page-stores .challenge-store-list{margin:0!important;border:0!important;counter-reset:target}
 body.user-app #page-stores .challenge-card{
+  counter-increment:target;
   position:relative;
-  min-height:94px;
+  min-height:106px;
   margin:0!important;
-  padding:17px 0!important;
+  padding:18px 0!important;
   border:0!important;
-  border-bottom:1px solid #d8d8d4!important;
+  border-bottom:1px solid var(--bb-line)!important;
   border-radius:0!important;
-  background:#fff!important;
+  background:transparent!important;
   box-shadow:none!important;
   grid-template-columns:minmax(0,1fr) auto!important;
-  gap:14px!important;
-  transition:none!important;
+  gap:16px!important;
+}
+body.user-app #page-stores .challenge-card::after{
+  content:counter(target,decimal-leading-zero);
+  position:absolute;
+  right:0;
+  bottom:14px;
+  color:#b8b8b2;
+  font-size:9px;
+  font-weight:900;
+  letter-spacing:.08em;
 }
 body.user-app #page-stores .challenge-card::before{
   content:"TAKE";
   position:absolute;
-  top:18px;
+  top:19px;
   right:0;
-  color:#b1b1ad;
+  color:#8f8f89;
   font-size:8px;
-  line-height:1;
   font-weight:950;
   letter-spacing:.15em;
-  pointer-events:none;
 }
-body.user-app #page-stores .challenge-card.mode-retake::before{content:"RETAKE";color:#111}
-body.user-app #page-stores .challenge-card.mode-hot::before{content:"HOT";color:#111}
-body.user-app #page-stores .challenge-card.mode-challenge::before{content:"BATTLE";color:#777}
-body.user-app #page-stores .challenge-card.is-partner-store::before{content:"QR / PARTNER";color:#111}
-body.user-app #page-stores .challenge-card .store-card-main{
-  min-width:0;
-  gap:13px!important;
-  align-items:center!important;
-}
+body.user-app #page-stores .challenge-card.mode-retake::before{content:"RETAKE";color:var(--bb-ink)}
+body.user-app #page-stores .challenge-card.mode-hot::before{content:"HOT";color:var(--bb-signal)}
+body.user-app #page-stores .challenge-card.mode-challenge::before{content:"BATTLE";color:var(--bb-ink)}
+body.user-app #page-stores .challenge-card.is-partner-store::before{content:"QR / PARTNER";color:var(--bb-ink)}
+body.user-app #page-stores .challenge-card .store-card-main{min-width:0;gap:14px!important;align-items:center!important}
 body.user-app #page-stores .challenge-card .store-card-photo{
-  flex:0 0 58px!important;
-  width:58px!important;
-  height:58px!important;
-  border-radius:0!important;
-  border:1px solid #111!important;
-  background:#f2f2ef!important;
+  flex:0 0 64px!important;width:64px!important;height:64px!important;
+  border:1px solid var(--bb-ink)!important;border-radius:0!important;background:#ddd!important;
+  filter:grayscale(.15);
 }
-body.user-app #page-stores .challenge-card .store-card-copy{padding-right:54px;min-width:0}
-body.user-app #page-stores .challenge-card .store-card-title-row{display:block!important;min-width:0}
+body.user-app #page-stores .challenge-card .store-card-copy{min-width:0;padding-right:70px}
+body.user-app #page-stores .challenge-card .store-card-title-row{display:block!important}
 body.user-app #page-stores .challenge-card .store-card-name{
-  display:block;
-  max-width:100%;
-  color:#050505!important;
-  font-size:20px!important;
-  line-height:1!important;
-  font-weight:950!important;
-  letter-spacing:-.045em!important;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
+  display:block;max-width:100%;color:var(--bb-ink)!important;font-size:21px!important;line-height:1!important;font-weight:950!important;letter-spacing:-.045em!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap
 }
-body.user-app #page-stores .challenge-card .store-status-tags{
-  display:flex!important;
-  gap:7px!important;
-  margin-top:7px!important;
-}
+body.user-app #page-stores .challenge-card .store-status-tags{display:flex!important;gap:8px!important;margin-top:7px!important}
 body.user-app #page-stores .challenge-card .store-status-tag{
-  padding:0!important;
-  border:0!important;
-  border-radius:0!important;
-  background:transparent!important;
-  color:#777!important;
-  font-size:8px!important;
-  line-height:1!important;
-  font-weight:900!important;
-  letter-spacing:.11em!important;
+  padding:0!important;border:0!important;border-radius:0!important;background:transparent!important;color:var(--bb-muted)!important;font-size:8px!important;font-weight:900!important;letter-spacing:.09em!important
 }
+body.user-app #page-stores .challenge-card .store-status-tag.partner,
+body.user-app #page-stores .challenge-card .store-status-tag.benefit,
+body.user-app #page-stores .challenge-card .store-status-tag.open{color:var(--bb-ink)!important}
 body.user-app #page-stores .challenge-card .store-card-meta,
-body.user-app #page-stores .challenge-card .store-card-status{
-  margin-top:6px!important;
-  color:#777!important;
-  font-size:10px!important;
-  line-height:1.25!important;
-  font-weight:700!important;
-}
+body.user-app #page-stores .challenge-card .store-card-status{margin-top:6px!important;color:var(--bb-muted)!important;font-size:10px!important;line-height:1.25!important;font-weight:700!important}
 body.user-app #page-stores .challenge-card .store-list-action{
-  align-self:end!important;
-  min-width:auto!important;
-  height:auto!important;
-  min-height:0!important;
-  margin:0!important;
-  padding:0 0 2px!important;
-  border:0!important;
-  border-radius:0!important;
-  background:transparent!important;
-  color:#050505!important;
-  font-size:10px!important;
-  line-height:1!important;
-  font-weight:950!important;
-  letter-spacing:.04em!important;
-  white-space:nowrap;
+  align-self:center!important;min-width:74px!important;min-height:38px!important;height:38px!important;margin:0!important;padding:0 10px!important;border:1px solid var(--bb-ink)!important;border-radius:0!important;background:transparent!important;color:var(--bb-ink)!important;font-size:9px!important;font-weight:950!important;letter-spacing:.04em!important
 }
-body.user-app #page-stores .challenge-card .store-list-action.is-primary{
-  padding:9px 11px!important;
-  background:#050505!important;
-  color:#fff!important;
-}
-body.user-app #page-stores .challenge-card .store-list-action.is-live{
-  font-size:22px!important;
-  letter-spacing:-.04em!important;
-  font-variant-numeric:tabular-nums;
-}
+body.user-app #page-stores .challenge-card .store-list-action.is-primary{background:var(--bb-ink)!important;color:#fff!important}
+body.user-app #page-stores .challenge-card .store-list-action.is-live{min-width:82px!important;font-size:17px!important;letter-spacing:-.04em!important;font-variant-numeric:tabular-nums}
 
-/* full-screen takeover: a live score board */
-.takeover-screen{
-  position:fixed;
-  inset:0;
-  z-index:10050;
-  display:flex;
-  align-items:stretch;
-  justify-content:stretch;
-  background:#050505;
-  color:#fff;
+/* ---------- ranking ---------- */
+body.user-app #page-rank .page-meter{
+  margin:0 0 28px;
+  padding:0 0 20px;
+  border-bottom:1px solid var(--bb-line);
 }
+body.user-app #page-rank .page-meter-row span{color:var(--bb-muted)}
+body.user-app #page-rank .page-meter-row strong{font-size:18px;color:var(--bb-ink);font-weight:950}
+body.user-app #page-rank .page-meter-track{height:4px;background:#d9d9d3}
+body.user-app #page-rank .page-meter-track span{background:var(--bb-ink)}
+body.user-app #page-rank .rank-tabs{
+  gap:24px;margin:0;border-bottom:1px solid var(--bb-ink);
+}
+body.user-app #page-rank .rank-tabs .chip{
+  min-height:42px;padding:0;border:0!important;border-radius:0!important;background:transparent!important;color:#999993!important;font-size:10px;font-weight:850;
+}
+body.user-app #page-rank .rank-tabs .chip.active{color:var(--bb-ink)!important;border-bottom:3px solid var(--bb-ink)!important}
+body.user-app #page-rank .rank-list{border-top:0}
+body.user-app #page-rank .rank-card{
+  min-height:78px;padding:15px 0!important;border-bottom:1px solid var(--bb-line)!important;background:transparent!important;color:var(--bb-ink)!important;
+}
+body.user-app #page-rank .rank-number{font-size:24px!important;line-height:1;font-weight:950!important;letter-spacing:-.06em;color:var(--bb-ink)!important}
+body.user-app #page-rank .rank-card strong{color:var(--bb-ink)!important;font-size:15px!important;font-weight:900!important}
+body.user-app #page-rank .rank-card p{color:var(--bb-muted)!important}
+body.user-app #page-rank .rank-result b{color:var(--bb-ink)!important;font-size:20px!important;font-weight:950!important}
+body.user-app #page-rank .rank-result span{color:var(--bb-muted)!important;font-size:8px!important;letter-spacing:.1em}
+
+/* ---------- profile / crew ---------- */
+.profile-page-head{margin-bottom:20px!important}
+body.user-app .profile-identity{
+  grid-template-columns:82px minmax(0,1fr) auto!important;
+  gap:16px!important;
+  padding:0 0 22px!important;
+  border-bottom:1px solid var(--bb-ink)!important;
+}
+body.user-app .profile-identity .avatar{
+  width:82px!important;height:82px!important;min-width:82px!important;
+  border:1px solid var(--bb-ink)!important;border-radius:0!important;background:#deded8!important;
+}
+body.user-app .profile-identity .avatar img,
+body.user-app .profile-identity .avatar .profile-fallback{border-radius:0!important}
+body.user-app .profile-identity h3{color:var(--bb-ink)!important;font-size:31px!important;line-height:.95!important;font-weight:950!important;letter-spacing:-.055em!important}
+body.user-app .profile-subline{color:var(--bb-muted)!important}
+body.user-app .profile-actions{padding:11px 0 20px!important;border-bottom:1px solid var(--bb-line)}
+body.user-app .profile-actions .text-btn{color:var(--bb-ink)!important;text-decoration:underline;text-underline-offset:4px}
+body.user-app .profile-guest-info{
+  margin:0!important;padding:0!important;border-bottom:1px solid var(--bb-ink)!important;background:transparent!important;
+  display:grid!important;grid-template-columns:1fr 1fr!important;
+}
+body.user-app .profile-guest-info>div{min-height:84px;padding:15px 12px 15px 0!important;border:0!important}
+body.user-app .profile-guest-info>div+div{padding-left:14px!important;border-left:1px solid var(--bb-line)!important}
+body.user-app .profile-guest-info span{color:var(--bb-muted)!important;font-size:8px!important;letter-spacing:.12em;text-transform:uppercase}
+body.user-app .profile-guest-info strong{margin-top:11px!important;color:var(--bb-ink)!important;font-size:13px!important}
+body.user-app #page-profile .profile-game-stats{
+  display:grid!important;grid-template-columns:repeat(3,1fr)!important;
+  margin:0 0 34px!important;border-top:0!important;border-bottom:2px solid var(--bb-ink)!important;
+}
+body.user-app #page-profile .profile-game-stats .stat-card{
+  min-height:116px;padding:18px 10px 16px 0!important;border:0!important;background:transparent!important;
+}
+body.user-app #page-profile .profile-game-stats .stat-card+.stat-card{padding-left:14px!important;border-left:1px solid var(--bb-line)!important}
+body.user-app #page-profile .profile-game-stats .stat-card b{color:var(--bb-ink)!important;font-size:34px!important;line-height:.9!important;font-weight:950!important;letter-spacing:-.055em}
+body.user-app #page-profile .profile-game-stats .stat-card span{margin-top:12px!important;color:var(--bb-muted)!important;font-size:8px!important;font-weight:850;letter-spacing:.11em;text-transform:uppercase}
+
+body.user-app .organization-panel,
+body.user-app .crew-panel{
+  margin:0 0 34px!important;padding:0!important;border:0!important;border-top:2px solid var(--bb-ink)!important;border-bottom:1px solid var(--bb-ink)!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;
+}
+body.user-app .crew-panel .organization-panel-head{
+  min-height:112px;padding:17px 0!important;display:flex!important;align-items:center!important;gap:15px;border-bottom:1px solid var(--bb-line);
+}
+body.user-app .crew-profile-avatar{
+  width:66px!important;height:66px!important;flex:0 0 66px;border:1px solid var(--bb-ink)!important;border-radius:0!important;background:#ddd!important;
+}
+body.user-app .crew-profile-copy span{color:var(--bb-muted)!important;font-size:8px!important;font-weight:900;letter-spacing:.14em;text-transform:uppercase}
+body.user-app .crew-profile-copy strong{margin-top:7px;color:var(--bb-ink)!important;font-size:25px!important;line-height:.95;font-weight:950!important;letter-spacing:-.045em}
+body.user-app .organization-stats{
+  margin:0!important;display:grid!important;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--bb-line);
+}
+body.user-app .organization-stats>div{min-height:80px;padding:14px 0!important}
+body.user-app .organization-stats>div+div{padding-left:15px!important;border-left:1px solid var(--bb-line)}
+body.user-app .organization-stats span{color:var(--bb-muted)!important;font-size:8px!important;letter-spacing:.12em;text-transform:uppercase}
+body.user-app .organization-stats strong{margin-top:9px!important;color:var(--bb-ink)!important;font-size:26px!important;font-weight:950!important}
+body.user-app .crew-actions{margin:0!important;padding:14px 0!important;gap:8px!important}
+body.user-app .profile-record-section{margin:0 0 34px!important}
+body.user-app .profile-record-section .section-head{
+  margin:0;padding:13px 0;border-top:2px solid var(--bb-ink);border-bottom:1px solid var(--bb-line);align-items:baseline;
+}
+body.user-app .profile-record-section .section-head h3{color:var(--bb-ink)!important;font-size:19px!important;font-weight:950!important}
+body.user-app .profile-record-section .section-head small{color:var(--bb-muted)!important;font-size:9px!important}
+body.user-app .activity-list,
+body.user-app .visit-log{border-top:0!important}
+body.user-app .timeline-item,
+body.user-app .visit-card{color:var(--bb-ink)!important;border-bottom:1px solid var(--bb-line)!important;background:transparent!important}
+
+body.user-app .profile-settings{margin-top:24px!important;border-top:2px solid var(--bb-ink)!important}
+body.user-app .profile-setting-row{
+  min-height:56px!important;border-bottom:1px solid var(--bb-line)!important;color:var(--bb-ink)!important;font-size:12px!important;font-weight:800;
+}
+body.user-app .profile-setting-row>span:last-child{color:#999993!important}
+
+/* ---------- store detail: editorial match sheet ---------- */
+body.user-app:not(.home-active) .modal{background:rgba(0,0,0,.52)}
+body.user-app:not(.home-active) .modal-card{
+  width:min(100%,680px);
+  max-height:92dvh;
+  padding:24px 20px calc(30px + var(--safe-bottom));
+  border-top:2px solid var(--bb-ink);
+  border-radius:0!important;
+  background:var(--bb-paper)!important;
+  color:var(--bb-ink)!important;
+}
+body.user-app:not(.home-active) .modal-card>h3,
+body.user-app:not(.home-active) .modal-head h3{color:var(--bb-ink)!important;font-size:20px!important;font-weight:950!important}
+body.user-app:not(.home-active) .x-btn,
+body.user-app:not(.home-active) .modal-close{color:var(--bb-ink)!important}
+body.user-app .store-detail-identity{
+  grid-template-columns:minmax(0,1fr) auto!important;
+  padding:18px 0 22px!important;
+  border-top:2px solid var(--bb-ink)!important;
+  border-bottom:1px solid var(--bb-ink)!important;
+}
+body.user-app .store-detail-avatar{border-radius:0!important;border:1px solid var(--bb-ink)!important}
+body.user-app .store-detail-identity-copy>strong{color:var(--bb-ink)!important;font-size:31px!important;line-height:.94!important;font-weight:950!important;letter-spacing:-.055em!important}
+body.user-app .store-detail-address{color:var(--bb-muted)!important}
+body.user-app .store-detail-section,
+body.user-app .store-detail-subsection{border-color:var(--bb-line)!important}
+body.user-app .store-detail-section h3,
+body.user-app .subsection-title{color:var(--bb-ink)!important}
+body.user-app .store-status-tag{border:0!important;border-radius:0!important;background:transparent!important;color:var(--bb-muted)!important}
+body.user-app .store-status-tag.partner,
+body.user-app .store-status-tag.benefit,
+body.user-app .store-status-tag.open{color:var(--bb-signal)!important}
+body.user-app .store-arena{
+  margin-top:20px!important;padding:0!important;border:0!important;border-top:2px solid var(--bb-ink)!important;border-bottom:1px solid var(--bb-ink)!important;border-radius:0!important;background:transparent!important;
+}
+body.user-app .store-arena-head{padding:15px 0!important;border-bottom:1px solid var(--bb-line)}
+body.user-app .store-arena-grid{background:transparent!important}
+body.user-app .store-arena-grid>div{border-color:var(--bb-line)!important}
+body.user-app .store-arena-grid strong,
+body.user-app .store-arena-crew strong{color:var(--bb-ink)!important}
+body.user-app .store-arena-grid span,
+body.user-app .store-arena-crew span{color:var(--bb-muted)!important}
+
+/* ---------- full-screen takeover: scoreboard ---------- */
+.takeover-screen{position:fixed;inset:0;z-index:10050;display:flex;background:#050505;color:#fff}
 .takeover-screen.hidden{display:none}
 .takeover-screen-inner{
-  width:100%;
-  min-height:100%;
-  padding:max(24px,env(safe-area-inset-top)) clamp(18px,4vw,34px) max(22px,env(safe-area-inset-bottom));
-  display:grid;
-  grid-template-rows:auto auto minmax(0,1fr) auto;
-  box-sizing:border-box;
+  width:100%;min-height:100%;padding:max(24px,env(safe-area-inset-top)) clamp(18px,4vw,34px) max(22px,env(safe-area-inset-bottom));
+  display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;box-sizing:border-box;
 }
-.takeover-topline{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  padding-bottom:14px;
-  border-bottom:1px solid #303030;
-  color:#777;
-  font-size:9px;
-  line-height:1;
-  font-weight:950;
-  letter-spacing:.19em;
-}
-.takeover-topline span:last-child{
-  position:relative;
-  padding-left:13px;
-  color:#fff;
-}
-.takeover-topline span:last-child::before{
-  content:"";
-  position:absolute;
-  left:0;
-  top:50%;
-  width:5px;
-  height:5px;
-  margin-top:-2.5px;
-  background:#fff;
-  border-radius:50%;
-}
+.takeover-topline{display:flex;justify-content:space-between;align-items:center;padding-bottom:13px;border-bottom:1px solid #2d2d2d;color:#777;font-size:8px;font-weight:950;letter-spacing:.18em}
+.takeover-topline span:last-child{position:relative;padding-left:13px;color:#fff}
+.takeover-topline span:last-child::before{content:"";position:absolute;left:0;top:50%;width:5px;height:5px;margin-top:-2.5px;background:#fff;border-radius:50%}
 .takeover-title-block{padding-top:18px}
-.takeover-eyebrow{
-  display:block;
-  color:#8a8a8a;
-  font-size:10px;
-  line-height:1;
-  font-weight:950;
-  letter-spacing:.17em;
-}
-.takeover-store-name{
-  display:block;
-  margin-top:8px;
-  max-width:100%;
-  font-size:clamp(30px,7vw,52px);
-  line-height:.94;
-  font-weight:950;
-  letter-spacing:-.06em;
-  overflow-wrap:anywhere;
-}
-.takeover-count-wrap{
-  min-height:0;
-  display:flex;
-  flex-direction:column;
-  justify-content:center;
-  padding:24px 0 26px;
-}
-.takeover-count-meta{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  margin-bottom:18px;
-  color:#666;
-  font-size:9px;
-  font-weight:950;
-  letter-spacing:.17em;
-}
-.takeover-count{
-  width:100%;
-  margin-left:-.035em;
-  font-size:clamp(112px,34vw,238px);
-  line-height:.69;
-  font-weight:950;
-  letter-spacing:-.105em;
-  font-variant-numeric:tabular-nums;
-  white-space:nowrap;
-  text-align:left;
-}
-.takeover-count-rule{
-  width:100%;
-  height:1px;
-  margin-top:26px;
-  background:#303030;
-}
-.takeover-count.is-hold{opacity:.2}
-.takeover-screen[data-status="hold"] .takeover-count-rule,
-.takeover-screen[data-status="outside"] .takeover-count-rule,
-.takeover-screen[data-status="low_accuracy"] .takeover-count-rule{background:#fff}
+.takeover-eyebrow{display:block;color:#777;font-size:9px;font-weight:950;letter-spacing:.17em}
+.takeover-store-name{display:block;margin-top:8px;max-width:100%;font-size:clamp(30px,7vw,54px);line-height:.91;font-weight:950;letter-spacing:-.06em;overflow-wrap:anywhere}
+.takeover-count-wrap{min-height:0;display:flex;flex-direction:column;justify-content:center;padding:26px 0}
+.takeover-count-meta{display:flex;justify-content:space-between;margin-bottom:20px;color:#666;font-size:8px;font-weight:950;letter-spacing:.17em}
+.takeover-count{width:100%;margin-left:-.035em;font-size:clamp(118px,35vw,246px);line-height:.67;font-weight:950;letter-spacing:-.105em;font-variant-numeric:tabular-nums;white-space:nowrap;text-align:left}
+.takeover-count-rule{width:100%;height:2px;margin-top:28px;background:#fff}
+.takeover-count.is-hold{opacity:.22}
 .takeover-count.is-final{animation:bitebossFinalSecond .8s steps(1,end) infinite}
-.takeover-bottom{align-self:end}
-.takeover-bottom-grid{
-  display:grid;
-  grid-template-columns:minmax(0,1fr) auto;
-  gap:18px;
-  align-items:end;
-  margin-bottom:16px;
-}
-.takeover-status{
-  margin:0;
-  max-width:36rem;
-  font-size:15px;
-  line-height:1.3;
-  font-weight:850;
-  letter-spacing:-.025em;
-}
-.takeover-live-mark{
-  color:#666;
-  font-size:8px;
-  line-height:1;
-  font-weight:950;
-  letter-spacing:.16em;
-  white-space:nowrap;
-}
-.takeover-progress{
-  width:100%;
-  height:2px;
-  background:#2c2c2c;
-  overflow:hidden;
-}
-.takeover-progress>span{
-  display:block;
-  width:0;
-  height:100%;
-  background:#fff;
-  transition:width .2s linear;
-}
-.takeover-signal-row{
-  display:flex;
-  justify-content:space-between;
-  gap:12px;
-  padding-top:12px;
-  color:#5f5f5f;
-  font-size:8px;
-  font-weight:950;
-  letter-spacing:.13em;
-}
-.takeover-cancel{
-  margin-top:22px;
-  min-height:44px;
-  padding:0;
-  border:0;
-  background:transparent;
-  color:#777;
-  font:850 12px/1 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-  text-align:left;
-}
+.takeover-bottom-grid{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:end;margin-bottom:14px}
+.takeover-status{margin:0;max-width:36rem;font-size:15px;line-height:1.3;font-weight:850;letter-spacing:-.025em}
+.takeover-live-mark{color:#666;font-size:8px;font-weight:950;letter-spacing:.16em;white-space:nowrap}
+.takeover-progress{width:100%;height:4px;background:#252525;overflow:hidden}
+.takeover-progress>span{display:block;width:0;height:100%;background:#fff;transition:width .2s linear}
+.takeover-signal-row{display:flex;justify-content:space-between;gap:12px;padding-top:11px;color:#606060;font-size:7px;font-weight:950;letter-spacing:.13em}
+.takeover-cancel{margin-top:20px;min-height:44px;padding:0;border:0;background:transparent;color:#777;font:850 11px/1 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;text-align:left}
 body.takeover-active{overflow:hidden;touch-action:none}
 @keyframes bitebossFinalSecond{50%{opacity:.26}}
 
-.conquest-history-list{border-top:1px solid #111}
-.conquest-history-list>div{
-  min-height:60px;
-  display:grid;
-  grid-template-columns:minmax(68px,.75fr) minmax(0,1.6fr) auto;
-  align-items:center;
-  gap:12px;
-  border-bottom:1px solid #deded9;
-}
-.conquest-history-list span,.conquest-history-list small{font-size:10px;color:#777;font-weight:800}
-.conquest-history-list strong{
-  min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-  font-size:15px;font-weight:950;letter-spacing:-.025em;
-}
+/* ---------- history ---------- */
+.conquest-history-list{border-top:2px solid var(--bb-ink)}
+.conquest-history-list>div{min-height:64px;display:grid;grid-template-columns:minmax(68px,.75fr) minmax(0,1.6fr) auto;align-items:center;gap:12px;border-bottom:1px solid var(--bb-line)}
+.conquest-history-list span,.conquest-history-list small{font-size:9px;color:var(--bb-muted);font-weight:800}
+.conquest-history-list strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--bb-ink);font-size:15px;font-weight:950;letter-spacing:-.025em}
 
 @media (hover:hover) and (pointer:fine){
-  body.user-app #page-stores .challenge-card:hover{background:#f7f7f5!important}
-  .game-pulse>button:hover{background:#f7f7f5}
+  body.user-app:not(.home-active) .primary-btn:hover,
+  body.user-app:not(.home-active) .crew-primary-action:hover{background:#222!important}
+  body.user-app #page-stores .challenge-card:hover{background:#e9e9e4!important}
+  .game-pulse>button:hover{background:#e9e9e4}
 }
-@media (prefers-reduced-motion:reduce){
-  .takeover-count.is-final{animation:none}
-  .takeover-progress>span{transition:none}
-}
-@media (max-width:640px){
-  .challenge-head{grid-template-columns:1fr;gap:16px;margin-bottom:18px}
-  .challenge-head h2{font-size:56px!important}
-  .challenge-head p{max-width:28rem;text-align:left}
-  .takeover-command{
-    grid-template-columns:52px minmax(0,1fr) 82px;
-    grid-template-rows:auto auto;
-  }
-  .takeover-command-index{grid-row:1/3;min-height:0;padding:14px 10px!important;font-size:20px}
-  .takeover-command-primary{grid-column:2/4;min-height:124px!important;border-bottom:1px solid #2b2b2b}
-  .takeover-command>div:not(.takeover-command-index){min-height:82px;padding:14px 12px}
+@media (prefers-reduced-motion:reduce){.takeover-count.is-final{animation:none}.takeover-progress>span{transition:none}}
+
+@media(max-width:640px){
+  body.user-app:not(.home-active) .inner-page{padding-left:16px;padding-right:16px}
+  body.user-app:not(.home-active) .inner-head h2,.challenge-head h2{font-size:52px!important}
+  .takeover-command{grid-template-columns:46px minmax(0,1fr) 78px;grid-template-rows:auto auto}
+  .takeover-command-index{grid-row:1/3;min-height:0;padding:13px 9px!important;font-size:19px}
+  .takeover-command-primary{grid-column:2/4;min-height:116px!important;border-bottom:1px solid var(--bb-ink)}
+  .takeover-command>div:not(.takeover-command-index){min-height:76px;padding:13px 11px}
   .takeover-command>div:nth-child(3){border-left:0!important}
-  .takeover-command-primary strong{font-size:30px;padding-top:24px}
-  .takeover-command-stat strong{font-size:25px}
+  .takeover-command-primary strong{font-size:28px;padding-top:22px}
+  .takeover-command-stat strong{font-size:23px}
   .game-pulse{grid-template-columns:1fr}
-  .game-pulse>button,.game-pulse-info{
-    min-height:100px;padding:15px 0;border-right:0;border-bottom:1px solid #deded9
-  }
-  .game-pulse>*:nth-child(even){padding-left:0}
-  .game-pulse>*:last-child{border-bottom:0}
-  .game-pulse strong,.game-pulse-info strong{font-size:19px;padding-top:15px}
-  body.user-app #page-stores .challenge-card{min-height:88px;padding:15px 0!important}
-  body.user-app #page-stores .challenge-card .store-card-photo{flex-basis:52px!important;width:52px!important;height:52px!important}
-  body.user-app #page-stores .challenge-card .store-card-name{font-size:18px!important}
-  body.user-app #page-stores .challenge-card .store-card-copy{padding-right:45px}
-  .takeover-bottom-grid{grid-template-columns:1fr;gap:8px}
-  .takeover-live-mark{display:none}
-  .takeover-count{font-size:clamp(104px,33vw,176px)}
-  .takeover-signal-row{font-size:7px;letter-spacing:.09em}
+  .game-pulse>button,.game-pulse-info{min-height:94px;padding:14px 0;border-right:0;border-bottom:1px solid var(--bb-line)}
+  .game-pulse>*:nth-child(even){padding-left:0}.game-pulse>*:last-child{border-bottom:0}
+  body.user-app #page-stores .challenge-card{min-height:96px;padding:15px 0!important;gap:10px!important}
+  body.user-app #page-stores .challenge-card .store-card-photo{flex-basis:56px!important;width:56px!important;height:56px!important}
+  body.user-app #page-stores .challenge-card .store-card-name{font-size:19px!important}
+  body.user-app #page-stores .challenge-card .store-card-copy{padding-right:58px}
+  body.user-app #page-stores .challenge-card .store-list-action{min-width:66px!important;padding:0 8px!important}
+  body.user-app .profile-identity{grid-template-columns:72px minmax(0,1fr) auto!important}
+  body.user-app .profile-identity .avatar{width:72px!important;height:72px!important;min-width:72px!important}
+  body.user-app .profile-identity h3{font-size:27px!important}
+  body.user-app #page-profile .profile-game-stats .stat-card b{font-size:29px!important}
+  .takeover-bottom-grid{grid-template-columns:1fr;gap:8px}.takeover-live-mark{display:none}
+  .takeover-count{font-size:clamp(108px,34vw,180px)}
 }
 @media(max-width:360px){
-  .takeover-command{grid-template-columns:44px minmax(0,1fr) 72px}
-  .takeover-command-primary strong{font-size:26px}
-  .takeover-command-stat strong{font-size:22px}
-  body.user-app #page-stores .challenge-card .store-card-photo{flex-basis:48px!important;width:48px!important;height:48px!important}
+  .takeover-command{grid-template-columns:42px minmax(0,1fr) 70px}
+  .takeover-command-primary strong{font-size:25px}
+  body.user-app #page-stores .challenge-card .store-card-photo{flex-basis:50px!important;width:50px!important;height:50px!important}
+  body.user-app #page-profile .profile-game-stats{grid-template-columns:repeat(3,1fr)!important}
+  body.user-app #page-profile .profile-game-stats .stat-card b{font-size:25px!important}
   .takeover-count{font-size:100px}
 }

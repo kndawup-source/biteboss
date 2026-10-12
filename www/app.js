@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "71.2";
+  const BITEBOSS_BUILD = "72.0";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
 if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;

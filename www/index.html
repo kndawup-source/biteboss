@@ -9,7 +9,7 @@
   <meta property="og:title" content="BiteBoss" />
   <meta property="og:description" content="주변 매장을 발견하고 도전해 보스를 차지하세요." />
   <meta property="og:type" content="website" />
-  <meta name="biteboss-build" content="71.2" />
+  <meta name="biteboss-build" content="72.0" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -18,8 +18,8 @@
   <link rel="preconnect" href="https://imumpyumchvctrpmfngr.supabase.co" crossorigin />
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
   <link rel="preconnect" href="https://unpkg.com" crossorigin />
-  <link rel="manifest" href="./manifest.webmanifest?v=71.2" />
-  <link rel="stylesheet" href="./styles.css?v=71.2" />
+  <link rel="manifest" href="./manifest.webmanifest?v=72.0" />
+  <link rel="stylesheet" href="./styles.css?v=72.0" />
 </head>
 <body class="user-app home-active">
 <div id="app" class="app-shell">
@@ -104,7 +104,7 @@
 
   <main class="page" id="page-rank">
     <section class="inner-page">
-      <div class="inner-head rank-head"><h2>순위</h2><p>보스와 크루의 점령 기록을 확인하세요.</p></div>
+      <div class="inner-head rank-head"><span class="page-kicker">BITEBOSS / RANKING</span><h2>순위</h2><p>보스와 크루의 점령 기록을 확인하세요.</p></div>
       <section class="page-meter" aria-label="다음 레벨 진행">
         <div class="page-meter-row">
           <div><span>다음 레벨까지</span></div>
@@ -139,7 +139,8 @@
 
 
   <main class="page" id="page-profile">
-    <section class="inner-page">
+    <section class="inner-page profile-page">
+      <div class="inner-head profile-page-head"><span class="page-kicker">BITEBOSS / PLAYER</span><h2>프로필</h2><p>점령 기록과 크루 활동을 한 화면에서 관리합니다.</p></div>
       <section class="profile-identity">
         <button id="profileAvatarButton" class="avatar profile-photo-btn" type="button" aria-label="프로필 사진 변경">
           <img id="profilePhoto" src="" alt="" />
@@ -163,7 +164,6 @@
       <section id="profileGameStats" class="grid two profile-game-stats" aria-label="내 기록">
         <article class="stat-card"><b id="myLevel">Lv 1</b><span>레벨</span></article>
         <article class="stat-card"><b id="myBossCount">0</b><span>보스</span></article>
-        <article class="stat-card"><b id="myCrewCount">0</b><span>크루</span></article>
         <article class="stat-card"><b id="myCheckinCount">0</b><span>유효 방문</span></article>
       </section>
 
@@ -262,6 +262,6 @@
   </div>
 </div>
 
-<script src="./bootstrap.js?v=71.2"></script>
+<script src="./bootstrap.js?v=72.0"></script>
 </body>
 </html>

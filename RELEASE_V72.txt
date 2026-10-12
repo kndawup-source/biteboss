@@ -1,0 +1,23 @@
+BiteBoss v72.0 — Editorial Game UI
+
+UI scope
+- Rebuilt user-facing visual system around paper/ink editorial hierarchy.
+- Replaced rounded/home CTAs with squared high-contrast game controls.
+- Reworked bottom navigation into a thinner utility rail.
+- Reworked challenge command board and target rows.
+- Reworked ranking hierarchy and tabs.
+- Reworked profile identity, stats, crew, records, settings.
+- Removed the redundant profile Crew count statistic (one active crew membership model).
+- Reworked store detail modal/action styling.
+- Preserved v71 takeover/RETAKE/HOT/partner QR/GPS/server-timer game logic.
+- Cache/build version bumped to 72.0.
+
+Quality
+- npm run quality: PASS
+- Node tests: 14/14 PASS
+- Mutation: 4/4 killed (100%)
+- Preflight: PASS
+
+Notes
+- Existing Supabase migration remains valid; do not re-run/reset DB for this UI release.
+- Vercel environment variables remain external to the repository.
