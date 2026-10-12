@@ -7924,87 +7924,315 @@ body.user-app .crew-profile-detail .organization-detail-section{
 }
 
 /* ============================================================
-   BiteBoss v71.1 — game loop / takeover UI
-   Canonical block. No feature overrides below this section.
+   BiteBoss v71.2 — Editorial live territory system
+   Canonical game UI. Black / white, no decorative cards.
    ============================================================ */
+.challenge-page{
+  --game-ink:#050505;
+  --game-paper:#f7f7f5;
+  --game-line:#d8d8d4;
+  --game-muted:#747474;
+}
 .challenge-head{
   display:grid;
-  grid-template-columns:minmax(0,1fr) minmax(180px,.7fr);
-  gap:24px;
+  grid-template-columns:minmax(0,1fr) minmax(220px,.72fr);
+  gap:32px;
   align-items:end;
+  margin-bottom:22px;
+  padding-bottom:18px;
+  border-bottom:1px solid #111;
 }
-.challenge-head>div{min-width:0}
+.challenge-head-title{min-width:0}
 .challenge-kicker{
   display:block;
-  margin:0 0 8px;
-  font-size:10px;
+  margin:0 0 12px;
+  color:#777;
+  font-size:9px;
   line-height:1;
   font-weight:900;
-  letter-spacing:.16em;
+  letter-spacing:.19em;
 }
-.challenge-head h2{margin:0}
+.challenge-head h2{
+  margin:0;
+  font-size:clamp(48px,8vw,78px)!important;
+  line-height:.78!important;
+  font-weight:950!important;
+  letter-spacing:-.075em!important;
+}
 .challenge-head p{
-  margin:0 0 2px;
-  max-width:28rem;
-  color:var(--muted);
+  margin:0 0 1px;
+  max-width:32rem;
+  color:#676767;
   font-size:12px;
-  line-height:1.45;
+  line-height:1.5;
   text-align:right;
 }
 .takeover-command{
+  position:relative;
   display:grid;
-  grid-template-columns:minmax(0,1.8fr) minmax(92px,.55fr) minmax(92px,.55fr);
-  margin:20px 0 18px;
-  border-top:1px solid #000;
-  border-bottom:1px solid #000;
-  background:#000;
+  grid-template-columns:72px minmax(0,1.8fr) minmax(96px,.5fr) minmax(112px,.58fr);
+  margin:0 0 12px;
+  border:1px solid #0a0a0a;
+  background:#050505;
   color:#fff;
+  overflow:hidden;
 }
-.takeover-command>div{
+.takeover-command-index{
+  min-height:154px;
+  padding:17px 14px!important;
+  display:flex!important;
+  align-items:flex-end!important;
+  justify-content:flex-start!important;
+  border-right:1px solid #2b2b2b;
+  color:#5c5c5c;
+  font-size:26px;
+  line-height:.85;
+  font-weight:950;
+  letter-spacing:-.06em;
+  font-variant-numeric:tabular-nums;
+}
+.takeover-command>div:not(.takeover-command-index){
   min-width:0;
-  min-height:118px;
-  padding:16px 14px;
+  min-height:154px;
+  padding:17px 16px;
   display:flex;
   flex-direction:column;
   justify-content:space-between;
   box-sizing:border-box;
 }
-.takeover-command>div+div{border-left:1px solid #2b2b2b}
+.takeover-command>div+div:not(.takeover-command-primary){border-left:1px solid #2b2b2b}
 .takeover-command span{
-  color:#8d8d8d;
+  color:#777;
   font-size:9px;
-  font-weight:900;
-  letter-spacing:.14em;
+  line-height:1;
+  font-weight:950;
+  letter-spacing:.16em;
 }
 .takeover-command-primary strong{
   margin-top:auto;
-  padding-top:22px;
+  padding-top:34px;
   color:#fff;
-  font-size:24px;
-  line-height:1;
+  font-size:clamp(28px,4.4vw,42px);
+  line-height:.9;
   font-weight:950;
-  letter-spacing:-.045em;
+  letter-spacing:-.06em;
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
 }
 .takeover-command-primary small,
 .takeover-command-stat small{
-  margin-top:7px;
-  color:#858585;
+  margin-top:9px;
+  color:#777;
   font-size:10px;
-  line-height:1.3;
-  font-weight:700;
+  line-height:1.25;
+  font-weight:750;
 }
 .takeover-command-stat strong{
   margin-top:auto;
   color:#fff;
-  font-size:30px;
-  line-height:.9;
+  font-size:34px;
+  line-height:.82;
   font-weight:950;
-  letter-spacing:-.05em;
+  letter-spacing:-.06em;
+  font-variant-numeric:tabular-nums;
+  white-space:nowrap;
+}
+.challenge-login-note{
+  margin:0!important;
+  padding:11px 0 13px!important;
+  border-bottom:1px solid var(--game-line)!important;
+  color:#666!important;
+  font-size:11px!important;
+}
+.challenge-search{
+  margin:0!important;
+  padding:18px 0 12px;
+  border-bottom:1px solid #111;
+}
+.challenge-search .input{
+  height:50px!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  color:#000!important;
+  font-size:18px!important;
+  font-weight:800!important;
+  letter-spacing:-.025em;
+}
+.challenge-search .input::placeholder{color:#aaa}
+.challenge-search .input:focus{outline:0!important}
+
+/* priority actions */
+.game-pulse{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:0;
+  margin:0 0 10px;
+  border-bottom:1px solid #111;
+  background:#fff;
+}
+.game-pulse.hidden{display:none}
+.game-pulse>button,.game-pulse-info{
+  position:relative;
+  min-width:0;
+  min-height:124px;
+  padding:18px 16px 16px 0;
+  border:0;
+  border-radius:0;
+  border-right:1px solid #d8d8d4;
+  background:#fff;
+  color:#000;
+  text-align:left;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+}
+.game-pulse>*:nth-child(even){padding-left:16px;padding-right:0;border-right:0}
+.game-pulse>button{cursor:pointer}
+.game-pulse span,.game-pulse-info span{
+  color:#777;
+  font-size:9px;
+  line-height:1;
+  font-weight:950;
+  letter-spacing:.17em;
+}
+.game-pulse strong,.game-pulse-info strong{
+  margin-top:auto;
+  padding-top:22px;
+  font-size:22px;
+  line-height:.96;
+  font-weight:950;
+  letter-spacing:-.045em;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.game-pulse small,.game-pulse-info small{
+  margin-top:8px;
+  color:#777;
+  font-size:10px;
+  line-height:1.35;
+  font-weight:700;
+}
+
+/* target list becomes an editorial scoreboard, not generic cards */
+body.user-app #page-stores .challenge-store-list{
+  margin:0!important;
+  border-top:0!important;
+}
+body.user-app #page-stores .challenge-card{
+  position:relative;
+  min-height:94px;
+  margin:0!important;
+  padding:17px 0!important;
+  border:0!important;
+  border-bottom:1px solid #d8d8d4!important;
+  border-radius:0!important;
+  background:#fff!important;
+  box-shadow:none!important;
+  grid-template-columns:minmax(0,1fr) auto!important;
+  gap:14px!important;
+  transition:none!important;
+}
+body.user-app #page-stores .challenge-card::before{
+  content:"TAKE";
+  position:absolute;
+  top:18px;
+  right:0;
+  color:#b1b1ad;
+  font-size:8px;
+  line-height:1;
+  font-weight:950;
+  letter-spacing:.15em;
+  pointer-events:none;
+}
+body.user-app #page-stores .challenge-card.mode-retake::before{content:"RETAKE";color:#111}
+body.user-app #page-stores .challenge-card.mode-hot::before{content:"HOT";color:#111}
+body.user-app #page-stores .challenge-card.mode-challenge::before{content:"BATTLE";color:#777}
+body.user-app #page-stores .challenge-card.is-partner-store::before{content:"QR / PARTNER";color:#111}
+body.user-app #page-stores .challenge-card .store-card-main{
+  min-width:0;
+  gap:13px!important;
+  align-items:center!important;
+}
+body.user-app #page-stores .challenge-card .store-card-photo{
+  flex:0 0 58px!important;
+  width:58px!important;
+  height:58px!important;
+  border-radius:0!important;
+  border:1px solid #111!important;
+  background:#f2f2ef!important;
+}
+body.user-app #page-stores .challenge-card .store-card-copy{padding-right:54px;min-width:0}
+body.user-app #page-stores .challenge-card .store-card-title-row{display:block!important;min-width:0}
+body.user-app #page-stores .challenge-card .store-card-name{
+  display:block;
+  max-width:100%;
+  color:#050505!important;
+  font-size:20px!important;
+  line-height:1!important;
+  font-weight:950!important;
+  letter-spacing:-.045em!important;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+body.user-app #page-stores .challenge-card .store-status-tags{
+  display:flex!important;
+  gap:7px!important;
+  margin-top:7px!important;
+}
+body.user-app #page-stores .challenge-card .store-status-tag{
+  padding:0!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  color:#777!important;
+  font-size:8px!important;
+  line-height:1!important;
+  font-weight:900!important;
+  letter-spacing:.11em!important;
+}
+body.user-app #page-stores .challenge-card .store-card-meta,
+body.user-app #page-stores .challenge-card .store-card-status{
+  margin-top:6px!important;
+  color:#777!important;
+  font-size:10px!important;
+  line-height:1.25!important;
+  font-weight:700!important;
+}
+body.user-app #page-stores .challenge-card .store-list-action{
+  align-self:end!important;
+  min-width:auto!important;
+  height:auto!important;
+  min-height:0!important;
+  margin:0!important;
+  padding:0 0 2px!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  color:#050505!important;
+  font-size:10px!important;
+  line-height:1!important;
+  font-weight:950!important;
+  letter-spacing:.04em!important;
+  white-space:nowrap;
+}
+body.user-app #page-stores .challenge-card .store-list-action.is-primary{
+  padding:9px 11px!important;
+  background:#050505!important;
+  color:#fff!important;
+}
+body.user-app #page-stores .challenge-card .store-list-action.is-live{
+  font-size:22px!important;
+  letter-spacing:-.04em!important;
   font-variant-numeric:tabular-nums;
 }
+
+/* full-screen takeover: a live score board */
 .takeover-screen{
   position:fixed;
   inset:0;
@@ -8012,14 +8240,14 @@ body.user-app .crew-profile-detail .organization-detail-section{
   display:flex;
   align-items:stretch;
   justify-content:stretch;
-  background:#000;
+  background:#050505;
   color:#fff;
 }
 .takeover-screen.hidden{display:none}
 .takeover-screen-inner{
   width:100%;
   min-height:100%;
-  padding:max(26px,env(safe-area-inset-top)) 22px max(24px,env(safe-area-inset-bottom));
+  padding:max(24px,env(safe-area-inset-top)) clamp(18px,4vw,34px) max(22px,env(safe-area-inset-bottom));
   display:grid;
   grid-template-rows:auto auto minmax(0,1fr) auto;
   box-sizing:border-box;
@@ -8029,30 +8257,46 @@ body.user-app .crew-profile-detail .organization-detail-section{
   justify-content:space-between;
   align-items:center;
   padding-bottom:14px;
-  border-bottom:1px solid #2a2a2a;
-  color:#8e8e8e;
-  font-size:10px;
+  border-bottom:1px solid #303030;
+  color:#777;
+  font-size:9px;
   line-height:1;
-  font-weight:900;
-  letter-spacing:.16em;
+  font-weight:950;
+  letter-spacing:.19em;
 }
-.takeover-topline span:last-child{color:#fff}
+.takeover-topline span:last-child{
+  position:relative;
+  padding-left:13px;
+  color:#fff;
+}
+.takeover-topline span:last-child::before{
+  content:"";
+  position:absolute;
+  left:0;
+  top:50%;
+  width:5px;
+  height:5px;
+  margin-top:-2.5px;
+  background:#fff;
+  border-radius:50%;
+}
 .takeover-title-block{padding-top:18px}
 .takeover-eyebrow{
   display:block;
-  font-size:12px;
+  color:#8a8a8a;
+  font-size:10px;
   line-height:1;
-  font-weight:900;
-  letter-spacing:.14em;
+  font-weight:950;
+  letter-spacing:.17em;
 }
 .takeover-store-name{
   display:block;
-  margin-top:10px;
+  margin-top:8px;
   max-width:100%;
-  font-size:clamp(28px,8vw,46px);
-  line-height:.98;
+  font-size:clamp(30px,7vw,52px);
+  line-height:.94;
   font-weight:950;
-  letter-spacing:-.05em;
+  letter-spacing:-.06em;
   overflow-wrap:anywhere;
 }
 .takeover-count-wrap{
@@ -8060,40 +8304,68 @@ body.user-app .crew-profile-detail .organization-detail-section{
   display:flex;
   flex-direction:column;
   justify-content:center;
-  padding:34px 0 28px;
+  padding:24px 0 26px;
 }
-.takeover-count-label{
-  margin-bottom:14px;
-  color:#747474;
+.takeover-count-meta{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:18px;
+  color:#666;
   font-size:9px;
-  font-weight:900;
-  letter-spacing:.16em;
+  font-weight:950;
+  letter-spacing:.17em;
 }
 .takeover-count{
   width:100%;
-  font-size:clamp(104px,31vw,196px);
-  line-height:.76;
+  margin-left:-.035em;
+  font-size:clamp(112px,34vw,238px);
+  line-height:.69;
   font-weight:950;
-  letter-spacing:-.085em;
+  letter-spacing:-.105em;
   font-variant-numeric:tabular-nums;
   white-space:nowrap;
   text-align:left;
 }
-.takeover-count.is-hold{opacity:.28}
-.takeover-count.is-final{animation:bitebossFinalSecond .9s steps(1,end) infinite}
+.takeover-count-rule{
+  width:100%;
+  height:1px;
+  margin-top:26px;
+  background:#303030;
+}
+.takeover-count.is-hold{opacity:.2}
+.takeover-screen[data-status="hold"] .takeover-count-rule,
+.takeover-screen[data-status="outside"] .takeover-count-rule,
+.takeover-screen[data-status="low_accuracy"] .takeover-count-rule{background:#fff}
+.takeover-count.is-final{animation:bitebossFinalSecond .8s steps(1,end) infinite}
 .takeover-bottom{align-self:end}
+.takeover-bottom-grid{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:18px;
+  align-items:end;
+  margin-bottom:16px;
+}
 .takeover-status{
-  margin:0 0 16px;
-  max-width:34rem;
+  margin:0;
+  max-width:36rem;
   font-size:15px;
-  line-height:1.35;
+  line-height:1.3;
   font-weight:850;
   letter-spacing:-.025em;
 }
+.takeover-live-mark{
+  color:#666;
+  font-size:8px;
+  line-height:1;
+  font-weight:950;
+  letter-spacing:.16em;
+  white-space:nowrap;
+}
 .takeover-progress{
   width:100%;
-  height:3px;
-  background:#292929;
+  height:2px;
+  background:#2c2c2c;
   overflow:hidden;
 }
 .takeover-progress>span{
@@ -8101,17 +8373,17 @@ body.user-app .crew-profile-detail .organization-detail-section{
   width:0;
   height:100%;
   background:#fff;
-  transition:width .25s linear;
+  transition:width .2s linear;
 }
 .takeover-signal-row{
   display:flex;
-  flex-wrap:wrap;
-  gap:7px 16px;
+  justify-content:space-between;
+  gap:12px;
   padding-top:12px;
-  color:#666;
-  font-size:9px;
-  font-weight:900;
-  letter-spacing:.1em;
+  color:#5f5f5f;
+  font-size:8px;
+  font-weight:950;
+  letter-spacing:.13em;
 }
 .takeover-cancel{
   margin-top:22px;
@@ -8120,97 +8392,69 @@ body.user-app .crew-profile-detail .organization-detail-section{
   border:0;
   background:transparent;
   color:#777;
-  font:800 13px/1 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  font:850 12px/1 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
   text-align:left;
 }
 body.takeover-active{overflow:hidden;touch-action:none}
-@keyframes bitebossFinalSecond{50%{opacity:.34}}
-@media (prefers-reduced-motion:reduce){
-  .takeover-count.is-final{animation:none}
-  .takeover-progress>span{transition:none}
-}
-.game-pulse{
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:0;
-  margin:0 0 20px;
-  border-top:1px solid #111;
-  border-bottom:1px solid #111;
-  background:#fff;
-}
-.game-pulse.hidden{display:none}
-.game-pulse>button,.game-pulse-info{
-  min-width:0;
-  min-height:106px;
-  padding:15px 14px;
-  border:0;
-  border-radius:0;
-  border-right:1px solid #dedede;
-  background:#fff;
-  color:#000;
-  text-align:left;
-  display:flex;
-  flex-direction:column;
-  justify-content:space-between;
-}
-.game-pulse>*:last-child{border-right:0}
-.game-pulse>button{cursor:pointer}
-.game-pulse span,.game-pulse-info span{
-  font-size:9px;
-  font-weight:950;
-  letter-spacing:.15em;
-}
-.game-pulse strong,.game-pulse-info strong{
-  margin-top:auto;
-  padding-top:16px;
-  font-size:18px;
-  line-height:1.05;
-  font-weight:950;
-  letter-spacing:-.035em;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
-}
-.game-pulse small,.game-pulse-info small{
-  margin-top:7px;
-  font-size:10px;
-  line-height:1.35;
-  color:#777;
-  font-weight:700;
-}
+@keyframes bitebossFinalSecond{50%{opacity:.26}}
+
 .conquest-history-list{border-top:1px solid #111}
 .conquest-history-list>div{
-  min-height:58px;
+  min-height:60px;
   display:grid;
   grid-template-columns:minmax(68px,.75fr) minmax(0,1.6fr) auto;
   align-items:center;
   gap:12px;
-  border-bottom:1px solid #dedede;
+  border-bottom:1px solid #deded9;
 }
-.conquest-history-list span,.conquest-history-list small{
-  font-size:10px;
-  color:#777;
-  font-weight:800;
-}
+.conquest-history-list span,.conquest-history-list small{font-size:10px;color:#777;font-weight:800}
 .conquest-history-list strong{
-  min-width:0;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
-  font-size:15px;
-  font-weight:950;
+  min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:15px;font-weight:950;letter-spacing:-.025em;
+}
+
+@media (hover:hover) and (pointer:fine){
+  body.user-app #page-stores .challenge-card:hover{background:#f7f7f5!important}
+  .game-pulse>button:hover{background:#f7f7f5}
+}
+@media (prefers-reduced-motion:reduce){
+  .takeover-count.is-final{animation:none}
+  .takeover-progress>span{transition:none}
 }
 @media (max-width:640px){
-  .challenge-head{grid-template-columns:1fr;gap:8px}
-  .challenge-head p{text-align:left}
-  .takeover-command{grid-template-columns:minmax(0,1fr) 86px}
-  .takeover-command-primary{grid-column:1/-1;border-bottom:1px solid #2b2b2b}
-  .takeover-command>div:nth-child(2){border-left:0}
-  .takeover-command>div{min-height:92px}
-  .takeover-command-primary{min-height:116px!important}
-  .takeover-command-primary strong{font-size:25px}
-  .takeover-command-stat strong{font-size:26px}
+  .challenge-head{grid-template-columns:1fr;gap:16px;margin-bottom:18px}
+  .challenge-head h2{font-size:56px!important}
+  .challenge-head p{max-width:28rem;text-align:left}
+  .takeover-command{
+    grid-template-columns:52px minmax(0,1fr) 82px;
+    grid-template-rows:auto auto;
+  }
+  .takeover-command-index{grid-row:1/3;min-height:0;padding:14px 10px!important;font-size:20px}
+  .takeover-command-primary{grid-column:2/4;min-height:124px!important;border-bottom:1px solid #2b2b2b}
+  .takeover-command>div:not(.takeover-command-index){min-height:82px;padding:14px 12px}
+  .takeover-command>div:nth-child(3){border-left:0!important}
+  .takeover-command-primary strong{font-size:30px;padding-top:24px}
+  .takeover-command-stat strong{font-size:25px}
   .game-pulse{grid-template-columns:1fr}
-  .game-pulse>button,.game-pulse-info{border-right:0;border-bottom:1px solid #dedede}
+  .game-pulse>button,.game-pulse-info{
+    min-height:100px;padding:15px 0;border-right:0;border-bottom:1px solid #deded9
+  }
+  .game-pulse>*:nth-child(even){padding-left:0}
   .game-pulse>*:last-child{border-bottom:0}
+  .game-pulse strong,.game-pulse-info strong{font-size:19px;padding-top:15px}
+  body.user-app #page-stores .challenge-card{min-height:88px;padding:15px 0!important}
+  body.user-app #page-stores .challenge-card .store-card-photo{flex-basis:52px!important;width:52px!important;height:52px!important}
+  body.user-app #page-stores .challenge-card .store-card-name{font-size:18px!important}
+  body.user-app #page-stores .challenge-card .store-card-copy{padding-right:45px}
+  .takeover-bottom-grid{grid-template-columns:1fr;gap:8px}
+  .takeover-live-mark{display:none}
+  .takeover-count{font-size:clamp(104px,33vw,176px)}
+  .takeover-signal-row{font-size:7px;letter-spacing:.09em}
+}
+@media(max-width:360px){
+  .takeover-command{grid-template-columns:44px minmax(0,1fr) 72px}
+  .takeover-command-primary strong{font-size:26px}
+  .takeover-command-stat strong{font-size:22px}
+  body.user-app #page-stores .challenge-card .store-card-photo{flex-basis:48px!important;width:48px!important;height:48px!important}
+  .takeover-count{font-size:100px}
 }

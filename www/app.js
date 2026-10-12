@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "71.1";
+  const BITEBOSS_BUILD = "71.2";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
 if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1088,8 +1088,9 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     ].filter(Boolean);
 
 
+    const cardMode = takeoverModeFromStore(store);
     return `
-      <article class="store-card store-card-open challenge-card" data-store-detail="${escapeAttr(store.id)}" role="button" tabindex="0" aria-label="${escapeAttr(store.name)} 매장 정보 보기">
+      <article class="store-card store-card-open challenge-card mode-${escapeAttr(cardMode)} ${isPartner ? "is-partner-store" : ""}" data-store-detail="${escapeAttr(store.id)}" role="button" tabindex="0" aria-label="${escapeAttr(store.name)} 매장 정보 보기">
         <div class="store-card-main">
           ${bossExists ? occupiedStoreAvatarMarkup(store.photo_url, store.name, bossAvatar, boss, "store-card-photo") : storeAvatarMarkup(store.photo_url, store.name, "store-card-photo")}
           <div class="store-card-copy">
@@ -2201,6 +2202,8 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     const required=Math.max(5,Number(state.required_seconds||takeoverFallbackSeconds(mode)));
     const remaining=Math.max(0,Number(state.remaining_seconds ?? required));
     takeoverUi={storeId:String(store.id),storeName:String(store.name||"매장"),mode,status:String(state.status||"tracking")};
+    screen.dataset.mode=mode;
+    screen.dataset.status=String(state.status||"tracking");
     takeoverRequired=required;
     takeoverRemaining=remaining;
     takeoverLastServerAt=Date.now();
@@ -2239,6 +2242,8 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
   function updateTakeoverUi(status,reason=""){
     if(!takeoverUi) return;
     takeoverUi.status=String(status||"tracking");
+    const screen=$("#takeoverScreen");
+    if(screen){ screen.dataset.status=takeoverUi.status; screen.dataset.mode=takeoverUi.mode||"takeover"; }
     const label=$("#takeoverStatus");
     const count=$("#takeoverCount");
     if(status==="hold" || status==="outside"){
