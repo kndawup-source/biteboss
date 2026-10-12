@@ -1,0 +1,626 @@
+/* BiteBoss Admin v66.5
+   Mobile-first hierarchy: 현황 / 매장 / 게임 / 설정
+   Loaded after styles.css.
+*/
+
+body.admin-app{
+  background:#050505;
+}
+
+.admin-app .admin-layout{
+  min-height:100dvh;
+  display:block;
+}
+
+.admin-app .admin-side{
+  position:sticky;
+  z-index:60;
+  top:0;
+  width:100%;
+  min-height:0;
+  padding:0;
+  border-right:0;
+  border-bottom:1px solid #191919;
+  background:rgba(5,5,5,.98);
+  backdrop-filter:blur(12px);
+}
+
+.admin-mobile-head{
+  height:54px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  padding:0 18px;
+  border-bottom:1px solid #131313;
+}
+
+.admin-app .admin-brand{
+  display:flex;
+  align-items:baseline;
+  gap:8px;
+  padding:0;
+  margin:0;
+  border:0;
+}
+
+.admin-app .admin-brand span{
+  color:rgba(255,247,232,.34);
+  font-size:8px;
+  font-weight:850;
+  letter-spacing:.08em;
+}
+
+.admin-app .admin-brand strong{
+  color:#fff7e8;
+  font-size:15px;
+  line-height:1;
+  font-weight:950;
+  letter-spacing:-.03em;
+}
+
+.admin-role{
+  color:rgba(255,247,232,.32);
+  font-size:9px;
+  font-weight:800;
+  text-transform:uppercase;
+}
+
+.admin-primary-nav{
+  height:48px;
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  padding:0 10px;
+  border-bottom:1px solid #161616;
+}
+
+.admin-primary-nav-btn{
+  position:relative;
+  min-width:0;
+  border:0;
+  background:transparent;
+  color:rgba(255,247,232,.38);
+  font:inherit;
+  font-size:11px;
+  font-weight:850;
+}
+
+.admin-primary-nav-btn.active{
+  color:#fff7e8;
+}
+
+.admin-primary-nav-btn.active::after{
+  content:"";
+  position:absolute;
+  left:16px;
+  right:16px;
+  bottom:-1px;
+  height:1px;
+  background:#fff7e8;
+}
+
+.admin-secondary-nav{
+  min-height:42px;
+  display:flex;
+  align-items:center;
+  gap:20px;
+  padding:0 18px;
+  overflow-x:auto;
+  scrollbar-width:none;
+}
+
+.admin-secondary-nav::-webkit-scrollbar{
+  display:none;
+}
+
+.admin-section-nav{
+  flex:0 0 auto;
+  min-height:42px;
+  padding:0;
+  border:0;
+  background:transparent;
+  color:rgba(255,247,232,.36);
+  font:inherit;
+  font-size:10px;
+  font-weight:800;
+  white-space:nowrap;
+}
+
+.admin-section-nav.active{
+  color:#d5232f;
+}
+
+.admin-app .admin-side-actions{
+  display:none;
+}
+
+.admin-app .admin-main{
+  width:100%;
+  max-width:none;
+  margin:0;
+  padding:22px 18px calc(42px + env(safe-area-inset-bottom));
+}
+
+.admin-app .admin-page{
+  display:none;
+}
+
+.admin-app .admin-page.active{
+  display:block;
+}
+
+.admin-app .admin-page-head{
+  margin:0 0 24px;
+  padding:0 0 16px;
+  border-bottom:1px solid #171717;
+}
+
+.admin-app .admin-page-head .eyebrow{
+  display:block;
+  margin:0 0 6px;
+  color:rgba(255,247,232,.32);
+  font-size:8px;
+  font-weight:900;
+  letter-spacing:.08em;
+}
+
+.admin-app .admin-page-head h2{
+  margin:0;
+  color:#fff7e8;
+  font-size:25px;
+  line-height:1;
+  letter-spacing:-.04em;
+}
+
+.admin-app .admin-page-head p{
+  margin:8px 0 0;
+  color:rgba(255,247,232,.40);
+  font-size:11px;
+  line-height:1.5;
+}
+
+.admin-app .ops-summary{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  margin:0 0 34px;
+  border-top:1px solid #191919;
+  border-bottom:1px solid #191919;
+}
+
+.admin-app .ops-summary>div{
+  min-height:82px;
+  padding:16px 12px 14px 0;
+  border:0;
+}
+
+.admin-app .ops-summary>div:nth-child(even){
+  padding-left:14px;
+  border-left:1px solid #191919;
+}
+
+.admin-app .ops-summary>div:nth-child(-n+2){
+  border-bottom:1px solid #191919;
+}
+
+.admin-app .ops-summary span{
+  color:rgba(255,247,232,.34);
+  font-size:9px;
+  font-weight:800;
+  letter-spacing:0;
+  text-transform:none;
+}
+
+.admin-app .ops-summary strong{
+  display:block;
+  margin-top:9px;
+  color:#fff7e8;
+  font-size:24px;
+  line-height:1;
+  font-weight:950;
+}
+
+.admin-dashboard-section{
+  margin-top:34px;
+}
+
+.admin-dashboard-section .section-head{
+  min-height:28px;
+  margin:0;
+  padding:0 0 10px;
+}
+
+.admin-dashboard-section .section-head h3{
+  margin:0;
+  color:#fff7e8;
+  font-size:15px;
+}
+
+.admin-dashboard-section .section-head span{
+  color:rgba(255,247,232,.32);
+  font-size:9px;
+}
+
+.admin-current-bosses .store-list{
+  border-top:1px solid #171717;
+}
+
+.admin-app .gameops-summary{
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  margin-bottom:30px;
+}
+
+.admin-app .gameops-summary>div{
+  min-height:72px;
+  border-right:0;
+  border-bottom:1px solid #171717;
+}
+
+.admin-app .gameops-summary>div:nth-child(even){
+  border-left:1px solid #171717;
+}
+
+.admin-app .form-grid,
+.admin-app .store-form,
+.admin-app .store-form.compact,
+.admin-app .compact-admin-form{
+  grid-template-columns:1fr!important;
+  gap:14px!important;
+}
+
+.admin-app .form-grid .wide,
+.admin-app .store-form .wide,
+.admin-app .compact-admin-form .wide{
+  grid-column:1!important;
+}
+
+.admin-app .admin-form{
+  margin-bottom:30px;
+  padding-bottom:26px;
+}
+
+.admin-app .partner-request-counters{
+  grid-template-columns:repeat(3,minmax(0,1fr));
+}
+
+.admin-app .partner-request-toolbar{
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:10px;
+}
+
+.admin-app .store-metrics{
+  grid-template-columns:repeat(2,minmax(0,1fr));
+}
+
+.admin-app .store-metrics article{
+  min-width:0;
+}
+
+.admin-app .store-admin-grid{
+  grid-template-columns:1fr;
+  gap:26px;
+}
+
+.admin-app .qr-display{
+  grid-template-columns:1fr;
+  gap:20px;
+}
+
+.admin-app .admin-maintenance-row{
+  display:grid;
+  grid-template-columns:1fr;
+  gap:14px;
+  padding:18px 0;
+}
+
+.admin-app .admin-maintenance-row button{
+  justify-self:start;
+}
+
+.admin-app .admin-editor-panel{
+  width:100%;
+  max-width:none;
+  height:100dvh;
+  max-height:none;
+  border-radius:0;
+}
+
+.admin-app .admin-editor-head{
+  position:sticky;
+  top:0;
+  z-index:2;
+  background:#050505;
+}
+
+@media(min-width:760px){
+  .admin-app .admin-layout{
+    display:grid;
+    grid-template-columns:210px minmax(0,1fr);
+  }
+
+  .admin-app .admin-side{
+    position:sticky;
+    top:0;
+    align-self:start;
+    height:100dvh;
+    border-right:1px solid #191919;
+    border-bottom:0;
+  }
+
+  .admin-mobile-head{
+    height:74px;
+    padding:0 22px;
+  }
+
+  .admin-app .admin-brand{
+    display:grid;
+    gap:5px;
+  }
+
+  .admin-app .admin-brand strong{
+    font-size:21px;
+  }
+
+  .admin-primary-nav{
+    height:auto;
+    display:grid;
+    grid-template-columns:1fr;
+    padding:18px 0 8px;
+    border-bottom:0;
+  }
+
+  .admin-primary-nav-btn{
+    min-height:46px;
+    padding:0 22px;
+    text-align:left;
+    font-size:12px;
+  }
+
+  .admin-primary-nav-btn.active::after{
+    left:0;
+    right:auto;
+    top:10px;
+    bottom:10px;
+    width:2px;
+    height:auto;
+    background:#d5232f;
+  }
+
+  .admin-secondary-nav{
+    min-height:0;
+    display:grid;
+    gap:0;
+    padding:6px 22px 20px 34px;
+    overflow:visible;
+  }
+
+  .admin-section-nav{
+    min-height:34px;
+    text-align:left;
+    font-size:10px;
+  }
+
+  .admin-app .admin-side-actions{
+    position:absolute;
+    left:22px;
+    right:22px;
+    bottom:24px;
+    display:grid;
+    gap:10px;
+  }
+
+  .admin-side-link{
+    min-height:30px;
+    display:flex;
+    align-items:center;
+    padding:0;
+    border:0;
+    background:transparent;
+    color:rgba(255,247,232,.36);
+    font:inherit;
+    font-size:10px;
+    text-decoration:none;
+    cursor:pointer;
+  }
+
+  .admin-side-link:hover{
+    color:#fff7e8;
+  }
+
+  .admin-app .admin-main{
+    max-width:1180px;
+    padding:42px 42px 70px;
+  }
+
+  .admin-app .ops-summary{
+    grid-template-columns:repeat(4,minmax(0,1fr));
+  }
+
+  .admin-app .ops-summary>div{
+    min-height:86px;
+    padding:16px;
+    border-bottom:0!important;
+  }
+
+  .admin-app .ops-summary>div+div{
+    border-left:1px solid #191919;
+  }
+
+  .admin-app .gameops-summary{
+    grid-template-columns:repeat(6,minmax(0,1fr));
+  }
+
+  .admin-app .gameops-summary>div{
+    border-bottom:0;
+  }
+
+  .admin-app .form-grid,
+  .admin-app .store-form,
+  .admin-app .compact-admin-form{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:18px 24px!important;
+  }
+
+  .admin-app .form-grid .wide,
+  .admin-app .store-form .wide,
+  .admin-app .compact-admin-form .wide{
+    grid-column:1/-1!important;
+  }
+}
+
+@media(max-width:430px){
+  .admin-app .admin-main{
+    padding-left:16px;
+    padding-right:16px;
+  }
+
+  .admin-mobile-head{
+    padding-left:16px;
+    padding-right:16px;
+  }
+
+  .admin-secondary-nav{
+    padding-left:16px;
+    padding-right:16px;
+  }
+
+  .admin-app .admin-page-head h2{
+    font-size:23px;
+  }
+
+  .admin-app .partner-request-counters{
+    grid-template-columns:1fr 1fr 1fr;
+  }
+
+  .admin-app .partner-request-counters>div{
+    min-width:0;
+    padding-left:8px;
+    padding-right:8px;
+  }
+}
+
+
+/* ============================================================
+   BiteBoss Admin v66.6 — Current Boss mobile hierarchy
+   ============================================================ */
+
+.admin-current-bosses .store-list{
+  border-top:1px solid #171717;
+}
+
+.admin-boss-row{
+  min-height:88px;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:center;
+  gap:18px;
+  padding:15px 0;
+  border-bottom:1px solid #171717;
+}
+
+.admin-boss-copy{
+  min-width:0;
+  display:grid;
+  gap:4px;
+}
+
+.admin-boss-store{
+  display:block;
+  min-width:0;
+  overflow:hidden;
+  color:#fff7e8;
+  font-size:16px;
+  line-height:1.25;
+  font-weight:900;
+  letter-spacing:-.025em;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.admin-boss-owner{
+  display:block;
+  min-width:0;
+  overflow:hidden;
+  color:rgba(255,247,232,.66);
+  font-size:12px;
+  line-height:1.25;
+  font-weight:800;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.admin-boss-row.is-unclaimed .admin-boss-owner{
+  color:rgba(255,247,232,.38);
+}
+
+.admin-boss-meta{
+  display:block;
+  min-width:0;
+  overflow:hidden;
+  color:rgba(255,247,232,.34);
+  font-size:10px;
+  line-height:1.35;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.admin-boss-xp{
+  min-width:50px;
+  display:flex;
+  align-items:baseline;
+  justify-content:flex-end;
+  gap:4px;
+  padding:0;
+  border:0;
+  background:transparent;
+  text-align:right;
+  white-space:nowrap;
+}
+
+.admin-boss-xp strong{
+  color:#fff7e8;
+  font-size:15px;
+  line-height:1;
+  font-weight:900;
+  font-variant-numeric:tabular-nums;
+}
+
+.admin-boss-xp span{
+  color:rgba(255,247,232,.34);
+  font-size:9px;
+  font-weight:800;
+}
+
+@media(max-width:430px){
+  .admin-boss-row{
+    min-height:84px;
+    gap:12px;
+    padding:14px 0;
+  }
+
+  .admin-boss-store{
+    font-size:15px;
+  }
+
+  .admin-boss-owner{
+    font-size:11px;
+  }
+
+  .admin-boss-meta{
+    font-size:9px;
+  }
+
+  .admin-boss-xp{
+    min-width:44px;
+  }
+
+  .admin-boss-xp strong{
+    font-size:14px;
+  }
+}
+
+@media(max-width:340px){
+  .admin-boss-row{
+    grid-template-columns:minmax(0,1fr) 42px;
+    gap:10px;
+  }
+}

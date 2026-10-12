@@ -1,0 +1,33 @@
+{
+  "name": "biteboss",
+  "version": "0.71.0",
+  "private": true,
+  "scripts": {
+    "vendor": "node scripts/vendor.mjs",
+    "preflight": "node scripts/preflight.mjs",
+    "patch:ios": "node scripts/patch-ios.mjs",
+    "prepare:ios": "npm run sync:web && npm run vendor && npm run preflight:native && node scripts/prepare-ios.mjs",
+    "sync:ios": "npm run sync:web && npm run vendor && npm run preflight:native && npx cap sync ios && npm run patch:ios",
+    "open:ios": "npx cap open ios",
+    "sync:web": "node scripts/sync-web.mjs",
+    "preflight:native": "node scripts/preflight.mjs --native",
+    "test": "node --test test/*.test.mjs",
+    "test:coverage": "node --experimental-test-coverage --test test/*.test.mjs",
+    "mutation": "node test/mutation.mjs",
+    "quality": "npm run sync:web && npm run preflight && npm test && npm run mutation"
+  },
+  "dependencies": {
+    "@capacitor/app": "^7.0.0",
+    "@capacitor/core": "7.6.9",
+    "@capacitor/geolocation": "^7.0.0",
+    "@capacitor/ios": "7.6.9",
+    "@supabase/supabase-js": "^2.0.0",
+    "html5-qrcode": "2.3.8",
+    "leaflet": "1.9.4",
+    "qrcodejs": "1.0.0",
+    "@capacitor/push-notifications": "^7.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "7.6.9"
+  }
+}

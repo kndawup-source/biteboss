@@ -1,0 +1,76 @@
+const CACHE_NAME = "biteboss-v71.0";
+const SHELL = [
+  "./",
+  "./index.html?v=71.0",
+  "./styles.css?v=71.0",
+  "./bootstrap.js?v=71.0",
+  "./app.js?v=71.0",
+  "./app-config.js?v=71.0",
+  "./supabase.js?v=71.0",
+  "./manifest.webmanifest?v=71.0",
+  "./privacy-policy.html?v=71.0",
+  "./support.html?v=71.0"
+];
+
+self.addEventListener("install", event => {
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(SHELL))
+      .catch(() => undefined)
+  );
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", event => {
+  event.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(
+        keys
+          .filter(key => key.startsWith("biteboss-") && key !== CACHE_NAME)
+          .map(key => caches.delete(key))
+      )
+    )
+  );
+  self.clients.claim();
+});
+
+self.addEventListener("fetch", event => {
+  const request = event.request;
+  if(request.method !== "GET") return;
+
+  const url = new URL(request.url);
+  if(url.origin !== self.location.origin) return;
+
+  const isNavigation = request.mode === "navigate";
+  const isCriticalAsset = /\/(?:app\.js|styles\.css|index\.html)(?:\?|$)/.test(url.pathname + url.search);
+
+  if(isNavigation || isCriticalAsset){
+    event.respondWith(
+      fetch(request, { cache:"no-store" })
+        .then(response => {
+          if(response.ok){
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(request, copy)).catch(() => {});
+          }
+          return response;
+        })
+        .catch(() =>
+          caches.match(request).then(hit => hit || caches.match("./index.html?v=71.0") || caches.match("./index.html"))
+        )
+    );
+    return;
+  }
+
+  event.respondWith(
+    caches.match(request).then(hit => {
+      const network = fetch(request)
+        .then(response => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
+          return response;
+        })
+        .catch(() => hit);
+      return hit || network;
+    })
+  );
+});

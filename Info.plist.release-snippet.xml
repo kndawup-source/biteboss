@@ -1,0 +1,8 @@
+<key>NSCameraUsageDescription</key>
+<string>매장 및 Crew QR 코드를 스캔하기 위해 카메라를 사용합니다.</string>
+<key>NSLocationWhenInUseUsageDescription</key>
+<string>주변 매장을 찾고 현장 점령을 확인하기 위해 위치를 사용합니다.</string>
+<key>NSPhotoLibraryUsageDescription</key>
+<string>프로필 사진을 선택하기 위해 사진 보관함을 사용합니다.</string>
+<key>ITSAppUsesNonExemptEncryption</key>
+<false/>

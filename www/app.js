@@ -1,0 +1,5863 @@
+(() => {
+  "use strict";
+
+  const BITEBOSS_BUILD = "71.0";
+  window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
+if(window.__BITEBOSS_APP_BOOTED__) return;
+  window.__BITEBOSS_APP_BOOTED__ = true;
+
+  const $ = q => document.querySelector(q);
+  const $$ = q => [...document.querySelectorAll(q)];
+
+  const cfg = window.BITEBOSS_CONFIG || {};
+  const config = {
+    protect_minutes:60,
+    reclaim_cooldown_minutes:1440,
+    gps_radius_m:50,
+    max_location_accuracy_m:100,
+    gps_dwell_seconds:120,
+    gps_presence_ping_seconds:10,
+    gps_nearby_refresh_distance_m:80,
+    gps_nearby_refresh_min_seconds:12,
+    gps_nearby_watch_max_accuracy_m:250,
+    daily_store_limit:1,
+    nearby_radius_m:3000,
+    nearby_limit:20,
+    auto_store_import_enabled:true,
+    auto_store_import_min_count:10,
+    auto_store_import_radius_m:1000,
+    feature_ranking:true,
+    feature_offers:true,
+    home_splash_image_url:"",
+    home_hook_enabled:true,
+    home_hook_text:"찍고, 점령하고, 보스가 돼.",
+    home_primary_cta:"QR 스캔하기",
+    home_secondary_cta:"내 주변 보스 찾기",
+    crew_qr_invite_hours:72,
+    crew_qr_max_uses:30,
+    crew_max_members:30,
+    takeover_empty_seconds:20,
+    takeover_challenge_seconds:30,
+    takeover_retake_seconds:20,
+    takeover_hot_seconds:45,
+    takeover_grace_seconds:3,
+    takeover_cancel_outside_seconds:12,
+    hot_store_challenges_24h:5,
+    new_player_protection_claims:5,
+    season_days:30
+  };
+
+  let authUser = null;
+  let profile = null;
+  let organization = null;
+  let organizationCooldown = null;
+  let organizationInvites = [];
+  let organizationMembers = [];
+  let playerSession = null;
+  let stores = [];
+  let lastPosition = null;
+  let nearbyWatchId = null;
+  let nearbyRefreshBusy = false;
+  let nearbyLastRefreshPosition = null;
+  let nearbyLastRefreshAt = 0;
+  let scanner = null;
+  let currentRank = "players";
+  let summary = null;
+  let storeSearchTimer = null;
+  let storeSearchSeq = 0;
+  let presenceTimer = null;
+  let presenceBusy = false;
+  let presenceBlockedReason = "";
+  let takeoverUi = null;
+  let takeoverUiTimer = null;
+  let takeoverLastServerAt = 0;
+  let takeoverRemaining = 0;
+  let takeoverRequired = 0;
+  let takeoverCancelledLocally = false;
+  let gamePulseLoadedAt = 0;
+  let activeBanner = null;
+  const presenceState = new Map();
+  const storeRoleMap = new Map();
+  let territoryMap = null;
+  let territoryMapLayer = null;
+  let territoryUserLayer = null;
+  let territoryMapRows = [];
+  let pendingCrewInviteToken = "";
+  let lastForegroundRefreshAt = 0;
+  let foregroundRefreshPromise = null;
+  let pushListenersBound = false;
+  let pushDeviceToken = "";
+  let pushPermissionState = "unknown";
+  let pushPreferences = null;
+  let pushUnreadCount = 0;
+  const adSessionKey = getAdSessionKey();
+
+  init().catch(fatalError);
+
+  async function refreshNearbyOnForeground(){
+    const now = Date.now();
+    if(foregroundRefreshPromise) return foregroundRefreshPromise;
+    if(now - lastForegroundRefreshAt < 8000) return null;
+
+    lastForegroundRefreshAt = now;
+    foregroundRefreshPromise = (async () => {
+      const pos = await getPositionSafe(false, {
+        timeout:5000,
+        maximumAge:5000
+      });
+      if(pos){
+        await refreshStoresForPosition(pos, { force:true });
+      }
+      return pos;
+    })().finally(() => {
+      foregroundRefreshPromise = null;
+    });
+
+    return foregroundRefreshPromise;
+  }
+
+  function syncRuntimeShell(){
+    let native = false;
+    try{
+      native = Boolean(window.Capacitor?.isNativePlatform?.()) ||
+        (typeof window.Capacitor?.getPlatform === "function" && window.Capacitor.getPlatform() !== "web");
+    }catch{}
+
+    const standalone = !native && (
+      window.matchMedia?.("(display-mode: standalone)")?.matches === true ||
+      window.navigator.standalone === true
+    );
+
+    document.documentElement.classList.toggle("native-shell", native);
+    document.body?.classList.toggle("native-shell", native);
+    document.documentElement.classList.toggle("pwa-standalone", standalone);
+    document.body?.classList.toggle("pwa-standalone", standalone);
+    return native || standalone;
+  }
+
+  async function init(){
+    syncRuntimeShell();
+    syncViewportMetrics();
+    bindUi();
+    bindStaticUi();
+    document.addEventListener("visibilitychange", () => {
+      if(!document.hidden) void refreshNearbyOnForeground();
+    });
+    window.addEventListener("focus", () => {
+      void refreshNearbyOnForeground();
+    });
+    setupNativeUrlListener();
+    setupPushListeners();
+    updateNetworkState();
+
+    if(!window.sb){
+      throw new Error(window.BITEBOSS_BOOT_ERROR || "BiteBoss could not connect to Supabase.");
+    }
+
+    await ensureUserSession();
+    await restorePlayerSession();
+    await ensureProfile();
+
+    // Load server state in parallel. Location must not block first paint.
+    await Promise.all([
+      loadConfig(),
+      loadMyOrganization(),
+      loadGameActivity()
+    ]);
+
+    renderHomeSplashImage();
+    renderHomeCopy();
+    updateProfileUi();
+    await refreshNotificationState({ registerIfGranted:true });
+
+    const initialPositionPromise = getPositionSafe(false, {
+      timeout:2500,
+      maximumAge:60000
+    });
+
+    await Promise.all([
+      loadHome(),
+      loadAlerts(),
+      loadBanner()
+    ]);
+
+    lastPosition = await initialPositionPromise;
+    await loadStores();
+    if(lastPosition?.coords){
+      nearbyLastRefreshPosition = lastPosition;
+      nearbyLastRefreshAt = Date.now();
+    }
+    startNearbyLocationWatch();
+
+    // Cleanup is non-critical. Never delay app readiness for maintenance work.
+    void (async () => {
+      try{
+        await sb.rpc("biteboss_runtime_cleanup");
+      }catch(error){
+        console.warn("BiteBoss runtime cleanup:", error);
+      }
+    })();
+
+    await handleClaimParam();
+    await handleCrewInviteParam();
+    startPresenceTracking();
+    registerServiceWorker();
+  }
+
+  function setupNativeUrlListener(){
+    try{
+      const appPlugin = window.Capacitor?.Plugins?.App;
+      if(!appPlugin?.addListener) return;
+
+      appPlugin.addListener("appUrlOpen", async event => {
+        const incoming = String(event?.url || "").trim();
+        if(!incoming) return;
+
+        const crewToken = extractCrewInviteToken(incoming);
+        if(crewToken){
+          pendingCrewInviteToken = crewToken;
+          await previewCrewInvite(crewToken);
+        }
+      });
+    }catch(error){
+      console.warn("BiteBoss app URL listener:", error);
+    }
+  }
+
+  function bindStaticUi(){
+    const privacy = $("#privacyLink");
+    const support = $("#supportLink");
+    if(privacy) privacy.href = cfg.privacyUrl || "./privacy-policy.html";
+    if(support) support.href = cfg.supportUrl || "./support.html";
+
+    window.addEventListener("online", updateNetworkState);
+    window.addEventListener("offline", updateNetworkState);
+    window.addEventListener("resize", () => { syncRuntimeShell(); syncViewportMetrics(); }, { passive:true });
+    window.addEventListener("orientationchange", () => { syncRuntimeShell(); syncViewportMetrics(); }, { passive:true });
+    window.visualViewport?.addEventListener("resize", syncViewportMetrics, { passive:true });
+
+    document.addEventListener("visibilitychange", () => {
+      if(document.hidden){
+        stopPresenceTracking();
+        return;
+      }
+      refreshAfterForeground().catch(error => {
+        console.warn("BiteBoss foreground refresh:", error);
+      });
+    });
+  }
+
+  async function refreshAfterForeground(){
+    if(!window.sb || document.hidden) return;
+    if(foregroundRefreshPromise) return foregroundRefreshPromise;
+
+    const now = Date.now();
+    const elapsed = now - lastForegroundRefreshAt;
+
+    // Returning from Control Center / camera can trigger visibility repeatedly.
+    // Avoid re-fetching the entire app more than once every 30 seconds.
+    if(elapsed < 30000){
+      startPresenceTracking();
+      return;
+    }
+
+    lastForegroundRefreshAt = now;
+    foregroundRefreshPromise = (async () => {
+      await loadConfig();
+      renderHomeSplashImage();
+      renderHomeCopy();
+
+      const positionPromise = getPositionSafe(false, {
+        timeout:2500,
+        maximumAge:30000
+      });
+
+      await Promise.all([
+        loadHome(),
+        loadMyOrganization(),
+        loadBanner(),
+        loadGameActivity(),
+        refreshNotificationState({ registerIfGranted:true })
+      ]);
+
+      const nextPosition = await positionPromise;
+      if(nextPosition) lastPosition = nextPosition;
+      await loadStores();
+
+      if($("#page-alerts")?.classList.contains("active")) await loadAlerts();
+      if($("#page-rank")?.classList.contains("active")) await loadRank();
+
+      startPresenceTracking();
+    })();
+
+    try{
+      await foregroundRefreshPromise;
+    }finally{
+      foregroundRefreshPromise = null;
+    }
+  }
+
+  function bindUi(){
+    document.addEventListener("touchmove", blockHomeViewportScroll, { passive:false });
+    document.addEventListener("wheel", blockHomeViewportScroll, { passive:false });
+
+    $$(".nav-btn,[data-tab]").forEach(btn => {
+      btn.addEventListener("click", () => openTab(btn.dataset.tab));
+    });
+
+    $("#modalClose")?.addEventListener("click", closeModal);
+    $("#modal")?.addEventListener("click", event => {
+      if(event.target.id === "modal") closeModal();
+    });
+
+    $("#scanBtn")?.addEventListener("click", scanPrompt);
+    $("#storeSearch")?.addEventListener("input", () => {
+      clearTimeout(storeSearchTimer);
+      storeSearchTimer = setTimeout(searchStores, 250);
+    });
+    $("#homeEditProfile")?.addEventListener("click", openProfileEditor);
+    $("#homeAvatarButton")?.addEventListener("click", openProfileEditor);
+    $("#profileAvatarButton")?.addEventListener("click", openProfileEditor);
+    $("#memberLoginBtn")?.addEventListener("click", openMemberLogin);
+    $("#memberRegisterBtn")?.addEventListener("click", openMemberRegister);
+    $("#addStoreBtn")?.addEventListener("click", openMemberStoreForm);
+    const organizationAction = (selector, handler) => {
+      $(selector)?.addEventListener("click", event => {
+        event.preventDefault();
+        event.stopPropagation();
+        handler(event);
+      });
+    };
+
+    organizationAction("#createOrganizationBtn", openOrganizationCreate);
+    organizationAction("#leaveOrganizationBtn", openOrganizationLeave);
+    organizationAction("#inviteOrganizationMemberBtn", openOrganizationInvite);
+    organizationAction("#foundIndependentOrganizationBtn", openIndependentOrganizationCreate);
+    organizationAction("#organizationAvatarButton", openOrganizationAvatarEditor);
+
+    $("#organizationInvites")?.addEventListener("click", handleOrganizationInviteAction);
+    $("#organizationMemberList")?.addEventListener("click", handleOrganizationMemberAction);
+    document.addEventListener("click", handlePlayerProfileOpen);
+
+    const openCrewProfileFromRank = event => {
+      const trigger = event.target.closest(".crew-rank-profile-trigger");
+      if(!trigger) return;
+
+      if(event.type === "keydown" && event.key !== "Enter" && event.key !== " ") return;
+
+      const organizationId = String(trigger.dataset.organizationProfile || "").trim();
+      if(!organizationId) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      openOrganizationDetail(organizationId);
+    };
+
+    $("#rankList")?.addEventListener("click", openCrewProfileFromRank);
+    $("#rankList")?.addEventListener("keydown", openCrewProfileFromRank);
+
+    $("#organizationPanelOpen")?.addEventListener("click", event => {
+      if(event.target.closest("button,a,input,select,textarea,label")) return;
+      if(event.target.closest("[data-player-profile],[data-transfer-leader]")) return;
+      if(!organization?.id) return;
+      openCurrentOrganizationDetail();
+    });
+    $("#notificationSettingsBtn")?.addEventListener("click", openNotificationSettings);
+    $("#takeoverCancelBtn")?.addEventListener("click", cancelTakeoverUi);
+    $("#deleteAccountBtn")?.addEventListener("click", openDeleteAccount);
+    $("#logoutBtn")?.addEventListener("click", logout);
+
+    $$("[data-rank]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        currentRank = btn.dataset.rank || "players";
+        $$("[data-rank]").forEach(item => item.classList.toggle("active", item === btn));
+        syncTerritoryMapVisibility();
+        await loadRank();
+        if(currentRank === "territory") await loadTerritoryMap();
+      });
+    });
+  }
+
+  function syncViewportMetrics(){
+    // HOME now uses the real CSS viewport (100dvh). Keep this variable only for
+    // legacy non-HOME consumers; it no longer defines the HOME canvas.
+    const viewportHeight = Math.max(1, Math.round(document.documentElement.clientHeight || window.innerHeight || 1));
+    document.documentElement.style.setProperty("--app-viewport-height", `${viewportHeight}px`);
+  }
+
+  function setHomeViewportLocked(locked){
+    syncViewportMetrics();
+    document.body.classList.toggle("home-active", locked);
+    document.documentElement.classList.toggle("home-active", locked);
+    if(locked) window.scrollTo(0, 0);
+  }
+
+  function blockHomeViewportScroll(event){
+    if(!document.body.classList.contains("home-active")) return;
+    if(event.target?.closest?.(".modal-card")) return;
+    event.preventDefault();
+  }
+
+  function openTab(tab){
+    if(!tab) return;
+    const isHome = tab === "home";
+    setHomeViewportLocked(isHome);
+
+    $$(".page").forEach(page => page.classList.remove("active"));
+    $(`#page-${tab}`)?.classList.add("active");
+    $$(".nav-btn").forEach(btn => btn.classList.toggle("active", btn.dataset.tab === tab));
+
+    if(isHome){
+      window.scrollTo(0, 0);
+      loadHome();
+      loadBanner();
+    }
+    if(tab === "stores"){ renderStores(); void loadGamePulse(); }
+    if(tab === "rank"){
+      syncTerritoryMapVisibility();
+      loadRank();
+      if(currentRank === "territory") loadTerritoryMap();
+    }
+    if(tab === "alerts") loadAlerts();
+    if(tab === "profile"){
+      loadHistory();
+      loadMyOrganization();
+      loadGameActivity();
+    }
+  }
+
+  async function ensureUserSession(){
+    const { data:{ session }, error } = await sb.auth.getSession();
+    if(error) throw error;
+
+    if(session?.user){
+      // Local storage may contain an auth session whose anonymous user
+      // was already deleted from auth.users. Verify it against Supabase
+      // before using its UUID in biteboss_player_sessions.
+      const { data:userData, error:userError } = await sb.auth.getUser();
+
+      if(!userError && userData?.user){
+        authUser = userData.user;
+        return session;
+      }
+
+      console.warn("BiteBoss stale auth session detected. Recreating anonymous user.");
+
+      try{
+        await sb.auth.signOut({ scope:"local" });
+      }catch(error){
+        console.warn("BiteBoss stale auth cleanup:", error);
+      }
+
+      authUser = null;
+    }
+
+    const signed = await sb.auth.signInAnonymously({
+      options:{
+        data:{ app:"biteboss" }
+      }
+    });
+
+    if(signed.error) throw signed.error;
+
+    authUser = signed.data.user || signed.data.session?.user || null;
+
+    if(!authUser){
+      throw new Error("AUTH_SESSION_UNAVAILABLE");
+    }
+
+    return signed.data.session;
+  }
+
+  async function ensureProfile(){
+    const nickname = authUser?.user_metadata?.nickname || null;
+    const { data, error } = await sb.rpc("biteboss_ensure_profile", { p_nickname:nickname });
+    if(error) throw error;
+    profile = Array.isArray(data) ? data[0] : data;
+  }
+
+  async function loadConfig(){
+    const { data, error } = await sb
+      .from("biteboss_app_config")
+      .select("key,value");
+
+    if(error){
+      console.warn("BiteBoss config:", error);
+      return;
+    }
+
+    (data || []).forEach(row => {
+      if(Object.prototype.hasOwnProperty.call(config, row.key)){
+        config[row.key] = row.value;
+      }
+    });
+  }
+
+  function renderHomeSplashImage(){
+    const image = $("#homeSplashImage");
+    const promo = $("#homePromo");
+    if(!image || !promo) return;
+
+    const url = String(config.home_splash_image_url || "").trim();
+    if(url){
+      image.src = url;
+      image.classList.remove("hidden");
+      promo.classList.add("has-splash");
+      const safeUrl = url.replace(/["\\\n\r]/g, match => `\\${match}`);
+      promo.style.setProperty("--home-hero-image", `url("${safeUrl}")`);
+    }else{
+      image.removeAttribute("src");
+      image.classList.add("hidden");
+      promo.classList.remove("has-splash");
+      promo.style.removeProperty("--home-hero-image");
+    }
+  }
+
+
+  function configBoolean(value, fallback=false){
+    if(typeof value === "boolean") return value;
+    if(typeof value === "number") return value !== 0;
+    const normalized = String(value ?? "").trim().toLowerCase();
+    if(["true","1","yes","on"].includes(normalized)) return true;
+    if(["false","0","no","off",""].includes(normalized)) return false;
+    return fallback;
+  }
+
+  function renderHomeCopy(){
+    const hook = $("#homeHook");
+    const primary = $("#homePrimaryCtaLabel");
+    const secondary = $("#homeSecondaryCtaLabel");
+
+    const hookText = String(config.home_hook_text || "").trim();
+    const hookEnabled = configBoolean(config.home_hook_enabled, true) && Boolean(hookText);
+    if(hook){
+      hook.textContent = hookText;
+      hook.classList.toggle("hidden", !hookEnabled);
+    }
+
+    if(primary){
+      const text = String(config.home_primary_cta || "").trim();
+      primary.textContent = text || "QR 스캔하기";
+    }
+    if(secondary){
+      const text = String(config.home_secondary_cta || "").trim();
+      secondary.textContent = text || "내 주변 보스 찾기";
+    }
+  }
+
+  function getAdSessionKey(){
+    try{
+      const key = sessionStorage.getItem("biteboss-ad-session");
+      if(key) return key;
+      const next = window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      sessionStorage.setItem("biteboss-ad-session", next);
+      return next;
+    }catch{
+      return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    }
+  }
+
+  async function loadBanner(){
+    const banner = $("#homeAdBanner");
+    const image = $("#homeAdImage");
+    if(!banner || !image || !window.sb) return;
+
+    const { data, error } = await sb.rpc("biteboss_active_banner");
+    if(error){
+      console.warn("BiteBoss banner:", error);
+      hideBanner();
+      return;
+    }
+    if(!data?.id || !data?.image_url){
+      hideBanner();
+      return;
+    }
+
+    activeBanner = data;
+    image.src = data.image_url;
+    image.alt = data.advertiser_name ? `${data.advertiser_name} sponsored banner` : "Sponsored banner";
+    banner.href = /^https?:\/\//i.test(String(data.click_url || "")) ? data.click_url : "#";
+    banner.classList.remove("hidden");
+    banner.onclick = async event => {
+      if(!activeBanner?.click_url){
+        event.preventDefault();
+        return;
+      }
+      trackAdEvent(activeBanner.id, "click");
+    };
+    image.onerror = hideBanner;
+    trackAdEvent(data.id, "impression");
+  }
+
+  function hideBanner(){
+    activeBanner = null;
+    const banner = $("#homeAdBanner");
+    const image = $("#homeAdImage");
+    banner?.classList.add("hidden");
+    if(banner){ banner.removeAttribute("href"); banner.onclick = null; }
+    if(image){ image.removeAttribute("src"); image.onerror = null; }
+  }
+
+  async function trackAdEvent(campaignId, eventType){
+    if(!campaignId || !window.sb) return;
+    try{
+      const { error } = await sb.rpc("biteboss_track_ad_event", {
+        p_campaign_id:campaignId,
+        p_event_type:eventType,
+        p_session_key:adSessionKey
+      });
+      if(error) console.warn("BiteBoss ad tracking:", error);
+    }catch(error){
+      console.warn("BiteBoss ad tracking:", error);
+    }
+  }
+
+  function shouldRefreshNearbyStores(pos){
+    if(!pos?.coords) return false;
+
+    const lat = Number(pos.coords.latitude);
+    const lng = Number(pos.coords.longitude);
+    if(!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
+
+    const accuracy = Number(pos.coords.accuracy || 0);
+    const maxAccuracy = Math.max(
+      50,
+      Number(config.gps_nearby_watch_max_accuracy_m || 250)
+    );
+    if(accuracy && accuracy > maxAccuracy) return false;
+
+    if(!nearbyLastRefreshPosition?.coords) return true;
+
+    const moved = haversineMeters(
+      lat,
+      lng,
+      Number(nearbyLastRefreshPosition.coords.latitude),
+      Number(nearbyLastRefreshPosition.coords.longitude)
+    );
+
+    const minDistance = Math.max(
+      20,
+      Number(config.gps_nearby_refresh_distance_m || 80)
+    );
+    const minSeconds = Math.max(
+      5,
+      Number(config.gps_nearby_refresh_min_seconds || 12)
+    );
+    const elapsed = Date.now() - Number(nearbyLastRefreshAt || 0);
+
+    return moved >= minDistance && elapsed >= minSeconds * 1000;
+  }
+
+  async function refreshStoresForPosition(pos, { force=false } = {}){
+    if(!pos?.coords || nearbyRefreshBusy) return false;
+    if(!force && !shouldRefreshNearbyStores(pos)) return false;
+
+    nearbyRefreshBusy = true;
+    try{
+      lastPosition = pos;
+      await loadStores();
+      nearbyLastRefreshPosition = pos;
+      nearbyLastRefreshAt = Date.now();
+
+      const input = $("#storeSearch");
+      if(String(input?.value || "").trim()){
+        await searchStores();
+      }
+      return true;
+    }catch(error){
+      console.warn("BiteBoss live nearby refresh:", error);
+      return false;
+    }finally{
+      nearbyRefreshBusy = false;
+    }
+  }
+
+  function startNearbyLocationWatch(){
+    if(nearbyWatchId !== null) return;
+    if(!navigator.geolocation?.watchPosition) return;
+
+    try{
+      nearbyWatchId = navigator.geolocation.watchPosition(
+        position => {
+          lastPosition = position;
+          void refreshStoresForPosition(position);
+        },
+        error => {
+          // Keep the last known position/list. Permission or temporary GPS errors
+          // must not blank the current nearby store UI.
+          if(error?.code !== 1){
+            console.warn("BiteBoss location watch:", error);
+          }
+        },
+        {
+          enableHighAccuracy:true,
+          maximumAge:5000,
+          timeout:15000
+        }
+      );
+    }catch(error){
+      console.warn("BiteBoss location watch start:", error);
+    }
+  }
+
+  function stopNearbyLocationWatch(){
+    if(nearbyWatchId === null) return;
+    try{
+      navigator.geolocation?.clearWatch?.(nearbyWatchId);
+    }catch{}
+    nearbyWatchId = null;
+  }
+
+
+  async function loadStoreRoles(list){
+    const ids = [...new Set(
+      (Array.isArray(list) ? list : [])
+        .map(store => String(store?.id || "").trim())
+        .filter(Boolean)
+    )];
+
+    if(!ids.length || !playerSession?.authenticated){
+      storeRoleMap.clear();
+      return;
+    }
+
+    const { data, error } = await sb.rpc("biteboss_my_store_roles", {
+      p_store_ids:ids
+    });
+
+    if(error){
+      console.warn("BiteBoss store roles:", error);
+      return;
+    }
+
+    ids.forEach(id => storeRoleMap.delete(id));
+
+    (Array.isArray(data) ? data : []).forEach(row => {
+      if(!row?.store_id) return;
+      storeRoleMap.set(String(row.store_id), row);
+    });
+  }
+
+
+  async function loadStores(){
+    let result;
+
+    if(lastPosition){
+      result = await sb.rpc("biteboss_nearby_stores_v631", {
+        p_lat:lastPosition.coords.latitude,
+        p_lng:lastPosition.coords.longitude,
+        p_radius_m:Number(config.nearby_radius_m || 3000),
+        p_limit:Number(config.nearby_limit || 20)
+      });
+    }else{
+      result = await sb.rpc("biteboss_list_stores_v631", { p_limit:100 });
+    }
+
+    if(result.error){
+      console.warn(result.error);
+      toast("매장 정보를 불러오지 못했습니다.");
+      return;
+    }
+
+    stores = Array.isArray(result.data) ? result.data : [];
+
+    const autoImportEnabled = config.auto_store_import_enabled !== false &&
+      String(config.auto_store_import_enabled).toLowerCase() !== "false";
+    const autoImportMinCount = Math.max(1, Number(config.auto_store_import_min_count || 10));
+
+    if(lastPosition && autoImportEnabled && stores.length < autoImportMinCount){
+      const sync = await syncNearbyAutoStores(lastPosition);
+
+      if(sync?.ok){
+        const refreshed = await sb.rpc("biteboss_nearby_stores_v631", {
+          p_lat:lastPosition.coords.latitude,
+          p_lng:lastPosition.coords.longitude,
+          p_radius_m:Number(config.nearby_radius_m || 3000),
+          p_limit:Number(config.nearby_limit || 20)
+        });
+
+        if(!refreshed.error){
+          stores = Array.isArray(refreshed.data) ? refreshed.data : stores;
+        }else{
+          console.warn("BiteBoss nearby refresh:", refreshed.error);
+        }
+      }
+    }
+
+    await loadStoreRoles(stores);
+    stores.sort(compareNearbyStores);
+    void loadGamePulse(true);
+    renderStores();
+    renderHomeNearbyBosses();
+  }
+
+  async function syncNearbyAutoStores(pos){
+    if(!pos?.coords) return null;
+
+    try{
+      const { data:sessionData } = await sb.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+      if(!accessToken) return null;
+
+      const lat = Number(pos.coords.latitude);
+      const lng = Number(pos.coords.longitude);
+      const radius = Math.max(
+        300,
+        Math.min(2000, Number(config.auto_store_import_radius_m || 1000))
+      );
+
+      if(!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 7000);
+
+      try{
+        const configuredApiBase = String(cfg.apiBaseUrl || cfg.publicAppUrl || "").trim();
+        let apiBase = null;
+
+        try{
+          if(configuredApiBase){
+            const candidate = new URL(configuredApiBase);
+            if(candidate.protocol === "https:" || candidate.protocol === "http:") apiBase = candidate;
+          }else if(location.protocol === "https:" || location.protocol === "http:"){
+            apiBase = new URL(location.origin);
+          }
+        }catch{}
+
+        // Native packaged origins cannot host /api routes.
+        // Without a configured HTTPS API, only auto-import is skipped.
+        if(!apiBase) return null;
+
+        const url = new URL("/api/nearby-stores", apiBase);
+        url.searchParams.set("lat", String(lat));
+        url.searchParams.set("lng", String(lng));
+        url.searchParams.set("radius", String(radius));
+
+        const response = await fetch(url, {
+          method:"GET",
+          headers:{
+            "Accept":"application/json",
+            "Authorization":`Bearer ${accessToken}`
+          },
+          cache:"no-store",
+          signal:controller.signal
+        });
+
+        if(!response.ok){
+          const message = await response.text().catch(() => "");
+          console.warn("BiteBoss auto store import:", response.status, message);
+          return null;
+        }
+
+        const payload = await response.json();
+        if(payload?.error){
+          console.warn("BiteBoss auto store import:", payload.error, payload.detail || "");
+          return null;
+        }
+        return payload && typeof payload === "object" ? payload : null;
+      }finally{
+        clearTimeout(timer);
+      }
+    }catch(error){
+      if(error?.name !== "AbortError"){
+        console.warn("BiteBoss auto store import:", error);
+      }
+      return null;
+    }
+  }
+
+  function renderStores(list = stores){
+    const box = $("#storeList");
+    if(!box) return;
+
+    box.innerHTML = list.map(storeCard).join("") ||
+      `<div class="app-state">검색 결과가 없습니다.</div>`;
+
+
+    const loginNotice = $("#storesLoginNotice");
+    loginNotice?.classList.toggle("hidden", presenceBlockedReason !== "MEMBER_LOGIN_REQUIRED");
+
+    $$("#storeList [data-store-detail]").forEach(card => {
+      const open = () => openStoreDetail(card.dataset.storeDetail);
+      card.addEventListener("click", open);
+      card.addEventListener("keydown", event => {
+        if(event.key === "Enter" || event.key === " "){
+          event.preventDefault();
+          open();
+        }
+      });
+    });
+
+    $$("#storeList [data-scan-store]").forEach(btn => {
+      btn.onclick = event => {
+        event.stopPropagation();
+        scanPrompt();
+      };
+    });
+
+    $$("#storeList [data-store-login]").forEach(btn => {
+      btn.onclick = event => {
+        event.stopPropagation();
+        openMemberLogin();
+      };
+    });
+  }
+
+  async function searchStores(){
+    const input = $("#storeSearch");
+    const keyword = String(input?.value || "").trim();
+    const seq = ++storeSearchSeq;
+
+    if(!keyword){
+      renderStores(stores);
+      return;
+    }
+
+    const box = $("#storeList");
+    if(box) box.innerHTML = `<div class="app-state">검색 중…</div>`;
+
+    const { data, error } = await sb.rpc("biteboss_search_stores_v631", {
+      p_query:keyword,
+      p_lat:lastPosition?.coords?.latitude ?? null,
+      p_lng:lastPosition?.coords?.longitude ?? null,
+      p_limit:50
+    });
+
+    if(seq !== storeSearchSeq) return;
+
+    if(error){
+      console.error("BiteBoss store search:", error);
+      if(box) box.innerHTML = `<div class="app-state is-error">매장 검색에 실패했습니다.</div>`;
+      return;
+    }
+
+    const searchRows = Array.isArray(data) ? data : [];
+    await loadStoreRoles(searchRows);
+    searchRows.sort(compareNearbyStores);
+    renderStores(searchRows);
+  }
+
+  function compareNearbyStores(a,b){
+    const ar=storeRoleMap.get(String(a.id))||{}, br=storeRoleMap.get(String(b.id))||{};
+    const now=Date.now();
+    const aProtected=Boolean((ar.protected_until||a.protected_until)&&new Date(ar.protected_until||a.protected_until).getTime()>now);
+    const bProtected=Boolean((br.protected_until||b.protected_until)&&new Date(br.protected_until||b.protected_until).getTime()>now);
+    if(aProtected!==bProtected) return aProtected?1:-1;
+    const aPartner=String(a.partnership_status||"unclaimed")==="partnered", bPartner=String(b.partnership_status||"unclaimed")==="partnered";
+    if(aPartner!==bPartner) return aPartner?-1:1;
+    const aMyPower=Math.max(0,Number(ar.my_power ?? 0));
+    const bMyPower=Math.max(0,Number(br.my_power ?? 0));
+    const aDefense=Math.max(0,Number(a.boss_defense||ar.boss_defense||0)), bDefense=Math.max(0,Number(b.boss_defense||br.boss_defense||0));
+    const aAdv=aMyPower>aDefense, bAdv=bMyPower>bDefense; if(aAdv!==bAdv) return aAdv?-1:1;
+    const ad=Number.isFinite(Number(a.distance_m))?Number(a.distance_m):Number.MAX_SAFE_INTEGER;
+    const bd=Number.isFinite(Number(b.distance_m))?Number(b.distance_m):Number.MAX_SAFE_INTEGER;
+    return ad-bd;
+  }
+
+  function storeAvatarMarkup(photoUrl, storeName, className = "store-avatar"){
+    const url = String(photoUrl || "").trim();
+    const name = String(storeName || "매장").trim();
+
+    if(url){
+      return `<img class="${escapeAttr(className)}" src="${escapeAttr(url)}" alt="${escapeAttr(name)} 매장 사진" />`;
+    }
+
+    const initial = Array.from(name)[0] || "B";
+    return `<span class="${escapeAttr(className)} store-avatar-fallback" aria-hidden="true">${escapeHtml(initial)}</span>`;
+  }
+
+  function bossAvatarMarkup(avatarUrl, nickname, className = "boss-avatar"){
+    const url = String(avatarUrl || "").trim();
+    const name = String(nickname || "보스").trim();
+    if(url){
+      return `<img class="${escapeAttr(className)}" src="${escapeAttr(url)}" alt="${escapeAttr(name)} 프로필" />`;
+    }
+    const initial = Array.from(name)[0] || "B";
+    return `<span class="${escapeAttr(className)} boss-avatar-fallback" aria-hidden="true">${escapeHtml(initial)}</span>`;
+  }
+
+  function occupiedStoreAvatarMarkup(storePhotoUrl, storeName, bossAvatarUrl, bossName, className = "store-card-photo"){
+    const storeUrl = String(storePhotoUrl || "").trim();
+    const storeLabel = String(storeName || "매장").trim();
+    const bossUrl = String(bossAvatarUrl || "").trim();
+    const bossLabel = String(bossName || "보스").trim();
+    const storeInitial = Array.from(storeLabel)[0] || "B";
+    const bossInitial = Array.from(bossLabel)[0] || "B";
+
+    const storeHalf = storeUrl
+      ? `<img src="${escapeAttr(storeUrl)}" alt="" />`
+      : `<span class="occupied-store-half-fallback">${escapeHtml(storeInitial)}</span>`;
+
+    const bossHalf = bossUrl
+      ? `<img src="${escapeAttr(bossUrl)}" alt="" />`
+      : `<span class="occupied-boss-half-fallback">${escapeHtml(bossInitial)}</span>`;
+
+    return `
+      <span class="${escapeAttr(className)} occupied-store-avatar" role="img" aria-label="${escapeAttr(storeLabel)} · 현재 보스 ${escapeAttr(bossLabel)}">
+        <span class="occupied-store-half">${storeHalf}</span>
+        <span class="occupied-boss-half">${bossHalf}</span>
+      </span>
+    `;
+  }
+
+  function storeCard(store){
+    const roleState = storeRoleMap.get(String(store.id)) || {};
+    const isMyBossStore = Boolean(roleState.is_my_boss_store || roleState.my_role === "boss");
+    const protectionUntil = roleState.protected_until || store.protected_until || null;
+    const protectedNow = Boolean(protectionUntil && new Date(protectionUntil).getTime() > Date.now());
+
+    const boss = String(store.current_boss_nickname || "").trim();
+    const bossExists = Boolean(boss && boss !== "No Boss" && boss !== "미점령");
+    const bossAvatar = String(store.current_boss_avatar_url || "").trim();
+
+    const distance = Number.isFinite(Number(store.distance_m)) ? formatDistance(store.distance_m) : "";
+    const place = [store.city, store.district].filter(Boolean).join(" ");
+    const details = [categoryLabel(store.category), place, distance].filter(Boolean).join(" · ");
+    const isPartner = String(store.partnership_status || "unclaimed") === "partnered";
+    const presence = presenceState.get(String(store.id));
+    const requiredSeconds = Math.max(30, Number(presence?.required_seconds || config.gps_dwell_seconds || 120));
+    const remainingSeconds = Math.max(0, Number(presence?.remaining_seconds ?? requiredSeconds));
+    const loginRequired = presenceBlockedReason === "MEMBER_LOGIN_REQUIRED";
+
+    let status = "";
+    if(isMyBossStore){
+      status = protectedNow
+        ? `보호 ${formatRemaining(protectionUntil)} 남음`
+        : "";
+    }else if(bossExists && protectedNow){
+      status = `보호 ${formatRemaining(protectionUntil)} 남음`;
+    }else if(presence?.status === "tracking"){
+      status = `자동 점령 진행 중 · ${formatPresenceSeconds(remainingSeconds)} 남음`;
+    }else if(presence?.status === "outside"){
+      status = `${Math.round(Number(presence.distance_m || 0))}m 더 가까이 가면 자동 시작`;
+    }else if(presence?.status === "low_accuracy"){
+      status = "GPS 정확도 확인 중";
+    }else if(loginRequired){
+      status = "";
+    }else if(isPartner){
+      status = "QR로 바로 도전";
+    }else{
+      status = "";
+    }
+
+    let action = "";
+    if(isPartner){
+      action = `<button class="store-list-action is-primary" data-scan-store="${escapeAttr(store.id)}" type="button">QR 도전</button>`;
+    }else if(loginRequired){
+      action = `<button class="store-list-action" data-store-login="${escapeAttr(store.id)}" type="button">로그인</button>`;
+    }else if(presence?.status === "tracking"){
+      action = `<span class="store-list-action is-live" aria-live="polite">${formatPresenceSeconds(remainingSeconds)}</span>`;
+    }else{
+      action = `<span class="store-list-action is-auto">자동 점령</span>`;
+    }
+
+    const badges = [
+      isPartner ? {label:"제휴", cls:"partner"} : null,
+      Boolean(store.has_benefit || Number(store.active_offer_count || 0) > 0) ? {label:"혜택", cls:"benefit"} : null,
+      protectedNow ? {label:"보호 중", cls:"protected"} : null
+    ].filter(Boolean);
+
+
+    return `
+      <article class="store-card store-card-open challenge-card" data-store-detail="${escapeAttr(store.id)}" role="button" tabindex="0" aria-label="${escapeAttr(store.name)} 매장 정보 보기">
+        <div class="store-card-main">
+          ${bossExists ? occupiedStoreAvatarMarkup(store.photo_url, store.name, bossAvatar, boss, "store-card-photo") : storeAvatarMarkup(store.photo_url, store.name, "store-card-photo")}
+          <div class="store-card-copy">
+            <div class="store-card-title-row">
+              <strong class="store-card-name">${escapeHtml(store.name)}</strong>
+              ${badges.length ? `<div class="store-status-tags">${badges.map(tag => `<span class="store-status-tag ${tag.cls}">${tag.label}</span>`).join("")}</div>` : ""}
+            </div>
+            ${details ? `<div class="store-card-meta">${escapeHtml(details)}</div>` : ""}
+            ${status ? `<div class="store-card-status ${protectedNow ? "is-protected" : ""}">${escapeHtml(status)}</div>` : ""}
+          </div>
+        </div>
+        ${action}
+      </article>
+    `;
+  }
+
+  async function openStoreDetail(storeId, options = {}){
+    const cached = stores.find(store => String(store.id) === String(storeId));
+    openModal(
+      "",
+      `<div class="app-state">매장 정보를 불러오는 중…</div>`,
+      { type:"store-detail" }
+    );
+
+    try{
+      const [detailResult, statusResult, orgResult, offerResult, partnerRequestResult, growthResult, arenaResult, historyResult] = await Promise.all([
+        sb.rpc("biteboss_store_detail", { p_store_id:storeId }),
+        sb.rpc("biteboss_my_store_status", { p_store_id:storeId }),
+        sb.rpc("biteboss_store_organization_status", { p_store_id:storeId }),
+        sb.rpc("biteboss_store_offer_access", { p_store_id:storeId }),
+        playerSession?.authenticated && options?.showPartnerOwnerCard !== false
+          ? sb.rpc("biteboss_partner_request_status", { p_store_id:storeId })
+          : Promise.resolve({ data:null, error:null }),
+        sb.rpc("biteboss_store_public_growth_v63", { p_store_id:storeId, p_days:30 }),
+        sb.rpc("biteboss_store_game_board_v631", { p_store_id:storeId }),
+        sb.rpc("biteboss_store_history_v71", { p_store_id:storeId, p_limit:12 })
+      ]);
+
+      if(detailResult.error) throw detailResult.error;
+      if(!detailResult.data?.store) throw new Error("STORE_NOT_FOUND");
+
+      if(statusResult.error){
+        console.warn("BiteBoss store battle status:", statusResult.error);
+      }
+      if(orgResult.error){
+        console.warn("BiteBoss store organization status:", orgResult.error);
+      }
+      if(offerResult.error){
+        console.warn("BiteBoss store offer access:", offerResult.error);
+      }
+
+      const data = detailResult.data;
+      data.game = statusResult.error ? null : (statusResult.data || null);
+      data.organization = orgResult.error ? null : (orgResult.data || null);
+      data.offerAccess = offerResult.error ? null : (offerResult.data || null);
+      data.partnerRequest = partnerRequestResult?.error ? null : (partnerRequestResult?.data || null);
+      data.publicGrowth = growthResult?.error ? null : (growthResult?.data || null);
+      data.arena = arenaResult?.error ? null : (arenaResult?.data || null);
+      data.history = historyResult?.error || !Array.isArray(historyResult?.data) ? [] : historyResult.data;
+      if(historyResult?.error && !String(historyResult.error.message||"").includes("biteboss_store_history_v71")) console.warn("BiteBoss conquest history:", historyResult.error);
+      if(partnerRequestResult?.error) console.warn("BiteBoss partner request status:", partnerRequestResult.error);
+      if(growthResult?.error) console.warn("BiteBoss public growth:", growthResult.error);
+      if(arenaResult?.error) console.warn("BiteBoss arena:", arenaResult.error);
+
+      if(cached && !Number.isFinite(Number(data.store.distance_m)) && Number.isFinite(Number(cached.distance_m))){
+        data.store.distance_m = Number(cached.distance_m);
+      }
+
+      renderStoreDetail(data, options);
+    }catch(error){
+      console.warn("BiteBoss store detail:", error);
+      const body = $("#modalBody");
+      if(body) body.innerHTML = `<div class="store-detail-empty">매장 정보를 불러오지 못했습니다.</div>`;
+    }
+  }
+
+  function renderStoreDetail(data, options = {}){
+    const store = data.store || {};
+    const game = data.game || {};
+    const orgStatus = data.organization || {};
+    const offerAccess = data.offerAccess || {};
+    const partnerRequest = data.partnerRequest || {};
+    const publicGrowth = data.publicGrowth || {};
+    const arena = data.arena || {};
+    const growth = game.growth || {};
+    const defenseActivity = game.defense_activity || {};
+    const photos = Array.isArray(data.photos) ? data.photos : [];
+    const menu = Array.isArray(data.menu) ? data.menu : [];
+    const offers = Array.isArray(offerAccess.offers)
+      ? offerAccess.offers
+      : (Array.isArray(data.offers) ? data.offers.filter(item => item.status === "active") : []);
+    const isPartner = String(store.partnership_status || "unclaimed") === "partnered";
+    const showPartnerOwnerCard = options?.showPartnerOwnerCard !== false;
+
+    const protectionUntil = game.protected_until || store.protected_until || null;
+    const protectedNow = Boolean(game.protected ?? (protectionUntil && new Date(protectionUntil).getTime() > Date.now()));
+    const cooldownUntil = game.challenge_cooldown_until || null;
+    const cooldownNow = Boolean(cooldownUntil && new Date(cooldownUntil).getTime() > Date.now());
+
+    const bossExists = Boolean(game.boss_user_id || game.boss_nickname || store.current_boss_nickname);
+    const bossName = game.boss_nickname || arena.current_boss_nickname || store.current_boss_nickname || "";
+    const bossOrganizationName = String(orgStatus.boss_organization_name || "").trim();
+    const bossOrganizationAvatar = String(orgStatus.boss_organization_avatar_url || "").trim();
+    const bossAvatar = bossOrganizationAvatar || arena.current_boss_avatar_url || store.current_boss_avatar_url || "";
+    const myRole = String(game.my_role || "visitor");
+    const isBoss = myRole === "boss";
+    const isCrew = myRole === "crew";
+
+    const myLevel = Math.max(1, Number(game.my_level || summary?.level || 1));
+    const myLevelBonus = Math.max(0, Number(game.my_level_bonus ?? 0));
+    const battleBasePower = Math.max(0, Number(game.battle_base_power ?? 1));
+    const myPower = Math.max(0, Number(game.my_power ?? 0));
+    const storeBonus = Math.max(0, Number(game.my_store_bonus ?? growth.store_bonus ?? 0));
+    const validVisits = Math.max(0, Number(game.my_valid_visits ?? growth.valid_visits ?? 0));
+    const bossLevel = Math.max(1, Number(game.boss_level ?? 1));
+    const bossLevelBonus = Math.max(0, Number(game.boss_level_bonus ?? 0));
+    const bossStoreBonus = Math.max(0, Number(game.boss_store_bonus ?? 0));
+    const bossDefense = Math.max(0, Number(game.boss_defense || 0));
+    const defenseDecay = Math.max(0, Number(game.defense_decay ?? defenseActivity.decay ?? 0));
+
+    const visitsToNextBonus = Math.max(0, Number(growth.visits_to_next_bonus || 0));
+    const bonusMax = Math.max(storeBonus, Number(growth.store_bonus_max || 5));
+    const nextBonus = Math.max(storeBonus, Number(growth.next_store_bonus || storeBonus));
+    const bonusProgress = Math.max(0, Math.min(100, Number(growth.bonus_progress_percent || 0)));
+
+    const powerNeeded = Math.max(
+      0,
+      Number(game.power_needed || (bossExists && !isBoss && myPower <= bossDefense ? bossDefense - myPower + 1 : 0))
+    );
+
+    const canChallenge = game.challengeable !== false && !protectedNow && !cooldownNow && !isBoss;
+
+    const distance = Number.isFinite(Number(store.distance_m)) ? formatDistance(store.distance_m) : "";
+    const place = [store.city, store.district].filter(Boolean).join(" ");
+    const address = String(store.address || "").trim();
+    const detailLine = [categoryLabel(store.category), place, distance].filter(Boolean).join(" · ");
+
+    let battleState = "도전 가능";
+    if(isBoss) battleState = "";
+    else if(protectedNow) battleState = "보호 중";
+    else if(cooldownNow) battleState = "재도전 대기";
+    else if(bossExists) battleState = "도전 가능";
+    else battleState = "미점령";
+
+    let bossText = "아직 보스가 없습니다";
+    if(bossExists){
+      const bossIdentity = [bossName || "보스", bossOrganizationName].filter(Boolean).join(" · ");
+      bossText = protectedNow
+        ? `${bossIdentity} · 보호 ${formatRemaining(protectionUntil)} 남음`
+        : `${bossIdentity} · 방어력 ${bossDefense}`;
+    }
+
+    let roleCopy = "방문자";
+    if(isBoss) roleCopy = "보스";
+    else if(isCrew) roleCopy = "크루";
+
+    const bonusCopy = storeBonus >= bonusMax
+      ? `매장 보너스 최대 +${storeBonus}`
+      : `유효 방문 ${visitsToNextBonus}회 후 +${nextBonus}`;
+
+    const defenseStateRaw = String(defenseActivity.state || (defenseDecay > 0 ? "weak" : "active"));
+    const defenseState = ({
+      active:"활성",
+      cooling:"유지 중",
+      weak:"약화",
+      vulnerable:"취약"
+    })[defenseStateRaw] || "활성";
+
+    const nextDefenseAt = defenseActivity.next_decay_at || null;
+    const nextDefenseValue = Number(defenseActivity.next_decay_value || defenseDecay);
+    const defenseTimelineCopy = !bossExists
+      ? ""
+      : nextDefenseAt
+        ? `다음 약화까지 ${formatRemaining(nextDefenseAt)} · 방어력 -${nextDefenseValue}`
+        : `장시간 미방문 · 방어력 -${defenseDecay}`;
+
+    const gallery = photos.length ? `
+      <section class="store-detail-section">
+        <h4>사진</h4>
+        <div class="store-detail-gallery">
+          ${photos.map(photo => `<img src="${escapeAttr(photo.image_url)}" alt="${escapeAttr(photo.caption || store.name || "Store photo")}" />`).join("")}
+        </div>
+      </section>` : "";
+
+    const menuHtml = menu.length ? `
+      <section class="store-detail-section">
+        <h4>메뉴</h4>
+        <div class="store-detail-menu">
+          ${menu.map(item => `
+            <article>
+              <div>
+                <strong>${escapeHtml(item.name)}</strong>
+                ${item.description ? `<p>${escapeHtml(item.description)}</p>` : ""}
+              </div>
+              <span>${item.price != null && item.price !== "" ? `${Number(item.price).toLocaleString("ko-KR")}원` : "-"}${item.is_signature ? `<small>대표</small>` : ""}</span>
+            </article>`).join("")}
+        </div>
+      </section>` : "";
+
+    const detailBadges=[
+      isPartner ? {label:"제휴",cls:"partner"} : null,
+      offers.length ? {label:"혜택",cls:"benefit"} : null,
+      protectedNow
+        ? {label:"보호 중",cls:"protected"}
+        : (!isBoss && bossExists ? {label:"도전 가능",cls:"open"} : null)
+    ].filter(Boolean);
+
+    const offersHtml = isPartner ? `
+      <section class="store-detail-section partner-benefits">
+        <div class="partner-benefits-head">
+          <h4>혜택</h4>
+          <span>${escapeHtml((offerAccess.player_role || myRole || "visitor").toUpperCase())}</span>
+        </div>
+        <div class="store-detail-offers">
+          ${offers.length ? offers.map(item => {
+            const minimumRole = String(item.minimum_role || (item.boss_only ? "boss" : "visitor"));
+            const eligible = item.eligible !== false && (
+              item.eligible === true ||
+              minimumRole === "visitor" ||
+              (minimumRole === "crew" && (myRole === "crew" || myRole === "boss")) ||
+              (minimumRole === "boss" && myRole === "boss")
+            );
+            const accessLabel = minimumRole === "boss"
+              ? "보스 전용"
+              : minimumRole === "crew"
+                ? "크루 + 보스"
+                : "모두 사용";
+
+            return `
+              <article class="partner-benefit ${eligible ? "is-eligible" : "is-locked"}">
+                <div>
+                  <span>${escapeHtml(accessLabel)}</span>
+                  <strong>${escapeHtml(item.title)}</strong>
+                  ${item.description ? `<p>${escapeHtml(item.description)}</p>` : ""}
+                </div>
+                ${eligible
+                  ? `<button class="text-btn benefit-use-btn" type="button" data-benefit-offer="${escapeAttr(item.id)}">혜택 사용</button>`
+                  : `<small>${minimumRole === "boss" ? "보스가 되면 사용할 수 있습니다" : "크루가 되면 사용할 수 있습니다"}</small>`}
+              </article>
+            `;
+          }).join("") : `<div class="store-detail-empty">현재 사용 가능한 혜택이 없습니다.</div>`}
+        </div>
+      </section>` : "";
+
+    const arenaCurrentBoss = String(arena.current_boss_nickname || bossName || "아직 없음");
+    const arenaCurrentBossAvatar = String(arena.current_boss_avatar_url || bossAvatar || "");
+    const arenaLongestBoss = String(arena.longest_boss_nickname || "—");
+    const arenaLongestHours = Math.max(0, Number(arena.longest_reign_hours || 0));
+    const arenaTodayChallengers = Math.max(0, Number(arena.today_challengers || 0));
+    const arenaMonthVisits = Math.max(0, Number(arena.month_visits || publicGrowth.visits || 0));
+    const arenaCrew = String(arena.current_crew_name || "");
+    const arenaCrewTerritory = Math.max(0, Number(arena.current_crew_territory || 0));
+
+    const history = Array.isArray(data.history) ? data.history : [];
+    const historyHtml = history.length ? `
+      <section class="store-detail-section conquest-history">
+        <h4>점령 히스토리</h4>
+        <div class="conquest-history-list">${history.slice(0,8).map((row,index)=>`<div><span>${index===0 && !row.ended_at ? "NOW" : formatDate(row.started_at)}</span><strong>${escapeHtml(row.boss_nickname||"Boss")}</strong><small>${row.ended_at ? `${Number(row.hours||0).toFixed(1)}h` : "점령 중"}</small></div>`).join("")}</div>
+      </section>` : "";
+
+    const arenaHtml = `
+      <section class="store-arena" aria-label="Store arena">
+        <div class="store-arena-head">
+          <span>점령 현황</span>
+          <strong>이 매장을 차지하고 있는 보스</strong>
+        </div>
+        <div class="store-arena-grid">
+          <article class="arena-boss-card">
+            <span>보스</span>
+            <div class="arena-boss-identity">
+              ${bossAvatarMarkup(arenaCurrentBossAvatar, arenaCurrentBoss, "arena-boss-avatar")}
+              <strong>${escapeHtml(arenaCurrentBoss)}</strong>
+            </div>
+          </article>
+          <article><span>최장 점령</span><strong>${escapeHtml(arenaLongestBoss)}</strong><small>${arenaLongestHours ? `${arenaLongestHours.toFixed(arenaLongestHours < 10 ? 1 : 0)}h` : "—"}</small></article>
+          <article><span>오늘 도전자</span><strong>${arenaTodayChallengers}</strong></article>
+          <article><span>30일 방문</span><strong>${arenaMonthVisits}</strong></article>
+        </div>
+        ${arenaCrew ? `
+          <div class="store-arena-crew">
+            <span>크루 점령지</span>
+            <strong>${escapeHtml(arenaCrew)}</strong>
+            <b>${arenaCrewTerritory}개 매장</b>
+          </div>` : ""}
+      </section>
+    `;
+
+    const impactVisits = Math.max(0, Number(publicGrowth.visits || 0));
+    const impactUnique = Math.max(0, Number(publicGrowth.unique_visitors || 0));
+    const impactRepeat = Math.max(0, Number(publicGrowth.repeat_visitors || 0));
+    const impactChallengers = Math.max(0, Number(publicGrowth.challengers || 0));
+    const impactShares = Math.max(0, Number(publicGrowth.shares || 0));
+
+    const publicImpactHtml = `
+      <section class="public-impact ${isPartner ? "is-partner" : ""}">
+        <div class="public-impact-head">
+          <div>
+            <span>30일 매장 활동</span>
+            <strong>${isPartner ? "BiteBoss 활동 현황" : "이 매장에서도 이미 게임이 진행 중입니다."}</strong>
+          </div>
+          ${isPartner ? `<b>제휴</b>` : `<b>미제휴</b>`}
+        </div>
+        <div class="public-impact-grid">
+          <article><span>방문</span><strong>${impactVisits}</strong></article>
+          <article><span>사용자</span><strong>${impactUnique}</strong></article>
+          <article><span>재방문</span><strong>${impactRepeat}</strong></article>
+          <article><span>도전</span><strong>${impactChallengers}</strong></article>
+        </div>
+        ${impactShares ? `<p>최근 30일 공유 ${impactShares}회</p>` : ""}
+      </section>
+    `;
+
+    const powerState = isBoss
+      ? ""
+      : protectedNow
+        ? `보호 ${formatRemaining(protectionUntil)} 남음`
+        : cooldownNow
+          ? `재도전 ${formatRemaining(cooldownUntil)} 남음`
+          : !bossExists
+            ? "지금 점령 가능"
+            : powerNeeded > 0
+              ? `파워 +${powerNeeded} 필요`
+              : "지금 도전 가능";
+
+    const powerStateClass = isBoss
+      ? "is-mine"
+      : protectedNow
+        ? "is-protected"
+        : powerNeeded > 0
+          ? "is-needs-power"
+          : "is-ready";
+
+    const growthTargetText = storeBonus >= bonusMax
+      ? "매장 보너스 최대"
+      : `다음 +${nextBonus}까지 유효 방문 ${visitsToNextBonus}회`;
+
+    const compactDefenseHtml = isBoss && bossExists ? `
+      <div class="owner-defense-summary">
+        <span>내 방어 상태</span>
+        <strong>${escapeHtml(defenseState)}</strong>
+        ${defenseTimelineCopy ? `<small>${escapeHtml(defenseTimelineCopy)}</small>` : ""}
+      </div>
+    ` : "";
+
+    let action = "";
+    if(isBoss){
+      action = `<div class="store-detail-auto is-boss"><strong class="store-detail-boss-owner-copy">현재 이 매장의 보스입니다.</strong><span>다시 방문하면 방어력이 유지됩니다.</span></div>`;
+    }else if(protectedNow){
+      action = `<button class="secondary-btn store-detail-primary" type="button" disabled>보호 중</button>`;
+    }else if(cooldownNow){
+      action = `<button class="secondary-btn store-detail-primary" type="button" disabled>재도전 ${escapeHtml(formatRemaining(cooldownUntil))}</button>`;
+    }else if(isPartner){
+      action = `<button id="detailScanQr" class="primary-btn store-detail-primary" type="button">QR로 도전</button>`;
+    }else{
+      action = "";
+    }
+
+    $("#modal")?.classList.add("store-detail-modal");
+    setText("#modalTitle", "");
+    const body = $("#modalBody");
+    if(!body) return;
+
+    body.innerHTML = `
+      <div class="store-detail store-detail-v635">
+        <header class="store-detail-head compact-store-head store-detail-identity">
+          <div class="store-detail-primary-identity">
+            ${storeAvatarMarkup(store.photo_url, store.name, "store-detail-avatar")}
+            <div class="store-detail-identity-copy">
+              <strong>${escapeHtml(store.name || "매장")}</strong>
+              ${detailLine ? `<p>${escapeHtml(detailLine)}</p>` : ""}
+              ${address ? `<p class="store-detail-address">${escapeHtml(address)}</p>` : ""}
+            </div>
+          </div>
+          ${detailBadges.length ? `
+            <div class="store-detail-status">
+              ${detailBadges.map(tag=>`<span class="store-status-tag ${tag.cls}">${tag.label}</span>`).join("")}
+            </div>` : ""}
+        </header>
+
+        ${bossExists ? `
+          <section class="boss-focus" aria-label="보스 정보">
+            <div class="boss-focus-head">
+              <span></span>
+              <small>${protectedNow ? `보호 ${escapeHtml(formatRemaining(protectionUntil))}` : `방어력 ${bossDefense}`}</small>
+            </div>
+            <div class="boss-focus-main">
+              ${bossAvatarMarkup(bossAvatar, bossName || "보스", "boss-focus-avatar")}
+              <div class="boss-focus-copy">
+                <strong>${escapeHtml(bossName || "보스")}</strong>
+                ${bossOrganizationName ? `<small>${escapeHtml(bossOrganizationName)}</small>` : ""}
+              </div>
+            </div>
+          </section>
+        ` : ""}
+
+        <section class="power-matchup" aria-label="도전 전력">
+          <div class="power-matchup-values">
+            <article>
+              <span>내 파워</span>
+              <strong>${myPower}</strong>
+            </article>
+            <i aria-hidden="true">VS</i>
+            <article>
+              <span>보스 방어력</span>
+              <strong>${bossExists ? bossDefense : "—"}</strong>
+            </article>
+          </div>
+          ${powerState ? `
+            <div class="power-matchup-result ${powerStateClass}">
+              <strong>${escapeHtml(powerState)}</strong>
+              ${!isBoss && powerNeeded > 0 ? `<small>방문 보너스와 레벨 보너스를 올리면 다시 도전할 수 있습니다.</small>` : ""}
+            </div>
+          ` : ""}
+        </section>
+
+        ${action ? `<div class="primary-store-action">${action}</div>` : ""}
+
+        <section class="growth-compact">
+          <div class="growth-compact-head">
+            <div>
+              <span>매장 보너스</span>
+              <strong>+${storeBonus}</strong>
+            </div>
+            <small>${escapeHtml(growthTargetText)}</small>
+          </div>
+          <div class="store-growth-track" aria-hidden="true">
+            <i style="width:${storeBonus >= bonusMax ? 100 : bonusProgress}%"></i>
+          </div>
+          <div class="growth-compact-meta">
+            <span>유효 방문 ${validVisits}회</span>
+            <span>최대 +${bonusMax}</span>
+          </div>
+        </section>
+
+        ${compactDefenseHtml}
+
+        ${offersHtml}
+
+        <details class="store-more">
+          <summary>
+            <span>상세 정보 보기</span>
+            <b aria-hidden="true">+</b>
+          </summary>
+          <div class="store-more-body">
+            <section class="store-more-stats">
+              <div><span>레벨</span><strong>Lv ${myLevel}</strong><small>보너스 +${myLevelBonus}</small></div>
+              <div><span>내 역할</span><strong>${escapeHtml(roleCopy)}</strong></div>
+              <div><span>상태</span><strong>${escapeHtml(battleState)}</strong></div>
+              <div><span>매장 보너스</span><strong>+${storeBonus}</strong><small>기본 ${battleBasePower}</small></div>
+            </section>
+
+            ${!isBoss && bossExists ? `
+              <section class="store-detail-subsection">
+                <div class="subsection-title">보스 방어 정보</div>
+                <div class="detail-line-row"><span>방어 상태</span><strong>${escapeHtml(defenseState)}${defenseDecay ? ` · -${defenseDecay}` : ""}</strong></div>
+                <div class="detail-line-row"><span>보스 레벨</span><strong>Lv ${bossLevel} · +${bossLevelBonus}</strong></div>
+                <div class="detail-line-row"><span>보스 매장 보너스</span><strong>+${bossStoreBonus}</strong></div>
+                ${defenseTimelineCopy ? `<p class="detail-note">${escapeHtml(defenseTimelineCopy)}</p>` : ""}
+              </section>` : ""}
+
+            <section class="store-detail-subsection">
+              <div class="subsection-title">점령 현황</div>
+              <div class="store-more-stats arena-mini">
+                <div><span>최장 점령</span><strong>${escapeHtml(arenaLongestBoss)}</strong><small>${arenaLongestHours ? `${arenaLongestHours.toFixed(arenaLongestHours < 10 ? 1 : 0)}시간` : "—"}</small></div>
+                <div><span>오늘 도전자</span><strong>${arenaTodayChallengers}</strong></div>
+                <div><span>30일 방문</span><strong>${arenaMonthVisits}</strong></div>
+                <div><span>크루 점령지</span><strong>${arenaCrew ? `${arenaCrewTerritory}개` : "—"}</strong></div>
+              </div>
+              ${arenaCrew ? `<p class="detail-note">${escapeHtml(arenaCrew)}</p>` : ""}
+            </section>
+
+            <section class="store-detail-subsection">
+              <div class="subsection-title">30일 매장 활동</div>
+              <div class="store-more-stats">
+                <div><span>방문</span><strong>${impactVisits}</strong></div>
+                <div><span>사용자</span><strong>${impactUnique}</strong></div>
+                <div><span>재방문</span><strong>${impactRepeat}</strong></div>
+                <div><span>도전</span><strong>${impactChallengers}</strong></div>
+              </div>
+              ${impactShares ? `<p class="detail-note">최근 30일 공유 ${impactShares}회</p>` : ""}
+            </section>
+
+            ${(store.hours || store.phone || store.notice) ? `
+              <section class="store-detail-section store-detail-info">
+                <h4>매장 정보</h4>
+                ${store.hours ? `<div><span>영업시간</span><strong>${escapeHtml(store.hours)}</strong></div>` : ""}
+                ${store.phone ? `<div><span>전화</span><strong>${escapeHtml(store.phone)}</strong></div>` : ""}
+                ${store.notice ? `<div><span>안내</span><strong>${escapeHtml(store.notice)}</strong></div>` : ""}
+              </section>` : ""}
+
+            ${gallery}
+            ${menuHtml}
+          </div>
+        </details>
+
+        ${showPartnerOwnerCard ? renderPartnerRequestCard(store, partnerRequest, isPartner) : ""}
+      </div>
+    `;
+
+    if(showPartnerOwnerCard){
+      $("#detailPartnerRequest")?.addEventListener("click", () => openPartnerRequestForm(store));
+    }
+    $("#shareBossCardBtn")?.addEventListener("click",()=>shareBossCard({
+      store,bossName,bossDefense,protectedNow,protectionUntil,myPower,isBoss,context:"store_detail"
+    }));
+    $("#detailPartnerAdmin")?.addEventListener("click", () => { location.href = "./store-admin.html"; });
+
+    $("#detailScanQr")?.addEventListener("click", () => {
+      closeModal();
+      scanPrompt();
+    });
+
+    $$("[data-benefit-offer]", body).forEach(button => {
+      button.addEventListener("click", () => createBenefitPass(button.dataset.benefitOffer));
+    });
+  }
+
+
+  function renderPartnerRequestCard(store, request, isPartner){
+    const status = String(request?.status || "");
+    const activationCode = String(request?.activation_code || "").trim();
+
+    if(status === "approved" && activationCode){
+      return `
+        <section class="store-detail-section partner-owner-card approved">
+          <span class="partner-owner-kicker">매장 관리자</span>
+          <strong>제휴 승인이 완료됐습니다.</strong>
+          <p>아래 활성화 코드로 매장 관리자 계정을 만들 수 있습니다.</p>
+          <code>${escapeHtml(activationCode)}</code>
+          <button id="detailPartnerAdmin" class="primary-btn" type="button">매장 관리자 열기</button>
+        </section>`;
+    }
+    if(status === "pending"){
+      return `
+        <section class="store-detail-section partner-owner-card pending">
+          <span class="partner-owner-kicker">매장 인증</span>
+          <strong>매장 관리자 확인 중</strong>
+          <p>승인되면 이 화면에서 활성화 코드를 확인할 수 있습니다.</p>
+        </section>`;
+    }
+    if(isPartner) return "";
+    return `
+      <section class="store-detail-section partner-owner-card">
+        <span class="partner-owner-kicker">매장 관리자</span>
+        <strong>${status === "rejected" ? "매장 관리자 인증을 다시 신청할 수 있습니다." : "이 매장의 관리자이신가요?"}</strong>
+        <p>지금도 BiteBoss 방문·도전 데이터가 쌓이고 있습니다.</p>
+        <button id="detailPartnerRequest" class="primary-btn claim-store-btn" type="button">매장 인증</button>
+      </section>`;
+  }
+
+  function openPartnerRequestForm(store){
+    recordGrowthEvent(store?.id, "claim_store_opened", {});
+    if(!playerSession?.authenticated){
+      toast("회원 로그인 후 매장 관리자 인증을 신청할 수 있습니다.");
+      return;
+    }
+    openModal("매장 관리자 인증", `
+      <form id="partnerRequestForm" class="partner-request-form">
+        <div class="partner-request-store">
+          <strong>${escapeHtml(store.name || "매장")}</strong>
+          <p>${escapeHtml(store.address || [store.city,store.district].filter(Boolean).join(" "))}</p>
+        </div>
+        <label>이름<input class="input" name="requester_name" maxlength="40" autocomplete="name" required /></label>
+        <label>연락처<input class="input" name="contact" maxlength="60" autocomplete="tel" inputmode="tel" placeholder="010-0000-0000" required /></label>
+        <label>메모<textarea class="input partner-request-note" name="message" maxlength="300" placeholder="확인에 필요한 내용을 적어주세요."></textarea></label>
+        <button class="primary-btn" type="submit">인증 요청</button>
+        <p id="partnerRequestStatus" class="inline-status"></p>
+      </form>`);
+    $("#partnerRequestForm")?.addEventListener("submit", event => submitPartnerRequest(event, store.id));
+  }
+
+  async function submitPartnerRequest(event, storeId){
+    event.preventDefault();
+    const formEl = event.currentTarget;
+    const form = new FormData(formEl);
+    const status = $("#partnerRequestStatus");
+    const submit = formEl.querySelector('button[type="submit"]');
+    const requesterName = String(form.get("requester_name") || "").trim();
+    const contact = String(form.get("contact") || "").trim();
+    const message = String(form.get("message") || "").trim();
+
+    if(!requesterName || contact.length < 4){
+      if(status) status.textContent = "이름과 연락처를 확인하세요.";
+      return;
+    }
+    if(submit) submit.disabled = true;
+    if(status) status.textContent = "신청 중…";
+    try{
+      const { data, error } = await sb.rpc("biteboss_partner_request_create", {
+        p_store_id:storeId,
+        p_requester_name:requesterName,
+        p_contact:contact,
+        p_business_number:"",
+        p_message:message,
+        p_website_url:null,
+        p_sns_url:null
+      });
+      if(error) throw error;
+      if(!data?.ok){
+        const messageText = ({
+          MEMBER_LOGIN_REQUIRED:"회원 로그인 후 신청할 수 있습니다.",
+          STORE_NOT_FOUND:"매장을 찾을 수 없습니다.",
+          ALREADY_PARTNERED:"이미 제휴된 매장입니다.",
+          REQUEST_ALREADY_PENDING:"이미 확인 중인 신청이 있습니다.",
+          INVALID_REQUEST:"이름과 연락처를 확인하세요."
+        })[data?.error] || "신청을 완료하지 못했습니다.";
+        if(status) status.textContent = messageText;
+        return;
+      }
+      closeModal();
+      toast("매장 관리자 인증 신청이 접수되었습니다.");
+      await openStoreDetail(storeId);
+    }catch(error){
+      console.warn("BiteBoss partner request:", error);
+      if(status) status.textContent = error?.message || "신청을 완료하지 못했습니다.";
+    }finally{
+      if(submit) submit.disabled = false;
+    }
+  }
+
+  async function recordGrowthEvent(storeId, eventType, payload = {}){
+    if(!playerSession?.authenticated || !storeId) return;
+    try{
+      await sb.rpc("biteboss_record_growth_event_v63", {
+        p_store_id:storeId,
+        p_event_type:String(eventType || "share"),
+        p_payload:payload || {}
+      });
+    }catch(error){
+      console.warn("BiteBoss growth event:", error);
+    }
+  }
+
+  async function shareBossCard({
+    store,
+    bossName,
+    bossDefense,
+    protectedNow,
+    protectionUntil,
+    myPower,
+    isBoss=false,
+    context="store_detail"
+  }){
+    const canvas=document.createElement("canvas");
+    canvas.width=1080;
+    canvas.height=1350;
+    const ctx=canvas.getContext("2d");
+
+    const storeName=String(store?.name||"STORE").trim();
+    const place=[store?.city,store?.district].filter(Boolean).join(" ");
+    const statusLine=isBoss ? "내가 현재 보스" : (bossName ? `현재 보스 ${bossName}` : "아직 보스 없음");
+    const challengeLine=isBoss ? "나한테서 뺏어봐." : "이 매장을 점령해봐." ;
+    const timeText=new Intl.DateTimeFormat("en",{month:"short",day:"2-digit",hour:"2-digit",minute:"2-digit"}).format(new Date()).toUpperCase();
+
+    ctx.fillStyle="#000";
+    ctx.fillRect(0,0,1080,1350);
+
+    ctx.fillStyle="#d5232f";
+    ctx.fillRect(0,0,1080,18);
+    ctx.fillRect(72,102,12,126);
+
+    ctx.fillStyle="#fff";
+    ctx.font="900 50px system-ui";
+    ctx.fillText("BITEBOSS",112,150);
+
+    ctx.fillStyle="#777";
+    ctx.font="800 26px system-ui";
+    ctx.fillText("매장 점령",72,286);
+
+    ctx.fillStyle="#fff";
+    ctx.font="900 92px system-ui";
+    const name=storeName.toUpperCase();
+    ctx.fillText(name.slice(0,18),72,410);
+    if(name.length>18){
+      ctx.fillText(name.slice(18,34),72,510);
+    }
+
+    ctx.fillStyle="#d5232f";
+    ctx.font="900 82px system-ui";
+    ctx.fillText(statusLine.slice(0,24).toUpperCase(),72,690);
+
+    ctx.fillStyle="#fff";
+    ctx.font="900 116px system-ui";
+    ctx.fillText(challengeLine,72,845);
+
+    ctx.strokeStyle="#242424";
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.moveTo(72,930);
+    ctx.lineTo(1008,930);
+    ctx.stroke();
+
+    ctx.fillStyle="#777";
+    ctx.font="800 25px system-ui";
+    ctx.fillText("보스 방어력",72,1005);
+    ctx.fillText("내 파워",400,1005);
+    ctx.fillText("상태",730,1005);
+
+    ctx.fillStyle="#fff";
+    ctx.font="900 56px system-ui";
+    ctx.fillText(String(Math.max(0,Number(bossDefense||0))),72,1070);
+    ctx.fillText(String(Math.max(0,Number(myPower||0))),400,1070);
+
+    ctx.fillStyle=protectedNow ? "#fff" : "#d5232f";
+    ctx.font="900 34px system-ui";
+    ctx.fillText(protectedNow ? "보호 중" : "도전 가능",730,1066);
+
+    ctx.fillStyle="#777";
+    ctx.font="700 24px system-ui";
+    if(place) ctx.fillText(place.toUpperCase().slice(0,36),72,1175);
+    ctx.fillText(timeText,72,1222);
+    if(protectedNow&&protectionUntil){
+      ctx.fillText(`보호 ${formatRemaining(protectionUntil)} 남음`,72,1269);
+    }
+
+    ctx.textAlign="right";
+    ctx.fillStyle="#fff";
+    ctx.font="900 26px system-ui";
+    ctx.fillText("찾고, 점령하고, 보스가 돼.",1008,1269);
+    ctx.textAlign="left";
+
+    const blob=await new Promise((resolve,reject)=>
+      canvas.toBlob(b=>b?resolve(b):reject(new Error("CARD_EXPORT_FAILED")),"image/png")
+    );
+    const file=new File(
+      [blob],
+      `biteboss-${storeName.replace(/[^a-z0-9가-힣_-]+/gi,"-")}.png`,
+      {type:"image/png"}
+    );
+
+    let shared=false;
+    try{
+      if(navigator.share&&navigator.canShare?.({files:[file]})){
+        await navigator.share({
+          files:[file],
+          title:`${storeName} · BiteBoss`,
+          text:isBoss ? "나한테서 뺏어봐. #BiteBoss" : "이 매장을 점령해봐. #BiteBoss"
+        });
+        shared=true;
+      }
+    }catch(error){
+      if(error?.name==="AbortError") return;
+    }
+
+    if(!shared){
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement("a");
+      a.href=url;
+      a.download=file.name;
+      a.click();
+      setTimeout(()=>URL.revokeObjectURL(url),1000);
+    }
+
+    await recordGrowthEvent(store?.id, shared ? "share_card_shared" : "share_card_saved", {
+      context,
+      is_boss:Boolean(isBoss)
+    });
+  }
+
+
+  async function createBenefitPass(offerId){
+    if(!offerId) return;
+
+    try{
+      const { data, error } = await sb.rpc("biteboss_create_offer_pass", {
+        p_offer_id:offerId
+      });
+      if(error) throw error;
+
+      if(!data?.ok){
+        const message = ({
+          MEMBER_LOGIN_REQUIRED:"회원 로그인 후 혜택을 사용할 수 있습니다.",
+          OFFER_NOT_FOUND:"현재 사용할 수 없는 혜택입니다.",
+          STORE_NOT_PARTNERED:"제휴 매장에서만 사용할 수 있습니다.",
+          ROLE_REQUIRED:data?.minimum_role === "boss"
+            ? "현재 보스만 사용할 수 있는 혜택입니다."
+            : "현재 크루 이상만 사용할 수 있는 혜택입니다."
+        })[data?.error] || "혜택 패스를 만들지 못했습니다.";
+
+        toast(message);
+        return;
+      }
+
+      openModal("Benefit pass", `
+        <div class="benefit-pass">
+          <span>SHOW TO STORE STAFF</span>
+          <strong>${escapeHtml(data.token || "")}</strong>
+          <h4>${escapeHtml(data.offer_title || "Benefit")}</h4>
+          <p>${escapeHtml(data.store_name || "Partner Store")}</p>
+          <div class="benefit-pass-meta">
+            <span>${escapeHtml(String(data.player_role || "visitor").toUpperCase())}</span>
+            <span>${escapeHtml(formatRemaining(data.expires_at))} left</span>
+          </div>
+          <small>직원이 이 코드를 확인하면 1회 사용 처리됩니다. 코드는 5분 후 만료됩니다.</small>
+        </div>
+      `);
+    }catch(error){
+      console.warn("BiteBoss benefit pass:", error);
+      toast("혜택 패스를 만들지 못했습니다.");
+    }
+  }
+
+
+  function renderHomeNearbyBosses(){
+    const box = $("#homeNearbyBosses");
+    if(!box) return;
+
+    const nearby = stores.slice(0, 8);
+    box.innerHTML = nearby.map(store => {
+      const boss = store.current_boss_nickname || "보스 없음";
+      const label = Number.isFinite(Number(store.distance_m))
+        ? `${store.name} · ${formatDistance(store.distance_m)}`
+        : store.name;
+      const avatar = String(store.current_boss_avatar_url || "").trim();
+      return `
+        <button class="nearby-boss" type="button" data-tab="stores">
+          ${boss !== "보스 없음"
+            ? bossAvatarMarkup(avatar, boss, "nearby-avatar")
+            : `<span class="nearby-avatar boss-avatar-fallback" aria-hidden="true">?</span>`}
+          <strong>${escapeHtml(boss)}</strong>
+          <small>${escapeHtml(label)}</small>
+        </button>
+      `;
+    }).join("") || `
+      <button class="nearby-empty" type="button" data-tab="stores">
+        <strong>주변 매장이 아직 없습니다.</strong>
+        <small>위치 권한을 허용하면 가까운 보스를 찾습니다.</small>
+      </button>
+    `;
+
+    $$("#homeNearbyBosses [data-tab]").forEach(btn => btn.onclick = () => openTab(btn.dataset.tab));
+  }
+
+  async function loadGameActivity(){
+    const homeBox = $("#homeActivity");
+    const profileBox = $("#profileActivity");
+
+    if(!playerSession?.authenticated){
+      if(homeBox) homeBox.innerHTML = `<div class="activity-empty">로그인 후 전투 기록을 확인할 수 있습니다.</div>`;
+      if(profileBox) profileBox.innerHTML = `<div class="activity-empty">로그인 후 전투 기록을 확인할 수 있습니다.</div>`;
+      return;
+    }
+
+    const { data, error } = await sb.rpc("biteboss_game_activity", {
+      p_limit:30
+    });
+
+    if(error){
+      console.warn("BiteBoss activity:", error);
+      if(homeBox) homeBox.innerHTML = `<div class="activity-empty">활동 기록을 불러오지 못했습니다.</div>`;
+      if(profileBox) profileBox.innerHTML = `<div class="activity-empty">활동 기록을 불러오지 못했습니다.</div>`;
+      return;
+    }
+
+    const rows = Array.isArray(data) ? data : [];
+
+    if(homeBox) homeBox.innerHTML = renderActivityRows(rows.slice(0,5), true);
+    if(profileBox) profileBox.innerHTML = renderActivityRows(rows, false);
+
+    $$("[data-activity-store]").forEach(button => {
+      button.onclick = event => {
+        const storeId = button.dataset.activityStore;
+        if(!storeId) return;
+
+        const fromProfileBattleLog = Boolean(button.closest("#profileActivity"));
+
+        if(fromProfileBattleLog){
+          event?.preventDefault?.();
+          event?.stopPropagation?.();
+        }
+
+        openStoreDetail(storeId, {
+          source:fromProfileBattleLog ? "profile_battle" : "activity",
+          showPartnerOwnerCard:!fromProfileBattleLog
+        });
+      };
+    });
+  }
+
+  function renderActivityRows(rows, compact){
+    if(!rows.length){
+      return `<div class="activity-empty">${compact ? "최근 전투 기록이 없습니다." : "아직 전투 기록이 없습니다."}</div>`;
+    }
+
+    return rows.map(row => {
+      const result = String(row.result || "");
+      const actor = row.actor_name || "사용자";
+      const defender = row.defender_name || "보스";
+      const storeName = row.store_name || "매장";
+
+      let title = "보스 도전";
+      let detail = `${actor} → ${defender}`;
+
+      if(result === "boss_win"){
+        title = "보스 점령";
+        detail = actor;
+      }else if(result === "crew"){
+        title = "크루 합류";
+        detail = actor;
+      }else if(result === "boss_visit"){
+        title = "방어 유지";
+        detail = actor;
+      }
+
+      if(compact){
+        const scope = row.is_mine ? "나" : row.is_org ? "크루" : "";
+        return `
+          <button class="activity-row is-compact" type="button" data-activity-store="${escapeAttr(row.store_id)}" data-player-profile="${escapeAttr(row.actor_user_id || "")}">
+            <div class="activity-main">
+              <div class="activity-title-row">
+                <strong>${escapeHtml(title)}</strong>
+                ${scope ? `<span class="activity-scope">${escapeHtml(scope)}</span>` : ""}
+              </div>
+              <p><b>${escapeHtml(storeName)}</b><span>${escapeHtml(detail)}</span></p>
+            </div>
+            <time>${escapeHtml(formatActivityTime(row.created_at))}</time>
+          </button>
+        `;
+      }
+
+      const cachedStore = stores.find(item => String(item.id) === String(row.store_id)) || null;
+      const photoUrl = String(
+        row.store_photo_url ||
+        row.photo_url ||
+        cachedStore?.photo_url ||
+        ""
+      ).trim();
+      const fallback = Array.from(String(storeName).trim())[0] || "B";
+      const thumb = photoUrl
+        ? `<img class="profile-record-thumb" src="${escapeAttr(photoUrl)}" alt="" />`
+        : `<span class="profile-record-thumb profile-record-thumb-fallback" aria-hidden="true">${escapeHtml(fallback)}</span>`;
+
+      return `
+        <button class="profile-record-row has-thumb" type="button" data-activity-store="${escapeAttr(row.store_id)}" data-player-profile="${escapeAttr(row.actor_user_id || "")}">
+          ${thumb}
+          <span class="profile-record-main">
+            <strong class="profile-record-title">${escapeHtml(title)}</strong>
+            <span class="profile-record-meta">${escapeHtml(storeName)} · ${escapeHtml(detail)}</span>
+          </span>
+          <time class="profile-record-time">${escapeHtml(formatActivityTime(row.created_at))}</time>
+        </button>
+      `;
+    }).join("");
+  }
+
+  function formatActivityTime(value){
+    const time = new Date(value).getTime();
+    if(!Number.isFinite(time)) return "";
+    const diff = Math.max(0,Date.now()-time);
+    const minutes = Math.floor(diff/60000);
+    if(minutes < 1) return "방금";
+    if(minutes < 60) return `${minutes}분 전`;
+    const hours = Math.floor(minutes/60);
+    if(hours < 24) return `${hours}시간 전`;
+    const days = Math.floor(hours/24);
+    if(days < 7) return `${days}일 전`;
+    return new Date(value).toLocaleDateString("ko-KR",{month:"numeric",day:"numeric"});
+  }
+
+
+  async function loadHome(){
+    if(!playerSession?.authenticated){
+      resetMemberSummaryUi();
+      return;
+    }
+
+    const { data, error } = await sb.rpc("biteboss_my_summary");
+    if(error){
+      console.warn(error);
+      return;
+    }
+
+    summary = data || {};
+    const bossCount = Number(summary.active_boss_count || 0);
+    const crewCount = Number(summary.crew_count || 0);
+    const checkins = Number(summary.checkin_count || 0);
+    const claims = Number(summary.claim_count || 0);
+    const xp = Number(summary.xp || 0);
+    const level = Math.max(1, Number(summary.level || 1));
+
+    setText("#homeBossCount", bossCount);
+    setText("#myBossCount", bossCount);
+    setText("#myCrewCount", crewCount);
+    setText("#myLevel", `Lv ${level}`);
+    setText("#homeCheckinCount", checkins);
+    setText("#myCheckinCount", checkins);
+    setText("#homeStreakCount", claims);
+    setText("#homeXp", `Lv ${level} · ${xp} XP`);
+    renderOrganizationUi();
+
+    updateHomeProtectionMeter(summary);
+    updateProfileMeter(bossCount);
+    updateRankMeter(xp);
+    await loadHistory();
+  }
+
+  function updateHomeProtectionMeter(data){
+    const expiresAt = data?.protected_until;
+    if(!expiresAt){
+      setPageMeter("home", "보스 기록 없음", "-", 0, true);
+      return;
+    }
+
+    const totalMs = Math.max(1, Number(config.protect_minutes || 60)) * 60 * 1000;
+    const remainingMs = Math.max(0, new Date(expiresAt).getTime() - Date.now());
+    const name = data.active_store_name || "매장";
+    setPageMeter("home", `${name} 보스`, formatRemaining(expiresAt), remainingMs / totalMs * 100, false);
+  }
+
+  async function loadHistory(){
+    const box = $("#myHistory");
+    if(!box) return;
+
+    const { data, error } = await sb.rpc("biteboss_my_history", { p_limit:30 });
+    if(error){
+      console.warn(error);
+      return;
+    }
+
+    renderVisitLog(data || []);
+  }
+
+  function renderVisitLog(entries){
+    const box = $("#myHistory");
+    if(!box) return;
+
+    const list = entries.slice(0, 12);
+    setText("#visitPlaceCount", `${list.length}곳`);
+
+    const summaryText = $("#visitSummaryText");
+    if(summaryText){
+      summaryText.textContent = list.length
+        ? `${list[0].store_name}${list.length > 1 ? ` 외 ${list.length - 1}곳` : ""} 방문 기록`
+        : "매장을 방문하면 기록이 여기에 남습니다.";
+    }
+
+    box.innerHTML = list.map(entry => {
+      const storeName = String(entry.store_name || "매장").trim();
+      const place = [entry.city, entry.district].filter(Boolean).join(", ") || entry.address || categoryLabel(entry.category) || "";
+      const cachedStore = stores.find(item => String(item.id) === String(entry.store_id)) || null;
+      const photoUrl = String(
+        entry.store_photo_url ||
+        entry.photo_url ||
+        cachedStore?.photo_url ||
+        ""
+      ).trim();
+      const fallback = Array.from(storeName)[0] || "B";
+      const thumb = photoUrl
+        ? `<img class="profile-record-thumb" src="${escapeAttr(photoUrl)}" alt="" />`
+        : `<span class="profile-record-thumb profile-record-thumb-fallback" aria-hidden="true">${escapeHtml(fallback)}</span>`;
+      const visitTime = formatDate(entry.claimed_at || entry.visited_at || entry.created_at);
+      const meta = [place, visitTime].filter(Boolean).join(" · ");
+
+      return `
+        <button
+          class="profile-record-row has-thumb"
+          type="button"
+          data-visit-store="${escapeAttr(entry.store_id || "")}"
+          aria-label="${escapeAttr(storeName)} 매장 상세 보기"
+        >
+          ${thumb}
+          <span class="profile-record-main">
+            <strong class="profile-record-title">${escapeHtml(storeName)}</strong>
+            <span class="profile-record-meta">${escapeHtml(meta || "방문 기록")}</span>
+          </span>
+        </button>
+      `;
+    }).join("") || `<div class="profile-record-empty">아직 방문 기록이 없습니다.</div>`;
+
+    $$("[data-visit-store]", box).forEach(row => {
+      const storeId = String(row.dataset.visitStore || "").trim();
+      if(!storeId){
+        row.disabled = true;
+        return;
+      }
+
+      row.addEventListener("click", () => {
+        openStoreDetail(storeId, {
+          source:"profile_visit",
+          showPartnerOwnerCard:false
+        });
+      });
+    });
+  }
+
+
+  function takeoverModeLabel(mode){
+    return ({takeover:"TAKING OVER",challenge:"CHALLENGING",retake:"RETAKING",hot:"HOT TAKEOVER"})[String(mode||"")] || "TAKING OVER";
+  }
+
+  function takeoverModeFromStore(store){
+    const role=storeRoleMap.get(String(store?.id||""))||{};
+    if(role.was_previous_boss || role.can_retake) return "retake";
+    if(Number(store?.challenges_24h||0)>=Number(config.hot_store_challenges_24h||5) || store?.is_hot) return "hot";
+    const boss=String(store?.current_boss_nickname||"").trim();
+    return boss && boss!=="No Boss" && boss!=="미점령" ? "challenge" : "takeover";
+  }
+
+  function takeoverFallbackSeconds(mode){
+    const key=({takeover:"takeover_empty_seconds",challenge:"takeover_challenge_seconds",retake:"takeover_retake_seconds",hot:"takeover_hot_seconds"})[mode]||"takeover_empty_seconds";
+    return Math.max(5,Math.min(120,Number(config[key]||20)));
+  }
+
+  function showTakeoverUi(store,state={}){
+    if(!store?.id || takeoverCancelledLocally) return;
+    const screen=$("#takeoverScreen");
+    if(!screen) return;
+    const mode=String(state.mode||takeoverModeFromStore(store));
+    const required=Math.max(5,Number(state.required_seconds||takeoverFallbackSeconds(mode)));
+    const remaining=Math.max(0,Number(state.remaining_seconds ?? required));
+    takeoverUi={storeId:String(store.id),storeName:String(store.name||"매장"),mode,status:String(state.status||"tracking")};
+    takeoverRequired=required;
+    takeoverRemaining=remaining;
+    takeoverLastServerAt=Date.now();
+    $("#takeoverEyebrow").textContent=takeoverModeLabel(mode);
+    $("#takeoverStoreName").textContent=takeoverUi.storeName;
+    updateTakeoverUi(state.status||"tracking",state.reason||"");
+    screen.classList.remove("hidden");
+    document.body.classList.add("takeover-active");
+    startTakeoverUiTicker();
+  }
+
+  function startTakeoverUiTicker(){
+    if(takeoverUiTimer) return;
+    takeoverUiTimer=window.setInterval(()=>{
+      if(!takeoverUi || ["hold","low_accuracy","cancelled","ready"].includes(takeoverUi.status)) return;
+      const elapsed=Math.max(0,(Date.now()-takeoverLastServerAt)/1000);
+      const visual=Math.max(0,takeoverRemaining-elapsed);
+      renderTakeoverCount(visual);
+    },100);
+  }
+
+  function renderTakeoverCount(seconds){
+    const count=$("#takeoverCount");
+    const bar=$("#takeoverProgressBar");
+    if(count){
+      const whole=Math.max(0,Math.ceil(Number(seconds||0)));
+      count.textContent=`${String(Math.floor(whole/60)).padStart(2,"0")}:${String(whole%60).padStart(2,"0")}`;
+      count.classList.toggle("is-final",whole>0&&whole<=5);
+    }
+    if(bar){
+      const done=takeoverRequired>0 ? Math.max(0,Math.min(100,(1-Number(seconds||0)/takeoverRequired)*100)) : 0;
+      bar.style.width=`${done}%`;
+    }
+  }
+
+  function updateTakeoverUi(status,reason=""){
+    if(!takeoverUi) return;
+    takeoverUi.status=String(status||"tracking");
+    const label=$("#takeoverStatus");
+    const count=$("#takeoverCount");
+    if(status==="hold" || status==="outside"){
+      if(label) label.textContent=reason==="SUSPICIOUS_SPEED" ? "비정상 이동이 감지되어 점령을 확인 중입니다." : "HOLD · 매장 가까이 돌아오면 계속됩니다.";
+      count?.classList.add("is-hold");
+    }else if(status==="low_accuracy"){
+      if(label) label.textContent="HOLD · GPS 정확도를 확인하고 있습니다.";
+      count?.classList.add("is-hold");
+    }else if(status==="cancelled"){
+      if(label) label.textContent="점령이 취소되었습니다. 매장 가까이에서 다시 시작하세요.";
+      count?.classList.add("is-hold");
+    }else if(status==="ready"){
+      if(label) label.textContent="점령 판정 중…";
+      count?.classList.remove("is-hold");
+      renderTakeoverCount(0);
+    }else{
+      if(label) label.textContent="매장 안에서 위치를 유지하세요.";
+      count?.classList.remove("is-hold");
+    }
+    renderTakeoverCount(takeoverRemaining);
+  }
+
+  function syncTakeoverUi(store,state={}){
+    if(!store?.id) return;
+    const status=String(state.status||"tracking");
+    if(!takeoverUi || takeoverUi.storeId!==String(store.id)) showTakeoverUi(store,state);
+    takeoverRemaining=Math.max(0,Number(state.remaining_seconds ?? takeoverRemaining));
+    takeoverRequired=Math.max(5,Number(state.required_seconds||takeoverRequired||20));
+    takeoverLastServerAt=Date.now();
+    if(state.mode) takeoverUi.mode=String(state.mode);
+    $("#takeoverEyebrow").textContent=takeoverModeLabel(takeoverUi.mode);
+    updateTakeoverUi(status,state.reason||"");
+  }
+
+  function closeTakeoverUi(delay=0){
+    const run=()=>{
+      $("#takeoverScreen")?.classList.add("hidden");
+      document.body.classList.remove("takeover-active");
+      if(takeoverUiTimer){ clearInterval(takeoverUiTimer); takeoverUiTimer=null; }
+      takeoverUi=null; takeoverRemaining=0; takeoverRequired=0; takeoverLastServerAt=0;
+    };
+    if(delay>0) setTimeout(run,delay); else run();
+  }
+
+  function cancelTakeoverUi(){
+    takeoverCancelledLocally=true;
+    closeTakeoverUi();
+    setTimeout(()=>{takeoverCancelledLocally=false;},Math.max(5000,Number(config.gps_presence_ping_seconds||10)*1000));
+    toast("점령을 취소했습니다.");
+  }
+
+  async function pingTakeoverSession(store,pos){
+    if(!store?.id || !pos?.coords || !window.sb) return null;
+    try{
+      const {data,error}=await sb.rpc("biteboss_takeover_session_ping_v71",{
+        p_store_id:store.id,
+        p_lat:Number(pos.coords.latitude),
+        p_lng:Number(pos.coords.longitude),
+        p_accuracy_m:Number.isFinite(pos.coords.accuracy)?Number(pos.coords.accuracy):null
+      });
+      if(error){
+        if(!String(error.message||"").includes("biteboss_takeover_session_ping_v71")) console.warn("BiteBoss takeover session:",error);
+        return null;
+      }
+      return data||null;
+    }catch{return null;}
+  }
+
+  async function loadGamePulse(force=false){
+    const box=$("#gamePulse");
+    if(!box) return;
+    if(!force && Date.now()-gamePulseLoadedAt<15000 && !box.classList.contains("hidden")) return;
+    gamePulseLoadedAt=Date.now();
+    let data=null;
+    try{
+      const result=await sb.rpc("biteboss_game_pulse_v71");
+      if(!result.error) data=result.data;
+    }catch{}
+    const fallbackRetakes=stores.filter(s=>Boolean((storeRoleMap.get(String(s.id))||{}).can_retake)).slice(0,3).map(s=>({store_id:s.id,store_name:s.name}));
+    const fallbackHot=stores.filter(s=>s.is_hot||Number(s.challenges_24h||0)>=Number(config.hot_store_challenges_24h||5)).slice(0,3).map(s=>({store_id:s.id,store_name:s.name,challenges_24h:s.challenges_24h||0}));
+    const retakes=Array.isArray(data?.retakes)?data.retakes:fallbackRetakes;
+    const hot=Array.isArray(data?.hot)?data.hot:fallbackHot;
+    const newcomer=data?.new_player_protected===true;
+    if(!retakes.length&&!hot.length&&!newcomer){ box.classList.add("hidden"); box.innerHTML=""; return; }
+    const items=[];
+    if(retakes[0]) items.push(`<button type="button" data-pulse-store="${escapeAttr(retakes[0].store_id)}"><span>RETAKE</span><strong>${escapeHtml(retakes[0].store_name||"빼앗긴 매장")}</strong><small>다시 가져오기</small></button>`);
+    if(hot[0]) items.push(`<button type="button" data-pulse-store="${escapeAttr(hot[0].store_id)}"><span>HOT</span><strong>${escapeHtml(hot[0].store_name||"인기 매장")}</strong><small>${Number(hot[0].challenges_24h||0)}명 도전</small></button>`);
+    if(newcomer) items.push(`<div class="game-pulse-info"><span>NEW BOSS</span><strong>첫 점령 가이드</strong><small>초반에는 쉬운 매장을 우선 추천합니다.</small></div>`);
+    box.innerHTML=items.join(""); box.classList.remove("hidden");
+    $$('[data-pulse-store]',box).forEach(btn=>btn.addEventListener('click',()=>openStoreDetail(btn.dataset.pulseStore)));
+  }
+
+
+  function startPresenceTracking(){
+    stopPresenceTracking();
+    if(document.hidden || !window.sb) return;
+    if(!playerSession?.authenticated){
+      presenceBlockedReason = "MEMBER_LOGIN_REQUIRED";
+      renderStores();
+      return;
+    }
+
+    const intervalSeconds = Math.max(5, Number(config.gps_presence_ping_seconds || 10));
+    tickPresenceTracking();
+    presenceTimer = window.setInterval(tickPresenceTracking, intervalSeconds * 1000);
+  }
+
+  function stopPresenceTracking(){
+    if(presenceTimer){
+      clearInterval(presenceTimer);
+      presenceTimer = null;
+    }
+  }
+
+  async function tickPresenceTracking(){
+    if(presenceBusy || document.hidden || !window.sb) return;
+
+    const candidates = stores.filter(store => {
+      if(!store?.id) return false;
+      if(String(store.partnership_status || "unclaimed") === "partnered") return false;
+      if(!Number.isFinite(Number(store.latitude)) || !Number.isFinite(Number(store.longitude))) return false;
+
+      const roleState = storeRoleMap.get(String(store.id)) || {};
+      const isMyBossStore = Boolean(roleState.is_my_boss_store || roleState.my_role === "boss");
+      const protectionUntil = roleState.protected_until || store.protected_until || null;
+      const protectedNow = Boolean(
+        protectionUntil &&
+        new Date(protectionUntil).getTime() > Date.now()
+      );
+
+      return isMyBossStore || !protectedNow;
+    });
+
+    if(!candidates.length) return;
+
+    presenceBusy = true;
+    try{
+      const pos = await getPositionSafe(false);
+      if(!pos) return;
+      lastPosition = pos;
+      void refreshStoresForPosition(pos);
+
+      const accuracy = Number(pos.coords.accuracy || 0);
+      const maxAccuracy = Math.max(1, Number(config.max_location_accuracy_m || 100));
+      if(accuracy && accuracy > maxAccuracy){
+        candidates.forEach(store => presenceState.set(String(store.id), {
+          status:"low_accuracy",
+          accuracy_m:accuracy,
+          required_seconds:Number(config.gps_dwell_seconds || 120),
+          remaining_seconds:Number(config.gps_dwell_seconds || 120)
+        }));
+        if(takeoverUi){ syncTakeoverUi(stores.find(item=>String(item.id)===takeoverUi.storeId)||{}, {status:"low_accuracy",remaining_seconds:takeoverRemaining,required_seconds:takeoverRequired}); }
+        renderStores();
+        return;
+      }
+
+      const nearest = candidates
+        .map(store => ({
+          store,
+          distance:haversineMeters(
+            pos.coords.latitude,
+            pos.coords.longitude,
+            Number(store.latitude),
+            Number(store.longitude)
+          )
+        }))
+        .sort((a,b) => a.distance - b.distance)[0];
+
+      if(!nearest) return;
+
+      const radius = Math.max(1, Number(config.gps_radius_m || 50));
+      if(nearest.distance > radius + Math.max(0, accuracy || 0)){
+        presenceState.set(String(nearest.store.id), {
+          status:"outside",
+          distance_m:nearest.distance,
+          required_seconds:Number(config.gps_dwell_seconds || 120),
+          remaining_seconds:Number(config.gps_dwell_seconds || 120)
+        });
+        if(takeoverUi?.storeId===String(nearest.store.id)) syncTakeoverUi(nearest.store,{status:"hold",reason:"OUTSIDE",remaining_seconds:takeoverRemaining,required_seconds:takeoverRequired});
+        renderStores();
+        return;
+      }
+
+      const takeoverSession = await pingTakeoverSession(nearest.store, pos);
+      if(takeoverSession?.ok){
+        syncTakeoverUi(nearest.store, takeoverSession);
+        if(takeoverSession.status === "cancelled"){
+          presenceState.set(String(nearest.store.id), takeoverSession);
+          renderStores();
+          return;
+        }
+      }else if(!takeoverCancelledLocally){
+        const existing=presenceState.get(String(nearest.store.id))||{};
+        showTakeoverUi(nearest.store,{...existing,status:"tracking"});
+      }
+
+      const { data, error } = await sb.rpc("biteboss_presence_ping", {
+        p_store_id:nearest.store.id,
+        p_lat:pos.coords.latitude,
+        p_lng:pos.coords.longitude,
+        p_accuracy_m:Number.isFinite(pos.coords.accuracy) ? pos.coords.accuracy : null
+      });
+
+      if(error){
+        console.warn("BiteBoss presence:", error);
+        return;
+      }
+
+      if(!data?.eligible){
+        presenceBlockedReason = String(data?.reason || "");
+        if(presenceBlockedReason === "MEMBER_LOGIN_REQUIRED") stopPresenceTracking();
+        presenceState.set(String(nearest.store.id), {
+          status:data?.status || "blocked",
+          required_seconds:Number(data?.required_seconds || config.gps_dwell_seconds || 120),
+          remaining_seconds:Number(data?.remaining_seconds || config.gps_dwell_seconds || 120),
+          distance_m:Number(data?.distance_m || nearest.distance)
+        });
+        renderStores();
+        return;
+      }
+
+      presenceBlockedReason = "";
+      if(!takeoverCancelledLocally){
+        syncTakeoverUi(nearest.store,{
+          ...(takeoverSession||{}),
+          status:String(data?.status||takeoverSession?.status||"tracking"),
+          remaining_seconds:Number(data?.remaining_seconds ?? takeoverSession?.remaining_seconds ?? 0),
+          required_seconds:Number((data?.required_seconds ?? takeoverSession?.required_seconds ?? config.gps_dwell_seconds) || 120)
+        });
+      }
+      presenceState.set(String(nearest.store.id), {
+        status:String(data?.status || "tracking"),
+        required_seconds:Number(data?.required_seconds || config.gps_dwell_seconds || 120),
+        remaining_seconds:Number(data?.remaining_seconds || 0),
+        elapsed_seconds:Number(data?.elapsed_seconds || 0),
+        distance_m:Number(data?.distance_m || nearest.distance)
+      });
+
+      if(["claimed","crew","boss_visit"].includes(String(data?.status || ""))){
+        presenceState.delete(String(nearest.store.id));
+        if(takeoverUi?.storeId===String(nearest.store.id)){
+          const count=$("#takeoverCount");
+          if(count) count.textContent=String(data?.status||"")==="crew" ? "HOLD" : "BOSS";
+          const status=$("#takeoverStatus");
+          if(status) status.textContent=String(data?.status||"")==="crew" ? "도전 결과를 확인하세요." : `${nearest.store.name||"매장"} 점령 완료`;
+          closeTakeoverUi(900);
+        }
+        showChallengeOutcome({
+          ...data,
+          store_name:data?.store_name || nearest.store.name || "매장"
+        });
+        await Promise.all([loadStores(), loadHome()]);
+        return;
+      }
+
+      renderStores();
+    }finally{
+      presenceBusy = false;
+    }
+  }
+
+  function formatPresenceSeconds(value){
+    const seconds = Math.max(0, Math.ceil(Number(value || 0)));
+    const minutes = Math.floor(seconds / 60);
+    const rest = seconds % 60;
+    if(minutes <= 0) return `${rest}초`;
+    return `${minutes}:${String(rest).padStart(2, "0")}`;
+  }
+
+  function haversineMeters(lat1, lng1, lat2, lng2){
+    const toRad = value => value * Math.PI / 180;
+    const earth = 6371000;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a = Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+    return earth * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(Math.max(0, 1 - a)));
+  }
+
+  function syncTerritoryMapVisibility(){
+    const section = $("#territoryMapSection");
+    if(!section) return;
+    section.classList.toggle("hidden", currentRank !== "territory");
+  }
+
+  async function loadTerritoryMap(){
+    const section = $("#territoryMapSection");
+    const mapEl = $("#territoryMap");
+    const summaryEl = $("#territoryMapSummary");
+
+    if(!section || !mapEl) return;
+    section.classList.remove("hidden");
+
+    if(!window.L){
+      if(summaryEl) summaryEl.textContent = "지도를 불러올 수 없습니다";
+      return;
+    }
+
+    if(summaryEl) summaryEl.textContent = "점령지 불러오는 중…";
+
+    const { data, error } = await sb.rpc("biteboss_territory_map");
+
+    if(error){
+      console.warn("BiteBoss territory map:", error);
+      if(summaryEl) summaryEl.textContent = "점령지 지도를 불러오지 못했습니다";
+      return;
+    }
+
+    territoryMapRows = Array.isArray(data) ? data : [];
+
+    const currentPosition = await getPositionSafe(false);
+    const currentLat = Number(currentPosition?.coords?.latitude);
+    const currentLng = Number(currentPosition?.coords?.longitude);
+    const hasCurrentPosition = Number.isFinite(currentLat) && Number.isFinite(currentLng);
+
+    if(hasCurrentPosition){
+      territoryMapRows = [...territoryMapRows].sort((a,b) => {
+        const aLat = Number(a.latitude);
+        const aLng = Number(a.longitude);
+        const bLat = Number(b.latitude);
+        const bLng = Number(b.longitude);
+        const aDistance = Number.isFinite(aLat) && Number.isFinite(aLng)
+          ? haversineMeters(currentLat,currentLng,aLat,aLng)
+          : Number.POSITIVE_INFINITY;
+        const bDistance = Number.isFinite(bLat) && Number.isFinite(bLng)
+          ? haversineMeters(currentLat,currentLng,bLat,bLng)
+          : Number.POSITIVE_INFINITY;
+        return aDistance - bDistance;
+      });
+    }
+
+    if(!territoryMap){
+      territoryMap = L.map(mapEl, {
+        zoomControl:true,
+        attributionControl:true,
+        preferCanvas:true
+      });
+
+      L.tileLayer(
+        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        {
+          maxZoom:19,
+          subdomains:"abc",
+          attribution:'&copy; OpenStreetMap contributors'
+        }
+      ).addTo(territoryMap);
+
+      territoryMapLayer = L.layerGroup().addTo(territoryMap);
+      territoryUserLayer = L.layerGroup().addTo(territoryMap);
+
+      territoryMap.on("popupopen", event => {
+        const node = event.popup?.getElement?.();
+        const button = node?.querySelector?.("[data-map-store]");
+        if(!button) return;
+
+        button.onclick = () => {
+          const storeId = button.dataset.mapStore;
+          territoryMap.closePopup();
+          if(storeId) openStoreDetail(storeId);
+        };
+      });
+    }
+
+    territoryMapLayer.clearLayers();
+    territoryUserLayer?.clearLayers();
+
+    if(hasCurrentPosition && territoryUserLayer){
+      const userMarker = L.circleMarker([currentLat,currentLng], {
+        radius:8,
+        weight:3,
+        color:"#ffffff",
+        fillColor:"#d5232f",
+        fillOpacity:1
+      });
+      userMarker.bindTooltip("내 위치", {
+        permanent:false,
+        direction:"top",
+        offset:[0,-6]
+      });
+      userMarker.addTo(territoryUserLayer);
+    }
+
+    const bounds = [];
+    const orgIds = new Set();
+
+    territoryMapRows.forEach(row => {
+      const lat = Number(row.latitude);
+      const lng = Number(row.longitude);
+      if(!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+      bounds.push([lat,lng]);
+      if(row.organization_id) orgIds.add(String(row.organization_id));
+
+      const protectedNow = Boolean(
+        row.protected_until &&
+        new Date(row.protected_until).getTime() > Date.now()
+      );
+
+      const mine = Boolean(row.is_my_organization);
+      const distanceMeters = hasCurrentPosition
+        ? haversineMeters(currentLat,currentLng,lat,lng)
+        : null;
+      const distanceLabel = Number.isFinite(distanceMeters)
+        ? (distanceMeters < 1000
+          ? `${Math.round(distanceMeters)}m`
+          : `${(distanceMeters / 1000).toFixed(1)}km`)
+        : "";
+
+      const marker = L.circleMarker([lat,lng], {
+        radius:mine ? 8 : 6,
+        weight:mine ? 3 : 2,
+        color:mine ? "#fff7e8" : "#9a9a9a",
+        fillColor:mine ? "#fff7e8" : "#111111",
+        fillOpacity:mine ? 0.95 : 0.85
+      });
+
+      marker.bindPopup(`
+        <div class="territory-map-popup">
+          <span>${escapeHtml(row.organization_name || "크루")}</span>
+          <strong>${escapeHtml(row.store_name || "매장")}</strong>
+          <p>${escapeHtml(row.boss_name || "보스")} · 방어력 ${Number(row.boss_defense || 0)}${distanceLabel ? ` · ${escapeHtml(distanceLabel)}` : ""}</p>
+          <small>${protectedNow ? `보호 ${escapeHtml(formatRemaining(row.protected_until))} 남음` : "도전 가능"}</small>
+          <button type="button" data-map-store="${escapeAttr(row.store_id)}">Open store</button>
+        </div>
+      `, {
+        closeButton:false,
+        offset:[0,-2]
+      });
+
+      marker.addTo(territoryMapLayer);
+    });
+
+    if(summaryEl){
+      summaryEl.textContent = hasCurrentPosition
+        ? `${territoryMapRows.length} stores · 현재 위치 기준`
+        : `${territoryMapRows.length} stores · ${orgIds.size} organizations`;
+    }
+
+    requestAnimationFrame(() => {
+      territoryMap.invalidateSize();
+
+      if(hasCurrentPosition){
+        territoryMap.setView([currentLat,currentLng],15,{
+          animate:false
+        });
+      }else if(bounds.length === 1){
+        territoryMap.setView(bounds[0],15);
+      }else if(bounds.length > 1){
+        territoryMap.fitBounds(bounds,{
+          padding:[28,28],
+          maxZoom:15
+        });
+      }else{
+        territoryMap.setView([37.5665,126.9780],11);
+      }
+    });
+  }
+
+
+  function rankingPlayerName(row = {}){
+    const nickname = String(row?.nickname || "").trim();
+    if(nickname && nickname !== "사용자") return nickname;
+
+    const rawId = String(row?.user_id || "").replace(/-/g,"").toUpperCase();
+    return rawId ? `Boss ${rawId.slice(0,4)}` : "Boss";
+  }
+
+  async function loadRank(){
+    const box = $("#rankList");
+    const myBox = $("#myRankSummary");
+    if(!box) return;
+
+    syncTerritoryMapVisibility();
+    myBox?.classList.add("hidden");
+
+    if(config.feature_ranking === false){
+      box.innerHTML = `<div class="app-state">순위 기능이 현재 비활성화되어 있습니다.</div>`;
+      return;
+    }
+
+    box.innerHTML = `<div class="app-state">순위를 불러오는 중…</div>`;
+
+
+    if(currentRank === "season"){
+      const {data,error}=await sb.rpc("biteboss_season_region_rank_v71",{p_limit:50});
+      if(error){
+        console.warn("BiteBoss season ranking:",error);
+        box.innerHTML=`<div class="app-state is-error">시즌 순위를 불러오지 못했습니다. v71 SQL 적용 여부를 확인하세요.</div>`;
+        return;
+      }
+      const rows=Array.isArray(data)?data:[];
+      box.innerHTML=rows.map((row,index)=>`<article class="rank-card territory-rank-card"><span class="rank-number">${index+1}</span><div><strong>${escapeHtml([row.city,row.district].filter(Boolean).join(" ")||"지역")}</strong><div class="meta">${escapeHtml(row.crew_name||"크루")} · 최근 ${Number(config.season_days||30)}일</div></div><div class="rank-result"><b>${Number(row.store_count||0)}</b><span>점령</span></div></article>`).join("")||`<div class="app-state">이번 시즌 점령 기록이 아직 없습니다.</div>`;
+      return;
+    }
+
+    if(currentRank === "local_crew"){
+      const position = lastPosition || await getPositionSafe(false, { timeout:2500, maximumAge:60000 });
+      if(!position){
+        box.innerHTML = `<div class="app-state"><strong>위치 권한이 필요합니다.</strong><span>현재 위치를 허용하면 주변 크루 순위를 볼 수 있습니다.</span></div>`;
+        return;
+      }
+
+      const { data, error } = await sb.rpc("biteboss_local_crew_rank_v660", {
+        p_lat:Number(position.coords.latitude),
+        p_lng:Number(position.coords.longitude),
+        p_radius_km:5,
+        p_limit:30
+      });
+
+      if(error){
+        console.warn("BiteBoss local crew ranking:", error);
+        box.innerHTML = `<div class="app-state is-error">주변 크루 순위를 불러오지 못했습니다.</div>`;
+        return;
+      }
+
+      const rows = Array.isArray(data) ? data : [];
+      box.innerHTML = rows.map((row,index)=>`
+          <article class="rank-card local-crew-rank-card">
+            <span class="rank-number">${index+1}</span>
+            <span
+              class="crew-rank-avatar-link crew-rank-profile-trigger"
+              data-organization-profile="${escapeAttr(row.crew_id || "")}"
+              role="button"
+              tabindex="0"
+              aria-label="${escapeAttr(row.crew_name || "크루")} 크루 프로필 열기">
+              ${bossAvatarMarkup(row.avatar_url || "", row.crew_name || "크루", "crew-rank-avatar")}
+            </span>
+            <div class="crew-rank-copy">
+              <strong
+                class="crew-rank-name-link crew-rank-profile-trigger"
+                data-organization-profile="${escapeAttr(row.crew_id || "")}"
+                role="button"
+                tabindex="0">${escapeHtml(row.crew_name || "크루")}</strong>
+              <div class="meta">개설자 ${escapeHtml(row.founder_name || "—")} · 멤버 ${Number(row.member_count || 0)}명</div>
+            </div>
+            <div class="rank-result">
+              <b>${Number(row.territory_count || 0)}</b>
+              <span>점령지</span>
+            </div>
+          </article>
+        `).join("") || `<div class="app-state">주변에 점령지를 가진 크루가 아직 없습니다.</div>`;
+      return;
+    }
+
+    const { data, error } = await sb.rpc("biteboss_game_rankings_v656", {
+      p_scope:currentRank,
+      p_limit:50
+    });
+
+    if(error){
+      console.warn("BiteBoss ranking:", error);
+      box.innerHTML = `<div class="app-state is-error">순위를 불러오지 못했습니다.</div>`;
+      return;
+    }
+
+    const rows = Array.isArray(data) ? data : [];
+
+    if(currentRank === "organizations"){
+      box.innerHTML = rows.map((row,index)=>`
+        <article class="rank-card organization-rank-card">
+          <span class="rank-number">${index+1}</span>
+          <span
+            class="crew-rank-avatar-link"
+            data-organization-profile="${escapeAttr(row.id || "")}"
+            role="button"
+            tabindex="0"
+            aria-label="${escapeAttr(row.name || "크루")} 크루 프로필 열기">
+            ${bossAvatarMarkup(row.avatar_url || "", row.name || "크루", "crew-rank-avatar")}
+          </span>
+          <div class="crew-rank-copy">
+            <strong
+              class="crew-rank-name-link crew-rank-profile-trigger"
+              data-organization-profile="${escapeAttr(row.id || "")}"
+              role="button"
+              tabindex="0">${escapeHtml(row.name || "크루")}</strong>
+            <div class="meta">개설자 ${escapeHtml(row.leader_name || "—")} · 멤버 ${Number(row.member_count || 0)}명</div>
+          </div>
+          <div class="rank-result">
+            <b>${Number(row.territory_count || 0)}</b>
+            <span>점령지</span>
+          </div>
+        </article>
+      `).join("") || `<div class="app-state">아직 크루 순위가 없습니다.</div>`;
+      return;
+    }
+
+    if(currentRank === "territory"){
+      syncTerritoryMapVisibility();
+      loadTerritoryMap();
+      box.innerHTML = rows.map((row,index)=>{
+        const area=[row.city,row.district].filter(Boolean).join(" ");
+        return `
+          <article class="rank-card territory-rank-card">
+            <span class="rank-number">${index+1}</span>
+            <div>
+              <strong>${escapeHtml(area || "지역 정보 없음")}</strong>
+              <div class="meta">${escapeHtml(row.organization_name || "크루")}</div>
+            </div>
+            <div class="rank-result">
+              <b>${Number(row.store_count || 0)}</b>
+              <span>매장</span>
+            </div>
+          </article>`;
+      }).join("") || `<div class="app-state">아직 점령지 순위가 없습니다.</div>`;
+      return;
+    }
+
+    // Ranking rows use BiteBoss's stable logical player ID.
+    // A member login can run on top of a different anonymous Supabase auth ID,
+    // so authUser.id must not be used as the primary identity here.
+    const myId=String(
+      playerSession?.player_user_id ||
+      profile?.user_id ||
+      authUser?.id ||
+      ""
+    );
+    const myIndex=rows.findIndex(row=>String(row.user_id || "")===myId);
+    if(myBox && myIndex>=0){
+      const me=rows[myIndex];
+      const myAvatar=String(profile?.avatar_url || me.avatar_url || "").trim();
+      myBox.innerHTML=`
+        <strong class="my-rank-position">${myIndex+1}</strong>
+        ${bossAvatarMarkup(myAvatar, rankingPlayerName(me) || "나", "my-rank-avatar")}
+        <div class="my-rank-copy">
+          <b>${escapeHtml(rankingPlayerName(me) || profile?.nickname || playerSession?.nickname || "나")}</b>
+          <small>Lv ${Number(me.level || 1)} · 보스 ${Number(me.boss_count || 0)} · 크루 ${Number(me.crew_count || 0)} · ${Number(me.xp || 0).toLocaleString("ko-KR")} XP</small>
+        </div>
+        <span class="my-rank-label">내 순위</span>`;
+      myBox.classList.remove("hidden");
+    }else if(myBox && playerSession?.authenticated){
+      const myAvatar=String(profile?.avatar_url || "").trim();
+      myBox.innerHTML=`
+        <strong class="my-rank-position is-out">–</strong>
+        ${bossAvatarMarkup(myAvatar, profile?.nickname || playerSession?.nickname || "나", "my-rank-avatar")}
+        <div class="my-rank-copy">
+          <b>${escapeHtml(profile?.nickname || playerSession?.nickname || "나")}</b>
+          <small>현재 상위 50명 목록에는 표시되지 않습니다.</small>
+        </div>
+        <span class="my-rank-label">50위 밖</span>`;
+      myBox.classList.remove("hidden");
+    }
+
+    box.innerHTML = rows.map((row,index)=>{
+      const rowIsMe = String(row.user_id || "") === myId;
+      const playerName=rankingPlayerName(row);
+      const identity=[playerName,row.organization_name].filter(Boolean).join(" · ");
+      const personalAvatar = rowIsMe
+        ? String(profile?.avatar_url || row.avatar_url || "").trim()
+        : String(row.avatar_url || "").trim();
+      return `
+        <article
+          class="rank-card player-rank-card ${rowIsMe ? "is-me" : ""}"
+          data-player-profile="${escapeAttr(row.user_id || "")}"
+          data-player-avatar="${escapeAttr(personalAvatar)}">
+          <span class="rank-number">${index+1}</span>
+          ${bossAvatarMarkup(personalAvatar, playerName, "rank-player-avatar")}
+          <div class="rank-player-copy">
+            <strong>${escapeHtml(identity)}</strong>
+            <div class="meta">Lv ${Number(row.level || 1)} · 보스 ${Number(row.boss_count || 0)} · 크루 ${Number(row.crew_count || 0)}</div>
+          </div>
+          <div class="rank-result">
+            <b>${Number(row.xp || 0).toLocaleString("ko-KR")}</b>
+            <span>XP</span>
+          </div>
+        </article>`;
+    }).join("") || `<div class="app-state">아직 사용자 순위가 없습니다.</div>`;
+  }
+
+  async function loadAlerts(){
+    const box = $("#alertsList");
+    if(!box) return;
+
+    if(config.feature_offers === false){
+      updateAlertMeter(0);
+      box.innerHTML = `<div class="timeline-item muted">매장 소식 기능이 현재 비활성화되어 있습니다.</div>`;
+      return;
+    }
+
+    const { data, error } = await sb.rpc("biteboss_active_offers", {
+      p_limit:20
+    });
+
+    if(error){
+      console.warn("BiteBoss offers:", error);
+      updateAlertMeter(0);
+      box.innerHTML = `<div class="app-state is-error">매장 소식을 불러오지 못했습니다.</div>`;
+      return;
+    }
+
+    const rows = Array.isArray(data) ? data : [];
+    updateAlertMeter(rows.length);
+
+    box.innerHTML = rows.map(item => {
+      const place = [item.city,item.district].filter(Boolean).join(" ");
+      const role = String(item.minimum_role || "visitor");
+      const audience = role === "boss" ? "보스 전용" : role === "crew" ? "크루 + 보스" : "모두 사용";
+      const eligible = item.eligible !== false;
+
+      return `
+        <article class="timeline-item offer-feed-item ${eligible ? "" : "is-locked"}">
+          <strong>${escapeHtml(item.title)}</strong>
+          <div class="meta">${escapeHtml(item.store_name || "BiteBoss")}${place ? ` · ${escapeHtml(place)}` : ""} · ${escapeHtml(audience)}</div>
+          ${item.description ? `<p>${escapeHtml(item.description)}</p>` : ""}
+          ${eligible ? "" : `<small>${role === "boss" ? "보스가 되면 사용할 수 있습니다" : "크루가 되면 사용할 수 있습니다"}</small>`}
+        </article>
+      `;
+    }).join("") || `<div class="app-state">아직 새로운 매장 소식이 없습니다.</div>`;
+  }
+
+  async function scanPrompt(){
+    if(!playerSession?.authenticated) return openMemberLogin();
+    openModal("QR 스캔", `
+      <div class="scan-direct">
+        <div id="qrReader" class="scanner-box"></div>
+        <p id="scannerHint" class="scanner-hint">매장 또는 크루 QR을 화면 안에 맞춰주세요.</p>
+        <button id="scannerRetry" class="secondary-btn hidden" type="button">다시 시도</button>
+      </div>
+    `);
+
+    requestAnimationFrame(() => startScanner());
+  }
+
+  async function startScanner(){
+    if(!window.Html5Qrcode){
+      return toast("QR 스캐너를 불러오지 못했습니다.");
+    }
+
+    try{
+      scanner = new Html5Qrcode("qrReader");
+      await scanner.start(
+        { facingMode:"environment" },
+        { fps:10, qrbox:{ width:240, height:240 } },
+        async decodedText => {
+          await stopScanner();
+          closeModal();
+          await handleScannedQr(decodedText);
+        }
+      );
+
+      const hint = $("#scannerHint");
+      if(hint) hint.textContent = "QR을 인식하는 중입니다…";
+    }catch(error){
+      console.warn(error);
+      const hint = $("#scannerHint");
+      if(hint) hint.textContent = "카메라 권한을 허용한 뒤 다시 시도해주세요.";
+      const retry = $("#scannerRetry");
+      if(retry){
+        retry.classList.remove("hidden");
+        retry.onclick = async () => {
+          retry.classList.add("hidden");
+          if(hint) hint.textContent = "카메라를 여는 중입니다…";
+          await startScanner();
+        };
+      }
+    }
+  }
+
+  async function stopScanner(){
+    if(!scanner) return;
+    try{ await scanner.stop(); }catch{}
+    try{ await scanner.clear(); }catch{}
+    scanner = null;
+  }
+
+  function extractCrewInviteToken(raw){
+    const value = String(raw || "").trim();
+    if(!value) return "";
+
+    if(value.startsWith("BITEBOSS:CREW:")){
+      return value.slice("BITEBOSS:CREW:".length).trim();
+    }
+
+    try{
+      const parsed = new URL(value, location.origin);
+      return String(parsed.searchParams.get("crew_invite") || "").trim();
+    }catch{
+      return "";
+    }
+  }
+
+  async function handleScannedQr(decodedText){
+    const crewToken = extractCrewInviteToken(decodedText);
+    if(crewToken){
+      await previewCrewInvite(crewToken);
+      return;
+    }
+
+    await claimByQrToken(extractToken(decodedText));
+  }
+
+  async function handleCrewInviteParam(){
+    const url = new URL(location.href);
+    const token = String(url.searchParams.get("crew_invite") || "").trim();
+    if(!token) return;
+
+    url.searchParams.delete("crew_invite");
+    const next = `${url.pathname}${url.search}${url.hash}`;
+    history.replaceState({}, "", next || location.pathname);
+
+    await previewCrewInvite(token);
+  }
+
+  function publicAppBaseUrl(){
+    const configured = String(cfg.publicAppUrl || "").trim();
+    if(configured){
+      try{
+        const url = new URL(configured);
+        if(url.protocol === "https:" || url.protocol === "http:") return url;
+      }catch{}
+    }
+
+    if(location.protocol === "https:" || location.protocol === "http:"){
+      const url = new URL(location.href);
+      url.search = "";
+      url.hash = "";
+      return url;
+    }
+
+    return null;
+  }
+
+  function crewInviteShareUrl(token){
+    const base = publicAppBaseUrl();
+    if(!base){
+      // In native builds without a public HTTPS URL, keep the QR usable
+      // inside BiteBoss instead of producing an invalid capacitor:// link.
+      return `BITEBOSS:CREW:${String(token || "").trim()}`;
+    }
+
+    base.searchParams.set("crew_invite", String(token || "").trim());
+    return base.toString();
+  }
+
+  async function previewCrewInvite(token){
+    const cleanToken = String(token || "").trim();
+    if(!cleanToken) return toast("유효한 크루 초대 QR이 아닙니다.");
+
+    pendingCrewInviteToken = cleanToken;
+
+    try{
+      const { data, error } = await sb.rpc("biteboss_preview_crew_qr_invite_v624", {
+        p_token:cleanToken
+      });
+      if(error) throw error;
+
+      if(!data?.ok){
+        const message = ({
+          INVITE_NOT_FOUND:"유효하지 않은 크루 초대 QR입니다.",
+          INVITE_EXPIRED:"만료된 크루 초대 QR입니다.",
+          INVITE_REVOKED:"취소된 크루 초대 QR입니다.",
+          INVITE_EXHAUSTED:"사용 가능한 인원이 모두 찬 크루 초대 QR입니다."
+        })[data?.error] || "크루 초대 정보를 확인하지 못했습니다.";
+        toast(message);
+        return;
+      }
+
+      const canJoin = data.can_join === true;
+      const reason = String(data.join_error || "");
+      const founder = data.founder_nickname || "Founder";
+      const remaining = Math.max(0, Number(data.remaining_uses || 0));
+      const memberCount = Number(data.member_count || 0);
+      const territoryCount = Number(data.territory_count || 0);
+      const expires = data.expires_at ? formatRemaining(data.expires_at) : "-";
+
+      let actionHtml = "";
+      if(canJoin){
+        actionHtml = `<button id="crewQrJoinBtn" class="primary-btn wide" type="button">크루 가입</button>`;
+      }else if(reason === "MEMBER_LOGIN_REQUIRED"){
+        actionHtml = `
+          <button id="crewQrLoginBtn" class="primary-btn wide" type="button">로그인 후 가입</button>
+          <button id="crewQrRegisterBtn" class="secondary-btn wide" type="button">계정 만들기</button>
+        `;
+      }else{
+        const label = ({
+          ALREADY_IN_THIS_CREW:"이미 이 크루의 멤버입니다.",
+          ALREADY_IN_CREW:"다른 크루에 소속되어 있습니다. 먼저 현재 크루를 나가야 합니다.",
+          CREW_COOLDOWN:data.cooldown_until
+            ? `크루 가입 쿨다운이 ${formatRemaining(data.cooldown_until)} 남았습니다.`
+            : "크루 가입 쿨다운 중입니다.",
+          CREW_FULL:"크루 최대 인원에 도달했습니다."
+        })[reason] || "현재 이 크루에 가입할 수 없습니다.";
+        actionHtml = `<p class="crew-join-state">${escapeHtml(label)}</p>`;
+      }
+
+      openModal("크루 가입", `
+        <div class="crew-join-preview">
+          <span class="crew-kicker">CREW INVITE</span>
+          <strong>${escapeHtml(data.crew_name || "Crew")}</strong>
+          <p>Founder ${escapeHtml(founder)}</p>
+          <div class="crew-join-stats">
+            <div><span>Members</span><b>${memberCount}</b></div>
+            <div><span>Territories</span><b>${territoryCount}</b></div>
+          </div>
+          <div class="crew-invite-facts">
+            <span>만료 ${escapeHtml(expires)}</span>
+            <span>${remaining} joins left</span>
+          </div>
+          ${actionHtml}
+        </div>
+      `);
+
+      $("#crewQrJoinBtn")?.addEventListener("click", () => joinCrewByQr(cleanToken));
+      $("#crewQrLoginBtn")?.addEventListener("click", openMemberLogin);
+      $("#crewQrRegisterBtn")?.addEventListener("click", openMemberRegister);
+    }catch(error){
+      console.warn("BiteBoss crew QR preview:", error);
+      toast("크루 초대 정보를 확인하지 못했습니다.");
+    }
+  }
+
+  async function joinCrewByQr(token){
+    const button = $("#crewQrJoinBtn");
+    if(button) button.disabled = true;
+
+    try{
+      const { data, error } = await sb.rpc("biteboss_join_crew_by_qr_v624", {
+        p_token:String(token || "").trim()
+      });
+      if(error) throw error;
+
+      if(!data?.ok){
+        const message = ({
+          MEMBER_LOGIN_REQUIRED:"회원 로그인이 필요합니다.",
+          INVITE_NOT_FOUND:"유효하지 않은 크루 초대 QR입니다.",
+          INVITE_EXPIRED:"만료된 크루 초대 QR입니다.",
+          INVITE_REVOKED:"취소된 크루 초대 QR입니다.",
+          INVITE_EXHAUSTED:"사용 가능한 인원이 모두 찼습니다.",
+          ALREADY_IN_THIS_CREW:"이미 이 크루의 멤버입니다.",
+          ALREADY_IN_CREW:"다른 크루에 소속되어 있습니다.",
+          CREW_COOLDOWN:data?.cooldown_until
+            ? `크루 가입 쿨다운이 ${formatRemaining(data.cooldown_until)} 남았습니다.`
+            : "크루 가입 쿨다운 중입니다.",
+          CREW_FULL:"크루 최대 인원에 도달했습니다."
+        })[data?.error] || "크루에 가입하지 못했습니다.";
+        toast(message);
+        return;
+      }
+
+      pendingCrewInviteToken = "";
+      organization = data.organization || null;
+      closeModal();
+
+      await Promise.all([
+        loadMyOrganization(),
+        loadHome(),
+        loadRank(),
+        loadGameActivity()
+      ]);
+
+      toast(`${organization?.name || data.crew_name || "크루"}에 가입했습니다.`);
+    }catch(error){
+      console.warn("BiteBoss crew QR join:", error);
+      toast("크루에 가입하지 못했습니다.");
+    }finally{
+      if(button) button.disabled = false;
+    }
+  }
+
+  async function claimByQrToken(token){
+    const cleanToken = String(token || "").trim();
+    if(!cleanToken) return toast("유효한 QR이 아닙니다.");
+
+    const pos = await getPositionSafe(true);
+    if(!pos) return toast("보스 점령에는 위치 권한이 필요합니다.");
+
+    const { data, error } = await sb.rpc("biteboss_claim_store", {
+      p_qr_token:cleanToken,
+      p_lat:pos.coords.latitude,
+      p_lng:pos.coords.longitude,
+      p_accuracy_m:Number.isFinite(pos.coords.accuracy) ? pos.coords.accuracy : null
+    });
+
+    if(error){
+      console.warn(error);
+      return toast(claimErrorMessage(error.message));
+    }
+
+    showChallengeOutcome(data);
+    lastPosition = pos;
+    await Promise.all([
+      loadStores(),
+      loadHome(),
+      loadRank(),
+      loadGameActivity(),
+      loadAlerts()
+    ]);
+  }
+
+  function showChallengeOutcome(data){
+    const storeName = data?.store_name || "매장";
+    const outcome = String(data?.outcome || "boss");
+
+    if(outcome === "crew"){
+      const myPower = Number(data?.challenger_power || 0);
+      const bossPower = Number(data?.defender_power || 0);
+      const needed = myPower && bossPower && myPower <= bossPower ? bossPower - myPower + 1 : 0;
+      return toast(`${storeName} 도전 실패 · 크루 합류 + 상대 정보 공개.${myPower && bossPower ? ` 내 파워 ${myPower} / 보스 방어력 ${bossPower}.` : ""}${needed ? ` 파워 +${needed}이면 다시 도전할 수 있습니다.` : ""}`);
+    }
+
+    if(outcome === "boss_visit"){
+      return toast(`${storeName} 보스 활동이 갱신되었습니다. 이 매장의 방어력 감소가 초기화됩니다.`);
+    }
+
+    const myPower = Number(data?.challenger_power || 0);
+    const bossPower = Number(data?.defender_power || 0);
+    const storeId = String(data?.store_id || "");
+    const store = stores.find(item => String(item.id) === storeId) || {
+      id:storeId,
+      name:storeName
+    };
+
+    openModal("보스가 되었습니다", `
+      <div class="boss-victory">
+        <span>점령 성공</span>
+        <strong>${escapeHtml(storeName)}</strong>
+        <p>${myPower ? `파워 ${myPower}${bossPower ? ` · 이전 방어력 ${bossPower}` : ""}` : "이 매장을 점령했습니다."}</p>
+        <button id="shareVictoryBtn" class="primary-btn" type="button">공유 · 나한테서 뺏어봐</button>
+        <button id="openVictoryStoreBtn" class="secondary-btn" type="button">매장 보기</button>
+      </div>
+    `);
+
+    $("#shareVictoryBtn")?.addEventListener("click", () => shareBossCard({
+      store,
+      bossName:String(data?.boss_nickname || profile?.nickname || "보스"),
+      bossDefense:Math.max(0, Number(data?.challenger_power || 0)),
+      protectedNow:Boolean(data?.protected_until),
+      protectionUntil:data?.protected_until || null,
+      myPower,
+      isBoss:true,
+      context:"boss_win"
+    }));
+
+    $("#openVictoryStoreBtn")?.addEventListener("click", async () => {
+      closeModal();
+      if(storeId) await openStoreDetail(storeId);
+    });
+  }
+
+  function claimErrorMessage(rawMessage){
+    const message = String(rawMessage || "");
+    if(message.includes("MEMBER_LOGIN_REQUIRED")) return "회원 로그인이 필요합니다.";
+    if(message.includes("PARTNER_ONLY_QR")) return "QR 점령은 제휴 매장에서만 사용할 수 있습니다.";
+    if(message.includes("INVALID_QR")) return "유효하지 않거나 만료된 QR입니다.";
+    if(message.includes("STORE_NOT_AVAILABLE")) return "현재 점령할 수 없는 매장입니다.";
+    if(message.includes("STORE_STAFF_CANNOT_CLAIM")) return "이 매장의 직원 계정은 보스에 도전할 수 없습니다.";
+    if(message.includes("ADMIN_CANNOT_CLAIM")) return "운영자 계정은 보스 경쟁에서 제외됩니다.";
+    if(message.includes("LOCATION_REQUIRED")) return "현재 위치를 확인할 수 없습니다.";
+    if(message.includes("STORE_LOCATION_MISSING")) return "매장 위치가 아직 등록되지 않았습니다.";
+    if(message.includes("LOCATION_ACCURACY_LOW")) return "GPS 정확도가 낮습니다. 매장 가까이에서 다시 시도하세요.";
+    if(message.includes("TOO_FAR:")){
+      const meters = Number(message.split("TOO_FAR:")[1]?.match(/\d+/)?.[0]);
+      return Number.isFinite(meters) ? `매장과 약 ${meters}m 떨어져 있습니다.` : "매장 가까이에서만 점령할 수 있습니다.";
+    }
+    if(message.includes("STORE_PROTECTED:")) return `현재 보스 보호시간이 남아 있습니다. ${secondsFromError(message, "STORE_PROTECTED:")}`;
+    if(message.includes("ALREADY_BOSS:")) return `이미 이 매장의 보스입니다. ${secondsFromError(message, "ALREADY_BOSS:")}`;
+    if(message.includes("RECLAIM_COOLDOWN:")) return `이 매장은 재점령 쿨다운 중입니다. ${secondsFromError(message, "RECLAIM_COOLDOWN:")}`;
+    if(message.includes("DAILY_LIMIT_REACHED")) return "오늘 이 매장에서 가능한 점령 횟수를 모두 사용했습니다.";
+    if(message.includes("ACCOUNT_BLOCKED")) return "현재 이 계정에서는 보스 기능을 사용할 수 없습니다.";
+    return "점령에 실패했습니다. 잠시 후 다시 시도하세요.";
+  }
+
+  function secondsFromError(message, prefix){
+    const value = Number(message.split(prefix)[1]?.match(/\d+/)?.[0] || 0);
+    if(!value) return "";
+    const minutes = Math.ceil(value / 60);
+    if(minutes < 60) return `약 ${minutes}분 후 다시 시도하세요.`;
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+    return `약 ${hours}시간${rest ? ` ${rest}분` : ""} 후 다시 시도하세요.`;
+  }
+
+  async function handleClaimParam(){
+    const url = new URL(location.href);
+    const token = url.searchParams.get("claim");
+    if(!token) return;
+    history.replaceState({}, "", location.pathname);
+    await claimByQrToken(token);
+  }
+
+  function extractToken(raw){
+    try{
+      const parsed = new URL(raw);
+      return parsed.searchParams.get("claim") || raw;
+    }catch{
+      return raw;
+    }
+  }
+
+
+  async function restorePlayerSession(){
+    try{
+      const { data, error } = await sb.rpc("biteboss_player_session");
+      if(error) throw error;
+      playerSession = data?.authenticated ? data : null;
+      return playerSession;
+    }catch(error){
+      console.warn("BiteBoss player session:", error);
+      playerSession = null;
+      return null;
+    }
+  }
+
+  function openMemberLogin(){
+    openModal("Member Login", `
+      <div class="form-grid member-auth-form">
+        <label class="wide">ID<input id="memberLoginId" class="input" maxlength="32" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="yourid" /></label>
+        <label class="wide">6-digit PIN<input id="memberLoginPin" class="input" type="password" inputmode="numeric" maxlength="6" autocomplete="current-password" placeholder="000000" /></label>
+        <button id="memberLoginSubmit" class="primary-btn wide" type="button">Login</button>
+        <p id="memberAuthStatus" class="inline-status wide" aria-live="polite"></p>
+      </div>
+    `);
+    $("#memberLoginSubmit").onclick = loginMember;
+  }
+
+  async function loginMember(){
+    const username = String($("#memberLoginId")?.value || "").trim().toLowerCase();
+    const pin = String($("#memberLoginPin")?.value || "").trim();
+    const status = $("#memberAuthStatus");
+    const button = $("#memberLoginSubmit");
+
+    if(!/^[a-z0-9][a-z0-9._-]{2,31}$/.test(username)){
+      setStatus(status, "ID를 확인하세요.");
+      return;
+    }
+    if(!/^\d{6}$/.test(pin)){
+      setStatus(status, "PIN은 숫자 6자리입니다.");
+      return;
+    }
+
+    if(button) button.disabled = true;
+    setStatus(status, "로그인 중…");
+
+    try{
+      // A logical BiteBoss account always runs on top of a live anonymous Supabase session.
+      // Refresh/restore it before the login RPC so stale browser auth cannot break member login.
+      const session = await ensureUserSession();
+      if(!session?.user && !authUser){
+        throw new Error("AUTH_SESSION_UNAVAILABLE");
+      }
+
+      const { data, error } = await sb.rpc("biteboss_player_login", {
+        p_username:username,
+        p_pin:pin
+      });
+
+      if(error){
+        console.error("BiteBoss member login RPC:", error);
+        throw new Error(error.message || error.code || "LOGIN_RPC_FAILED");
+      }
+
+      if(!data?.ok){
+        throw new Error(data?.error || "LOGIN_FAILED");
+      }
+
+      // Re-read the server session instead of trusting only the login response.
+      const restored = await restorePlayerSession();
+      if(!restored?.authenticated){
+        throw new Error("SESSION_RESTORE_FAILED");
+      }
+
+      playerSession = restored;
+      await ensureProfile();
+      closeModal();
+      updateProfileUi();
+
+      const loginPositionPromise = getPositionSafe(false, {
+        timeout:3000,
+        maximumAge:30000
+      });
+
+      await Promise.all([
+        loadHome(),
+        loadMyOrganization(),
+        loadGameActivity(),
+        loadAlerts()
+      ]);
+
+      lastPosition = await loginPositionPromise;
+      await loadStores();
+      if(lastPosition?.coords){
+        nearbyLastRefreshPosition = lastPosition;
+        nearbyLastRefreshAt = Date.now();
+      }
+      startNearbyLocationWatch();
+
+      startPresenceTracking();
+      await refreshNotificationState({ registerIfGranted:true });
+
+      if(pendingCrewInviteToken){
+        await previewCrewInvite(pendingCrewInviteToken);
+      }
+    }catch(error){
+      const code = String(error?.message || error || "LOGIN_FAILED");
+      console.error("BiteBoss member login:", code);
+
+      const message =
+        code.includes("LOCKED")
+          ? "로그인 시도가 많습니다. 15분 후 다시 시도하세요."
+          : code.includes("AUTH_REQUIRED") || code.includes("AUTH_SESSION_UNAVAILABLE")
+            ? "로그인 세션을 만들지 못했습니다. 새로고침 후 다시 시도하세요."
+            : code.includes("SESSION_RESTORE_FAILED")
+              ? "로그인은 확인됐지만 세션 복원에 실패했습니다. 다시 시도하세요."
+              : code.includes("INVALID_CREDENTIALS")
+                ? "ID 또는 PIN이 올바르지 않습니다."
+                : `로그인 실패 · ${code}`;
+
+      setStatus(status, message);
+    }finally{
+      if(button) button.disabled = false;
+    }
+  }
+
+  function openMemberRegister(){
+    openModal("Create ID", `
+      <div class="form-grid member-auth-form">
+        <label class="wide">ID<input id="memberRegisterId" class="input" maxlength="32" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="yourid" /></label>
+        <label class="wide">Nickname<input id="memberRegisterNick" class="input" maxlength="40" placeholder="Boss name" /></label>
+        <label class="wide">6-digit PIN<input id="memberRegisterPin" class="input" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" placeholder="000000" /></label>
+        <button id="memberRegisterSubmit" class="primary-btn wide" type="button">만들기</button>
+        <p id="memberAuthStatus" class="inline-status wide" aria-live="polite"></p>
+      </div>
+    `);
+    $("#memberRegisterSubmit").onclick = registerMember;
+  }
+
+  async function registerMember(){
+    const username = String($("#memberRegisterId")?.value || "").trim().toLowerCase();
+    const nickname = String($("#memberRegisterNick")?.value || "").trim();
+    const pin = String($("#memberRegisterPin")?.value || "").trim();
+    const status = $("#memberAuthStatus");
+    const button = $("#memberRegisterSubmit");
+    if(!/^[a-z0-9][a-z0-9._-]{2,31}$/.test(username)) return setStatus(status, "ID는 영문 소문자/숫자/._- 조합 3~32자입니다.");
+    if(!/^\d{6}$/.test(pin)) return setStatus(status, "PIN은 숫자 6자리입니다.");
+    if(button) button.disabled = true;
+    setStatus(status, "계정을 만드는 중…");
+    try{
+      const { data, error } = await sb.rpc("biteboss_member_register", { p_username:username, p_pin:pin, p_nickname:nickname || username });
+      if(error) throw error;
+      if(!data?.ok) throw new Error(data?.error || "REGISTER_FAILED");
+      playerSession = data;
+      await ensureProfile();
+      closeModal();
+      updateProfileUi();
+      const registerPositionPromise = getPositionSafe(false, {
+        timeout:3000,
+        maximumAge:30000
+      });
+      await Promise.all([loadHome(), loadMyOrganization()]);
+      lastPosition = await registerPositionPromise;
+      await loadStores();
+      if(lastPosition?.coords){
+        nearbyLastRefreshPosition = lastPosition;
+        nearbyLastRefreshAt = Date.now();
+      }
+      startNearbyLocationWatch();
+      startPresenceTracking();
+      await refreshNotificationState({ registerIfGranted:true });
+
+      if(pendingCrewInviteToken){
+        await previewCrewInvite(pendingCrewInviteToken);
+      }
+    }catch(error){
+      const code = String(error?.message || error);
+      const message = code.includes("USERNAME_TAKEN") ? "이미 사용 중인 ID입니다." : code.includes("ALREADY_REGISTERED") ? "이 기기에서 이미 회원 계정이 만들어져 있습니다." : "계정을 만들지 못했습니다.";
+      setStatus(status, message);
+    }finally{
+      if(button) button.disabled = false;
+    }
+  }
+
+  async function openMemberStoreForm(){
+    if(!playerSession?.authenticated) return openMemberLogin();
+    const pos = await getPositionSafe(true);
+    const lat = pos?.coords?.latitude;
+    const lng = pos?.coords?.longitude;
+    openModal("Add Store", `
+      <div class="form-grid member-store-form">
+        <label class="wide">Store name<input id="memberStoreName" class="input" maxlength="120" placeholder="매장명" /></label>
+        <label>Category<select id="memberStoreCategory" class="input"><option value="restaurant">Restaurant</option><option value="cafe">Cafe</option><option value="dessert">Dessert</option><option value="bakery">Bakery</option><option value="fastfood">Fast Food</option><option value="pub">Pub</option></select></label>
+        <label>City<input id="memberStoreCity" class="input" maxlength="120" placeholder="Seoul" /></label>
+        <label>District<input id="memberStoreDistrict" class="input" maxlength="120" placeholder="Gangnam" /></label>
+        <label class="wide">Address<input id="memberStoreAddress" class="input" maxlength="300" placeholder="주소 (선택)" /></label>
+        <div class="wide member-location-state" id="memberStoreLocation">${Number.isFinite(lat) && Number.isFinite(lng) ? `현재 위치 확인됨 · ${lat.toFixed(5)}, ${lng.toFixed(5)}` : "현재 위치를 확인하지 못했습니다."}</div>
+        <button id="memberStoreSubmit" class="primary-btn wide" type="button" ${Number.isFinite(lat) && Number.isFinite(lng) ? "" : "disabled"}>Register non-partner store</button>
+        <p id="memberStoreStatus" class="inline-status wide" aria-live="polite"></p>
+      </div>
+    `);
+    $("#memberStoreSubmit").onclick = () => submitMemberStore(lat, lng);
+  }
+
+  async function submitMemberStore(latitude, longitude){
+    const name = String($("#memberStoreName")?.value || "").trim();
+    const status = $("#memberStoreStatus");
+    const button = $("#memberStoreSubmit");
+    if(!name) return setStatus(status, "매장명을 입력하세요.");
+    if(!Number.isFinite(latitude) || !Number.isFinite(longitude)) return setStatus(status, "현재 위치가 필요합니다.");
+    if(button) button.disabled = true;
+    setStatus(status, "등록 중…");
+    try{
+      const { data, error } = await sb.rpc("biteboss_member_create_store", {
+        p_name:name,
+        p_category:String($("#memberStoreCategory")?.value || "restaurant"),
+        p_city:String($("#memberStoreCity")?.value || "").trim(),
+        p_district:String($("#memberStoreDistrict")?.value || "").trim(),
+        p_address:String($("#memberStoreAddress")?.value || "").trim(),
+        p_latitude:latitude,
+        p_longitude:longitude
+      });
+      if(error) throw error;
+      if(!data?.ok) throw new Error(data?.error || "STORE_CREATE_FAILED");
+      closeModal();
+      toast(`${data.store?.name || name} 등록 완료. 비제휴 매장은 현장 체류로 자동 점령됩니다.`);
+      await loadStores();
+    }catch(error){
+      setStatus(status, String(error?.message || error).includes("MEMBER_LOGIN_REQUIRED") ? "회원 로그인이 필요합니다." : "매장을 등록하지 못했습니다.");
+    }finally{
+      if(button) button.disabled = false;
+    }
+  }
+
+  function setStatus(node, text){
+    if(node) node.textContent = text;
+  }
+
+  function openProfileEditor(){
+    if(!playerSession?.authenticated){
+      openMemberLogin();
+      return;
+    }
+    const nickname = profile?.nickname || "보스";
+    openModal("프로필 수정", `
+      <div class="form-grid">
+        <label>닉네임<input id="profileNickInput" class="input" maxlength="40" value="${escapeAttr(nickname)}" /></label>
+        <label>프로필 이미지<input id="profilePhotoInput" class="input" type="file" accept="image/png,image/jpeg,image/webp" /></label>
+        <button id="saveProfileBtn" class="primary-btn wide" type="button">저장</button>
+      </div>
+    `);
+    $("#saveProfileBtn").onclick = saveProfileFromModal;
+  }
+
+  async function saveProfileFromModal(){
+    const button = $("#saveProfileBtn");
+    const nickname = String($("#profileNickInput")?.value || "").trim();
+    const file = $("#profilePhotoInput")?.files?.[0];
+    if(!nickname) return toast("닉네임을 입력하세요.");
+
+    if(button) button.disabled = true;
+    try{
+      let avatarUrl = profile?.avatar_url || "";
+      if(file) avatarUrl = await uploadAvatar(file);
+
+      const { data, error } = await sb.rpc("biteboss_update_profile", {
+        p_nickname:nickname.slice(0, 40),
+        p_avatar_url:avatarUrl
+      });
+
+      if(error) throw error;
+      profile = Array.isArray(data) ? data[0] : data;
+      closeModal();
+      updateProfileUi();
+      await Promise.all([loadStores(), loadHome()]);
+    }catch(error){
+      console.warn(error);
+      toast("프로필을 저장하지 못했습니다.");
+    }finally{
+      if(button) button.disabled = false;
+    }
+  }
+
+  async function uploadAvatar(file){
+    const blob = await imageFileToJpegBlob(file, 720, 720, 0.86);
+    const path = `${authUser.id}/avatar.jpg`;
+    const { error } = await sb.storage
+      .from("biteboss-avatars")
+      .upload(path, blob, { contentType:"image/jpeg", upsert:true, cacheControl:"3600" });
+    if(error) throw error;
+    const { data } = sb.storage.from("biteboss-avatars").getPublicUrl(path);
+    return `${data.publicUrl}?v=${Date.now()}`;
+  }
+
+
+  async function uploadOrganizationAvatar(file){
+    if(!organization?.id) throw new Error("CREW_NOT_FOUND");
+    if(!file) throw new Error("CREW_AVATAR_FILE_REQUIRED");
+
+    const allowedTypes = new Set(["image/jpeg","image/png","image/webp","image/heic","image/heif"]);
+    const fileType = String(file.type || "").toLowerCase();
+    if(fileType && !allowedTypes.has(fileType)){
+      throw new Error("CREW_AVATAR_UNSUPPORTED_FILE");
+    }
+
+    const { data:userData, error:userError } = await sb.auth.getUser();
+    if(userError) throw new Error(`CREW_AVATAR_AUTH:${userError.message || "AUTH_FAILED"}`);
+
+    const storageUserId = String(userData?.user?.id || "").trim();
+    if(!storageUserId) throw new Error("CREW_AVATAR_AUTH_REQUIRED");
+
+    let blob;
+    try{
+      blob = await imageFileToJpegBlob(file, 720, 720, 0.86);
+    }catch(error){
+      throw new Error(`CREW_AVATAR_IMAGE:${error?.message || "IMAGE_CONVERT_FAILED"}`);
+    }
+
+    const path = `${storageUserId}/crew/${organization.id}/avatar.jpg`;
+    const { error:uploadError } = await sb.storage
+      .from("biteboss-avatars")
+      .upload(path, blob, {
+        contentType:"image/jpeg",
+        upsert:true,
+        cacheControl:"3600"
+      });
+
+    if(uploadError){
+      throw new Error(`CREW_AVATAR_STORAGE:${uploadError.message || "UPLOAD_FAILED"}`);
+    }
+
+    const { data } = sb.storage.from("biteboss-avatars").getPublicUrl(path);
+    const publicUrl = String(data?.publicUrl || "").trim();
+    if(!publicUrl) throw new Error("CREW_AVATAR_PUBLIC_URL_FAILED");
+    return `${publicUrl}?v=${Date.now()}`;
+  }
+
+  function openOrganizationAvatarEditor(){
+    if(!playerSession?.authenticated || !organization?.id){
+      toast("크루 정보를 찾지 못했습니다.");
+      return;
+    }
+    if(!organization?.is_leader){
+      toast("크루 개설자만 크루 프로필을 변경할 수 있습니다.");
+      return;
+    }
+
+    const currentUrl = String(organization.avatar_url || "").trim();
+    const crewName = String(organization.name || "크루").trim();
+    const fallback = Array.from(crewName)[0] || "C";
+    const renameAvailableAt = organization.name_change_available_at || null;
+    const renameLocked = Boolean(
+      renameAvailableAt &&
+      new Date(renameAvailableAt).getTime() > Date.now()
+    );
+
+    openModal("크루 프로필", `
+      <div class="crew-avatar-editor crew-profile-editor">
+        <div class="crew-avatar-editor-preview">
+          ${currentUrl
+            ? `<img src="${escapeAttr(currentUrl)}" alt="${escapeAttr(crewName)} 크루 프로필" />`
+            : `<span aria-hidden="true">${escapeHtml(fallback)}</span>`}
+        </div>
+
+        <div>
+          <strong>${escapeHtml(crewName)}</strong>
+          <p>크루 이미지와 크루명은 개인 프로필과 별도로 관리됩니다.</p>
+        </div>
+
+        <section class="crew-profile-edit-section">
+          <span>크루 이미지</span>
+          <label class="crew-avatar-file">
+            이미지 선택
+            <input id="organizationAvatarInput" type="file" accept="image/png,image/jpeg,image/webp" />
+          </label>
+          <div class="crew-profile-edit-actions">
+            <button id="saveOrganizationAvatarBtn" class="primary-btn" type="button">이미지 저장</button>
+            ${currentUrl ? `<button id="removeOrganizationAvatarBtn" class="text-btn crew-avatar-remove" type="button">이미지 삭제</button>` : ""}
+          </div>
+        </section>
+
+        <section class="crew-profile-edit-section crew-name-edit-section">
+          <span>크루명</span>
+          <input
+            id="organizationRenameInput"
+            class="input"
+            type="text"
+            maxlength="30"
+            autocomplete="off"
+            value="${escapeAttr(crewName)}" />
+          <p class="crew-name-rule">
+            ${renameLocked
+              ? `다음 변경까지 ${escapeHtml(formatRemaining(renameAvailableAt))}`
+              : "크루명은 월 1회 변경할 수 있습니다."}
+          </p>
+          <button
+            id="renameOrganizationBtn"
+            class="secondary-btn"
+            type="button"
+            ${renameLocked ? "disabled" : ""}>
+            ${renameLocked ? `변경 대기 ${escapeHtml(formatRemaining(renameAvailableAt))}` : "크루명 변경"}
+          </button>
+        </section>
+      </div>
+    `);
+
+    $("#saveOrganizationAvatarBtn")?.addEventListener("click", saveOrganizationAvatarFromModal);
+    $("#removeOrganizationAvatarBtn")?.addEventListener("click", removeOrganizationAvatar);
+    $("#renameOrganizationBtn")?.addEventListener("click", renameOrganizationFromModal);
+  }
+
+  async function saveOrganizationAvatarFromModal(){
+    const button = $("#saveOrganizationAvatarBtn");
+    const file = $("#organizationAvatarInput")?.files?.[0];
+    if(!file){
+      toast("이미지를 선택하세요.");
+      return;
+    }
+
+    if(button) button.disabled = true;
+    try{
+      const avatarUrl = await uploadOrganizationAvatar(file);
+      const { data, error } = await sb.rpc("biteboss_update_organization_avatar_v649", {
+        p_avatar_url:avatarUrl
+      });
+
+      if(error) throw new Error(`CREW_AVATAR_RPC:${error.message || "RPC_FAILED"}`);
+      if(!data?.ok) throw new Error(`CREW_AVATAR_RPC:${data?.error || "CREW_AVATAR_UPDATE_FAILED"}`);
+
+      organization = data.organization || organization;
+      closeModal();
+      renderOrganizationUi();
+      updateProfileUi();
+      await Promise.all([loadStores(), loadHome()]);
+      toast("크루 프로필 이미지를 변경했습니다.");
+    }catch(error){
+      console.warn("BiteBoss crew avatar:", error);
+      const code = String(error?.message || "");
+      let message = "크루 프로필 이미지를 저장하지 못했습니다.";
+
+      if(code.includes("LEADER_REQUIRED")){
+        message = "크루 개설자만 프로필 이미지를 변경할 수 있습니다.";
+      }else if(code.includes("CREW_AVATAR_STORAGE")){
+        message = "이미지 업로드 권한이 없습니다. 크루 이미지 저장 SQL을 먼저 적용하세요.";
+      }else if(code.includes("CREW_AVATAR_RPC") && code.includes("Could not find the function")){
+        message = "크루 이미지 저장 기능이 서버에 아직 적용되지 않았습니다.";
+      }else if(code.includes("CREW_AVATAR_RPC")){
+        message = "이미지는 업로드됐지만 크루 정보 저장에 실패했습니다.";
+      }else if(code.includes("CREW_AVATAR_IMAGE") || code.includes("UNSUPPORTED_FILE")){
+        message = "이 이미지를 처리하지 못했습니다. JPG, PNG 또는 WEBP 이미지를 사용하세요.";
+      }else if(code.includes("CREW_AVATAR_AUTH")){
+        message = "로그인 세션을 확인하지 못했습니다. 다시 로그인한 뒤 시도하세요.";
+      }
+
+      toast(message);
+    }finally{
+      if(button) button.disabled = false;
+    }
+  }
+
+  async function removeOrganizationAvatar(){
+    const button = $("#removeOrganizationAvatarBtn");
+    if(button) button.disabled = true;
+    try{
+      const { data, error } = await sb.rpc("biteboss_update_organization_avatar_v649", {
+        p_avatar_url:""
+      });
+      if(error) throw error;
+      if(!data?.ok) throw new Error(data?.error || "CREW_AVATAR_UPDATE_FAILED");
+
+      organization = data.organization || organization;
+      closeModal();
+      renderOrganizationUi();
+      updateProfileUi();
+      await Promise.all([loadStores(), loadHome()]);
+      toast("크루 프로필 이미지를 삭제했습니다.");
+    }catch(error){
+      console.warn("BiteBoss remove crew avatar:", error);
+      toast("크루 프로필 이미지를 삭제하지 못했습니다.");
+    }finally{
+      if(button) button.disabled = false;
+    }
+  }
+
+
+  async function renameOrganizationFromModal(){
+    if(!organization?.is_leader){
+      toast("크루 개설자만 크루명을 변경할 수 있습니다.");
+      return;
+    }
+
+    const button = $("#renameOrganizationBtn");
+    const input = $("#organizationRenameInput");
+    const nextName = String(input?.value || "").trim().replace(/\s+/g," ");
+    const currentName = String(organization?.name || "").trim().replace(/\s+/g," ");
+
+    if(nextName.length < 2 || nextName.length > 30){
+      toast("크루명은 2~30자로 입력하세요.");
+      return;
+    }
+    if(nextName === currentName){
+      toast("현재 크루명과 같습니다.");
+      return;
+    }
+
+    if(button) button.disabled = true;
+    try{
+      const { data, error } = await sb.rpc("biteboss_rename_organization_v652", {
+        p_name:nextName
+      });
+      if(error) throw error;
+
+      if(!data?.ok){
+        const message = ({
+          MEMBER_LOGIN_REQUIRED:"회원 로그인이 필요합니다.",
+          LEADER_REQUIRED:"크루 개설자만 크루명을 변경할 수 있습니다.",
+          INVALID_NAME:"크루명은 2~30자로 입력하세요.",
+          SAME_NAME:"현재 크루명과 같습니다.",
+          NAME_TAKEN:"이미 사용 중인 크루명입니다.",
+          NAME_RESERVED:"이미 사용 중인 크루명입니다."
+        })[data?.error];
+
+        if(data?.error === "RENAME_COOLDOWN"){
+          toast(data?.available_at
+            ? `크루명은 ${formatRemaining(data.available_at)} 후 다시 변경할 수 있습니다.`
+            : "크루명은 월 1회 변경할 수 있습니다.");
+        }else{
+          toast(message || "크루명을 변경하지 못했습니다.");
+        }
+        return;
+      }
+
+      organization = data.organization || organization;
+      closeModal();
+      await loadMyOrganization();
+      await Promise.all([loadStores(), loadHome(), loadRank()]);
+      toast(`크루명이 ${organization?.name || nextName}(으)로 변경되었습니다.`);
+    }catch(error){
+      console.warn("BiteBoss crew rename:", error);
+      toast("크루명을 변경하지 못했습니다.");
+    }finally{
+      if(button) button.disabled = false;
+    }
+  }
+
+  async function loadMyOrganization(){
+    if(!window.sb){
+      organization = null;
+      organizationCooldown = null;
+      organizationInvites = [];
+      organizationMembers = [];
+      renderOrganizationUi();
+      return null;
+    }
+
+    try{
+      const [orgResult, cooldownResult, invitesResult, membersResult] = await Promise.all([
+        sb.rpc("biteboss_my_organization"),
+        sb.rpc("biteboss_organization_cooldown_status"),
+        sb.rpc("biteboss_my_organization_invites"),
+        sb.rpc("biteboss_organization_members")
+      ]);
+
+      if(orgResult.error) throw orgResult.error;
+
+      organization = orgResult.data || null;
+      organizationInvites = Array.isArray(invitesResult.data) ? invitesResult.data : [];
+      organizationMembers = Array.isArray(membersResult.data) ? membersResult.data : [];
+
+      if(cooldownResult.error){
+        console.warn("BiteBoss organization cooldown:", cooldownResult.error);
+        organizationCooldown = null;
+      }else{
+        organizationCooldown = cooldownResult.data || null;
+      }
+
+      if(invitesResult.error){
+        console.warn("BiteBoss organization invites:", invitesResult.error);
+        organizationInvites = [];
+      }
+
+      if(membersResult.error){
+        console.warn("BiteBoss organization members:", membersResult.error);
+        organizationMembers = [];
+      }
+    }catch(error){
+      console.warn("BiteBoss organization:", error);
+      organization = null;
+      organizationCooldown = null;
+      organizationInvites = [];
+      organizationMembers = [];
+    }
+
+    renderOrganizationUi();
+    updateProfileUi();
+    return organization;
+  }
+
+  function renderOrganizationUi(){
+    const hasOrg = Boolean(organization?.id);
+    const name = String(organization?.name || "").trim();
+    const cooldownActive = Boolean(organizationCooldown?.active);
+    const cooldownUntil = organizationCooldown?.cooldown_until || null;
+
+    setText("#organizationName", hasOrg ? name : "크루 없음");
+    setText(
+      "#organizationRole",
+      hasOrg
+        ? (organization.is_leader ? "개설자" : "멤버")
+        : cooldownActive && cooldownUntil
+          ? `Affiliation cooldown · ${formatRemaining(cooldownUntil)}`
+          : ""
+    );
+    const roleEl = $("#organizationRole");
+    if(roleEl) roleEl.classList.toggle("hidden", !hasOrg && !cooldownActive);
+
+    setText("#organizationMembers", hasOrg ? Number(organization.member_count || 0) : 0);
+    setText("#organizationTerritory", hasOrg ? Number(organization.territory_count || 0) : 0);
+
+    const crewAvatarButton = $("#organizationAvatarButton");
+    const crewAvatarImage = $("#organizationAvatarImage");
+    const crewAvatarFallback = $("#organizationAvatarFallback");
+    const crewAvatarUrl = hasOrg ? String(organization.avatar_url || "").trim() : "";
+    if(crewAvatarButton){
+      crewAvatarButton.classList.toggle("hidden", !hasOrg);
+      crewAvatarButton.disabled = !Boolean(hasOrg && organization?.is_leader);
+      crewAvatarButton.classList.toggle("is-editable", Boolean(hasOrg && organization?.is_leader));
+      crewAvatarButton.setAttribute(
+        "aria-label",
+        organization?.is_leader ? "크루 프로필 이미지 변경" : "크루 프로필 이미지"
+      );
+    }
+    if(crewAvatarImage){
+      if(crewAvatarUrl){
+        crewAvatarImage.src = crewAvatarUrl;
+        crewAvatarImage.alt = `${name || "크루"} 프로필`;
+        crewAvatarImage.classList.remove("hidden");
+      }else{
+        crewAvatarImage.removeAttribute("src");
+        crewAvatarImage.alt = "";
+        crewAvatarImage.classList.add("hidden");
+      }
+    }
+    if(crewAvatarFallback){
+      crewAvatarFallback.textContent = Array.from(name || "C")[0] || "C";
+      crewAvatarFallback.classList.toggle("hidden", Boolean(crewAvatarUrl));
+    }
+
+    const create = $("#createOrganizationBtn");
+    if(create){
+      const hasBoss = Number(summary?.active_boss_count || 0) > 0;
+      const loggedIn = Boolean(playerSession?.authenticated);
+      const canCreate = Boolean(
+        loggedIn &&
+        !hasOrg &&
+        hasBoss &&
+        !cooldownActive
+      );
+
+      create.classList.toggle("hidden", hasOrg);
+      create.disabled = Boolean(loggedIn && !canCreate);
+
+      if(!loggedIn){
+        create.textContent = "로그인 후 크루 만들기";
+      }else if(cooldownActive && cooldownUntil){
+        create.textContent = `재가입 대기 ${formatRemaining(cooldownUntil)}`;
+      }else{
+        create.textContent = canCreate ? "크루 만들기" : "보스가 되어 크루 만들기";
+      }
+    }
+
+    const invite = $("#inviteOrganizationMemberBtn");
+    if(invite){
+      const canInvite = Boolean(hasOrg && organization?.is_leader);
+      invite.classList.toggle("hidden", !canInvite);
+      invite.disabled = !canInvite;
+      invite.textContent = "QR로 초대";
+    }
+
+    const independence = $("#foundIndependentOrganizationBtn");
+    if(independence){
+      const canFoundIndependent = Boolean(
+        hasOrg &&
+        !organization?.is_leader &&
+        Number(summary?.active_boss_count || 0) > 0
+      );
+      independence.classList.toggle("hidden", !canFoundIndependent);
+      independence.disabled = !canFoundIndependent;
+    }
+
+    const leave = $("#leaveOrganizationBtn");
+    if(leave){
+      leave.classList.toggle("hidden", !hasOrg);
+      leave.textContent = organization?.is_leader ? "크루 해산" : "크루 탈퇴";
+    }
+
+    const memberBox = $("#organizationMemberList");
+    if(memberBox){
+      memberBox.classList.toggle("hidden", !hasOrg);
+
+      if(hasOrg && organizationMembers.length){
+        memberBox.innerHTML = organizationMembers.map(member => {
+          const canTransfer = Boolean(
+            organization?.is_leader &&
+            member.role !== "leader" &&
+            member.user_id
+          );
+
+          const memberName = String(member.nickname || member.username || "사용자").trim();
+          const isCurrentProfile = Boolean(
+            profile?.nickname &&
+            memberName &&
+            memberName === String(profile.nickname).trim()
+          );
+          const memberAvatar = String(
+            member.avatar_url ||
+            member.profile_avatar_url ||
+            member.profile_image_url ||
+            member.photo_url ||
+            member.image_url ||
+            (isCurrentProfile ? profile?.avatar_url : "") ||
+            ""
+          ).trim();
+
+          return `
+            <article
+              class="organization-member-row"
+              data-player-profile="${escapeAttr(member.user_id || "")}"
+              data-player-avatar="${escapeAttr(memberAvatar)}">
+              <div>
+                <strong>${escapeHtml(member.nickname || member.username || "사용자")}</strong>
+                <span>${escapeHtml(member.role === "leader" ? "개설자" : "멤버")}</span>
+              </div>
+              <div class="organization-member-side">
+                <b>${Number(member.boss_count || 0)} 보스</b>
+                ${canTransfer ? `
+                  <button
+                    class="text-btn organization-transfer-btn"
+                    type="button"
+                    data-transfer-leader="${escapeAttr(member.user_id)}"
+                    data-member-name="${escapeAttr(member.nickname || member.username || "멤버")}">
+                    리더 변경
+                  </button>` : ""}
+              </div>
+            </article>
+          `;
+        }).join("");
+      }else{
+        memberBox.innerHTML = "";
+      }
+    }
+
+    const invitesBox = $("#organizationInvites");
+    if(invitesBox){
+      const showInvites = !hasOrg && organizationInvites.length > 0;
+      invitesBox.classList.toggle("hidden", !showInvites);
+
+      if(showInvites){
+        invitesBox.innerHTML = `
+          <div class="organization-invites-head">
+            <span>초대</span>
+            <strong>${organizationInvites.length}</strong>
+          </div>
+          ${organizationInvites.map(inviteRow => `
+            <article class="organization-invite-row">
+              <div>
+                <strong>${escapeHtml(inviteRow.organization_name || "Crew")}</strong>
+                <span>${escapeHtml(formatRemaining(inviteRow.expires_at))} 남음</span>
+              </div>
+              <div class="organization-invite-actions">
+                <button type="button" data-org-invite="${escapeAttr(inviteRow.id)}" data-accept="true">참여</button>
+                <button type="button" data-org-invite="${escapeAttr(inviteRow.id)}" data-accept="false">거절</button>
+              </div>
+            </article>
+          `).join("")}
+        `;
+      }else{
+        invitesBox.innerHTML = "";
+      }
+    }
+  }
+
+  function openOrganizationCreate(){
+    if(!playerSession?.authenticated){
+      openMemberLogin();
+      return;
+    }
+
+    if(organization?.id){
+      toast("이미 크루에 소속되어 있습니다.");
+      return;
+    }
+
+    if(organizationCooldown?.active){
+      toast(`크루 재가입/창설 쿨다운이 ${formatRemaining(organizationCooldown.cooldown_until)} 남았습니다.`);
+      return;
+    }
+
+    if(Number(summary?.active_boss_count || 0) < 1){
+      toast("한 매장의 보스가 된 뒤 크루를 만들 수 있습니다.");
+      return;
+    }
+
+    openModal("크루 만들기", `
+      <div class="form-grid organization-create-form">
+        <label>
+          크루명
+          <input id="organizationNameInput" class="input" maxlength="30" autocomplete="off" placeholder="BLACK FORK" />
+        </label>
+        <p class="organization-create-note">현재 보스 매장 1곳 이상이 필요합니다. 대소문자·연속 공백만 다른 크루명은 같은 이름으로 처리됩니다.</p>
+        <button id="organizationCreateSubmit" class="primary-btn" type="button">만들기</button>
+      </div>
+    `);
+
+    $("#organizationCreateSubmit")?.addEventListener("click", createOrganization);
+  }
+
+  async function createOrganization(){
+    const name = String($("#organizationNameInput")?.value || "").trim().replace(/\s+/g," ");
+    if(name.length < 2 || name.length > 30){
+      toast("크루명은 2~30자로 입력하세요.");
+      return;
+    }
+
+    const button = $("#organizationCreateSubmit");
+    if(button) button.disabled = true;
+
+    try{
+      const { data, error } = await sb.rpc("biteboss_create_organization_v62", { p_name:name });
+      if(error) throw error;
+
+      if(!data?.ok){
+        const message = ({
+          MEMBER_LOGIN_REQUIRED:"회원 로그인이 필요합니다.",
+          BOSS_REQUIRED:"한 매장의 보스가 된 뒤 조직을 만들 수 있습니다.",
+          ALREADY_IN_CREW:"이미 조직에 소속되어 있습니다.",
+          CREW_COOLDOWN:data?.cooldown_until ? `조직 창설 쿨다운이 ${formatRemaining(data.cooldown_until)} 남았습니다.` : "조직 창설 쿨다운 중입니다.",
+          NAME_TAKEN:"이미 사용 중인 조직명입니다.",
+          NAME_RESERVED:"대소문자·공백만 다른 동일 조직명이 이미 사용 중입니다.",
+          INVALID_NAME:"조직명은 2~30자로 입력하세요."
+        })[data?.error] || "조직을 만들지 못했습니다.";
+        toast(message);
+        return;
+      }
+
+      organization = data.organization || null;
+      organizationCooldown = null;
+      closeModal();
+      await loadMyOrganization();
+      renderOrganizationUi();
+      updateProfileUi();
+      toast(`${organization?.name || name} 크루를 만들었습니다.`);
+      if(organization?.id) await openOrganizationDetail(organization.id);
+    }catch(error){
+      console.warn("BiteBoss create crew:", error);
+      toast("크루를 만들지 못했습니다.");
+    }finally{
+      if(button) button.disabled = false;
+    }
+  }
+
+
+
+  function handleOrganizationMemberAction(event){
+    const button = event.target.closest("[data-transfer-leader]");
+    if(!button) return;
+
+    const userId = String(button.dataset.transferLeader || "").trim();
+    const memberName = String(button.dataset.memberName || "Member").trim();
+    if(!userId) return;
+
+    openLeadershipTransferConfirm(userId, memberName);
+  }
+
+  function openLeadershipTransferConfirm(userId, memberName){
+    if(!organization?.is_leader){
+      toast("현재 개설자만 리더를 변경할 수 있습니다.");
+      return;
+    }
+
+    openModal("리더 변경", `
+      <div class="organization-transfer-confirm">
+        <span>새 개설자</span>
+        <strong>${escapeHtml(memberName)}</strong>
+        <p>${escapeHtml(organization?.name || "크루")}의 개설자 권한을 이 멤버에게 넘깁니다.</p>
+        <div class="organization-transfer-rules">
+          <p>XP 차감 <strong>0</strong></p>
+          <p>재가입 대기 <strong>0일</strong></p>
+          <p>보스 / 점령지 <strong>유지</strong></p>
+        </div>
+        <p class="organization-transfer-note">이전 개설자는 일반 멤버가 됩니다. 이후 조직을 탈퇴하면 일반 멤버 탈퇴 규칙이 적용됩니다.</p>
+        <button
+          id="organizationTransferConfirm"
+          class="primary-btn"
+          type="button"
+          data-new-leader="${escapeAttr(userId)}">
+          리더 변경
+        </button>
+      </div>
+    `);
+
+    $("#organizationTransferConfirm")?.addEventListener("click", transferOrganizationLeadership);
+  }
+
+  async function transferOrganizationLeadership(event){
+    const button = event.currentTarget;
+    const userId = String(button?.dataset?.newLeader || "").trim();
+    if(!userId) return;
+
+    button.disabled = true;
+
+    try{
+      const { data, error } = await sb.rpc("biteboss_transfer_organization_leadership", {
+        p_new_leader_user_id:userId
+      });
+      if(error) throw error;
+
+      if(!data?.ok){
+        const message = ({
+          MEMBER_LOGIN_REQUIRED:"회원 로그인이 필요합니다.",
+          TARGET_REQUIRED:"새 개설자를 선택하세요.",
+          ALREADY_LEADER:"이미 현재 개설자입니다.",
+          LEADER_REQUIRED:"현재 개설자만 리더를 변경할 수 있습니다.",
+          TARGET_NOT_MEMBER:"같은 크루의 멤버만 개설자로 지정할 수 있습니다."
+        })[data?.error] || "리더 변경에 실패했습니다.";
+
+        toast(message);
+        return;
+      }
+
+      closeModal();
+      await loadMyOrganization();
+      toast(`${data.new_leader_name || "멤버"}에게 개설자 권한을 넘겼습니다.`);
+    }catch(error){
+      console.warn("BiteBoss transfer organization leadership:", error);
+      toast("리더 변경에 실패했습니다.");
+    }finally{
+      button.disabled = false;
+    }
+  }
+
+
+  function handlePlayerProfileOpen(event){
+    const target = event.target.closest("[data-player-profile]");
+    if(!target) return;
+
+    const userId = String(target.dataset.playerProfile || "").trim();
+    if(!userId) return;
+
+    if(target.matches("[data-activity-store]")){
+      const storeId = target.dataset.activityStore;
+      if(event.metaKey || event.ctrlKey){
+        if(storeId) openStoreDetail(storeId);
+        return;
+      }
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const avatarHint = String(target.dataset.playerAvatar || "").trim();
+    openPlayerProfile(userId, avatarHint);
+  }
+
+  async function openPlayerProfile(userId, avatarHint = ""){
+    openModal("사용자", `<div class="app-state">사용자 정보를 불러오는 중…</div>`);
+
+    try{
+      const { data, error } = await sb.rpc("biteboss_player_profile", {
+        p_user_id:userId
+      });
+
+      if(error) throw error;
+      if(!data?.ok) throw new Error(data?.error || "PLAYER_LOAD_FAILED");
+
+      if(data?.player){
+        const sameAsCurrentProfile = Boolean(
+          profile?.nickname &&
+          data.player.nickname &&
+          String(profile.nickname).trim() === String(data.player.nickname).trim()
+        );
+
+        data.player.avatar_url = String(
+          data.player.avatar_url ||
+          data.player.profile_avatar_url ||
+          data.player.profile_image_url ||
+          data.player.photo_url ||
+          data.player.image_url ||
+          avatarHint ||
+          (sameAsCurrentProfile ? profile?.avatar_url : "") ||
+          ""
+        ).trim();
+      }
+
+      renderPlayerProfile(data);
+    }catch(error){
+      console.warn("BiteBoss player profile:", error);
+      const body = $("#modalBody");
+      if(body) body.innerHTML = `<div class="store-detail-empty">플레이어 정보를 불러오지 못했습니다.</div>`;
+    }
+  }
+
+  function renderPlayerProfile(data){
+    const player = data.player || {};
+    const h2h = data.head_to_head || {};
+    const recent = Array.isArray(data.recent_activity) ? data.recent_activity : [];
+
+    // Modal shell is generic; the nickname is the hero title.
+    setText("#modalTitle", "사용자 프로필");
+
+    const orgLine = player.organization_name
+      ? `${player.organization_name}${player.organization_role === "leader" ? " · 개설자" : ""}`
+      : "소속 크루 없음";
+
+    const recentHtml = recent.map(row => {
+      const result = String(row.result || "");
+      let title = "전투 기록";
+      if(result === "boss_win") title = row.as_challenger ? "보스 점령" : "보스 상실";
+      else if(result === "crew") title = row.as_challenger ? "크루 합류" : "방어 성공";
+      else if(result === "boss_visit") title = "보스 활동";
+
+      return `
+        <button class="player-profile-history-row" type="button" data-profile-store="${escapeAttr(row.store_id)}">
+          <div>
+            <strong>${escapeHtml(title)}</strong>
+            <span>${escapeHtml(row.store_name || "매장")}</span>
+          </div>
+          <time>${escapeHtml(formatActivityTime(row.created_at))}</time>
+        </button>
+      `;
+    }).join("") || `<div class="app-state player-profile-empty">아직 전투 기록이 없습니다.</div>`;
+
+    const body = $("#modalBody");
+    if(!body) return;
+
+    body.innerHTML = `
+      <div class="player-profile-detail">
+        <section class="player-profile-hero">
+          ${bossAvatarMarkup(player.avatar_url || "", player.nickname || "사용자", "player-profile-avatar")}
+          <div class="player-profile-hero-copy">
+            <span>사용자</span>
+            <strong>${escapeHtml(player.nickname || "사용자")}</strong>
+            <p>${escapeHtml(orgLine)}</p>
+          </div>
+        </section>
+
+        <section class="player-profile-stats" aria-label="사용자 기록">
+          <div><span>레벨</span><strong>Lv ${Number(player.level || 1)}</strong></div>
+          <div><span>XP</span><strong>${Number(player.xp || 0).toLocaleString("ko-KR")}</strong></div>
+          <div><span>보스</span><strong>${Number(player.boss_count || 0)}</strong></div>
+          <div><span>크루</span><strong>${Number(player.crew_count || 0)}</strong></div>
+        </section>
+
+        <section class="player-profile-h2h">
+          <div class="player-profile-section-head">
+            <span>맞대결 전적</span>
+            <strong>${Number(h2h.total || 0)}전</strong>
+          </div>
+          <div class="player-profile-h2h-grid">
+            <p><span>내 승리</span><strong>${Number(h2h.viewer_wins || 0)}</strong></p>
+            <p><span>상대 승리</span><strong>${Number(h2h.target_wins || 0)}</strong></p>
+          </div>
+        </section>
+
+        <section class="player-profile-history">
+          <div class="player-profile-section-head">
+            <span>최근 기록</span>
+            <strong>${recent.length}건</strong>
+          </div>
+          <div class="player-profile-history-list">${recentHtml}</div>
+        </section>
+      </div>
+    `;
+
+    $$("[data-profile-store]", body).forEach(button => {
+      button.addEventListener("click", () => {
+        const storeId = button.dataset.profileStore;
+        closeModal();
+        if(storeId){
+          openStoreDetail(storeId, {
+            source:"player_profile_battle",
+            showPartnerOwnerCard:false
+          });
+        }
+      });
+    });
+  }
+
+  async function openCurrentOrganizationDetail(){
+    const orgId = organization?.id;
+    if(!orgId){
+      toast("소속된 크루가 없습니다.");
+      return;
+    }
+
+    await openOrganizationDetail(orgId);
+  }
+
+  async function openOrganizationDetail(orgId){
+    openModal("크루 프로필", `<div class="store-detail-loading">Crew 정보를 불러오는 중…</div>`);
+
+    try{
+      const { data, error } = await sb.rpc("biteboss_organization_detail", {
+        p_organization_id:orgId
+      });
+      if(error) throw error;
+      if(!data?.ok) throw new Error(data?.error || "CREW_LOAD_FAILED");
+
+      renderOrganizationDetail(data);
+    }catch(error){
+      console.warn("BiteBoss organization detail:", error);
+      const body = $("#modalBody");
+      if(body) body.innerHTML = `<div class="store-detail-empty">Crew 정보를 불러오지 못했습니다.</div>`;
+    }
+  }
+
+  function renderOrganizationDetail(data){
+    const org = data.organization || {};
+    const members = Array.isArray(data.members) ? data.members : [];
+    const territories = Array.isArray(data.territories) ? data.territories : [];
+
+    setText("#modalTitle", "크루 프로필");
+
+    const body = $("#modalBody");
+    if(!body) return;
+
+    const memberHtml = members.map(member => `
+      <article class="organization-detail-member">
+        <div>
+          <strong>${escapeHtml(member.nickname || "사용자")}</strong>
+          <span>${member.role === "leader" ? "개설자" : "멤버"}</span>
+        </div>
+        <b>${Number(member.boss_count || 0)} 보스</b>
+      </article>
+    `).join("") || `<div class="store-detail-empty">멤버가 없습니다.</div>`;
+
+    const territoryHtml = territories.map(row => {
+      const protectedNow = Boolean(
+        row.protected_until &&
+        new Date(row.protected_until).getTime() > Date.now()
+      );
+      const place = [row.city,row.district].filter(Boolean).join(" ");
+
+      return `
+        <button
+          class="organization-territory-row"
+          type="button"
+          data-org-territory-store="${escapeAttr(row.store_id)}">
+          <div>
+            <strong>${escapeHtml(row.store_name || "매장")}</strong>
+            <span>${escapeHtml([place,row.category].filter(Boolean).join(" · "))}</span>
+          </div>
+          <div>
+            <b>${escapeHtml(row.boss_nickname || "보스")}</b>
+            <span>${protectedNow ? `보호 ${escapeHtml(formatRemaining(row.protected_until))} 남음` : `방어력 ${Number(row.boss_defense || 0)}`}</span>
+          </div>
+        </button>
+      `;
+    }).join("") || `<div class="store-detail-empty">아직 점령지가 없습니다.</div>`;
+
+    body.innerHTML = `
+      <div class="organization-detail crew-profile-detail">
+        <section class="player-profile-hero crew-profile-hero">
+          <div class="player-profile-avatar crew-profile-avatar">
+            ${String(org.avatar_url || "").trim()
+              ? `<img src="${escapeAttr(org.avatar_url)}" alt="${escapeAttr(org.name || "크루")} 프로필" />`
+              : `<span aria-hidden="true">${escapeHtml(Array.from(String(org.name || "C"))[0] || "C")}</span>`}
+          </div>
+          <div class="player-profile-hero-copy crew-profile-hero-copy">
+            <span>크루</span>
+            <strong>${escapeHtml(org.name || "크루")}</strong>
+          </div>
+        </section>
+
+        <section class="player-profile-h2h-grid crew-profile-stats" aria-label="크루 기록">
+          <p><span>멤버</span><strong>${Number(org.member_count || 0)}</strong></p>
+          <p><span>점령지</span><strong>${Number(org.territory_count || 0)}</strong></p>
+        </section>
+
+        <section class="organization-detail-section">
+          <h4>점령지</h4>
+          <div class="organization-territory-list">${territoryHtml}</div>
+        </section>
+
+        <section class="organization-detail-section">
+          <h4>멤버</h4>
+          <div class="organization-detail-members">${memberHtml}</div>
+        </section>
+      </div>
+    `;
+
+    $$("[data-org-territory-store]", body).forEach(button => {
+      button.addEventListener("click", () => {
+        const storeId = button.dataset.orgTerritoryStore;
+        closeModal();
+        if(storeId) openStoreDetail(storeId);
+      });
+    });
+  }
+
+
+  function openIndependentOrganizationCreate(){
+    if(!playerSession?.authenticated){
+      toast("회원 로그인이 필요합니다.");
+      return;
+    }
+
+    if(!organization?.id || organization?.is_leader){
+      toast("현재 조직의 일반 멤버만 독립할 수 있습니다.");
+      return;
+    }
+
+    const bossCount = Number(summary?.active_boss_count || 0);
+    if(bossCount < 1){
+      toast("한 매장의 보스가 된 뒤 독립할 수 있습니다.");
+      return;
+    }
+
+    openModal("Found your organization", `
+      <div class="form-grid organization-create-form independence-create-form">
+        <div class="independence-summary">
+          <span>PROMOTION</span>
+          <strong>Boss → Founder</strong>
+          <p>현재 보스 매장 ${bossCount}곳을 기반으로 자기 조직을 만듭니다.</p>
+        </div>
+        <label>
+          Organization name
+          <input id="independentOrganizationNameInput" class="input" maxlength="30" autocomplete="off" placeholder="NIGHT BITE" />
+        </label>
+        <div class="independence-rules">
+          <p>XP 차감 <strong>0</strong></p>
+          <p>Independent founding cooldown <strong>14 days</strong></p>
+          <p>현재 보스 매장 <strong>유지</strong></p>
+        </div>
+        <p class="organization-create-note">활성 Boss가 있어야 독립할 수 있습니다. 독립 창설 후 14일 동안 다시 독립 창설할 수 없습니다. 현재 Boss 기록은 유지됩니다.</p>
+        <button id="independentOrganizationCreateSubmit" class="primary-btn" type="button">Found organization</button>
+      </div>
+    `);
+
+    $("#independentOrganizationCreateSubmit")?.addEventListener("click", foundIndependentOrganization);
+  }
+
+  async function foundIndependentOrganization(){
+    const name = String($("#independentOrganizationNameInput")?.value || "").trim().replace(/\s+/g," ");
+    if(name.length < 2 || name.length > 30){
+      toast("조직명은 2~30자로 입력하세요.");
+      return;
+    }
+
+    const button = $("#independentOrganizationCreateSubmit");
+    if(button) button.disabled = true;
+
+    try{
+      const { data, error } = await sb.rpc("biteboss_found_independent_organization_v62", {
+        p_name:name
+      });
+      if(error) throw error;
+
+      if(!data?.ok){
+        const message = ({
+          MEMBER_LOGIN_REQUIRED:"회원 로그인이 필요합니다.",
+          INVALID_NAME:"조직명은 2~30자로 입력하세요.",
+          CREW_MEMBERSHIP_REQUIRED:"현재 소속 조직이 없습니다.",
+          ALREADY_CREW_LEADER:"이미 자기 조직의 Founder입니다.",
+          CREW_NOT_FOUND:"현재 조직 정보를 찾지 못했습니다.",
+          BOSS_REQUIRED:"현재 Boss인 매장이 1곳 이상 있어야 독립할 수 있습니다.",
+          INDEPENDENCE_COOLDOWN:data?.cooldown_until ? `다시 독립하려면 ${formatRemaining(data.cooldown_until)} 남았습니다.` : "독립 창설 쿨다운 중입니다.",
+          NAME_TAKEN:"이미 사용 중인 조직명입니다.",
+          NAME_RESERVED:"대소문자·공백만 다른 동일 조직명이 이미 사용 중입니다."
+        })[data?.error] || "독립 조직을 만들지 못했습니다.";
+
+        toast(message);
+        return;
+      }
+
+      organization = data.new_organization || null;
+      organizationCooldown = null;
+      organizationInvites = [];
+
+      closeModal();
+
+      await Promise.all([
+        loadHome(),
+        loadMyOrganization(),
+        loadRank()
+      ]);
+
+      toast(`${organization?.name || name} 창설 · Boss ${Number(data.boss_count || 0)}곳이 새 Territory가 되었습니다.`);
+    }catch(error){
+      console.warn("BiteBoss independent organization:", error);
+      toast("독립 조직을 만들지 못했습니다.");
+    }finally{
+      if(button) button.disabled = false;
+    }
+  }
+
+
+  async function openOrganizationInvite(){
+    if(!organization?.id || !organization?.is_leader){
+      toast("크루 개설자만 초대 QR을 만들 수 있습니다.");
+      return;
+    }
+
+    openModal("크루 초대", `
+      <div class="crew-invite-shell">
+        <div class="crew-invite-loading">크루 QR을 준비하는 중…</div>
+      </div>
+    `);
+
+    await loadCrewInviteQr();
+  }
+
+  async function loadCrewInviteQr(forceNew = false){
+    const shell = $(".crew-invite-shell");
+    if(!shell) return;
+
+    try{
+      let data = null;
+
+      if(!forceNew){
+        const current = await sb.rpc("biteboss_crew_qr_invite_status_v624");
+        if(current.error) throw current.error;
+        if(current.data?.ok && current.data?.active){
+          data = current.data;
+        }
+      }
+
+      if(!data){
+        const created = await sb.rpc("biteboss_create_crew_qr_invite_v624");
+        if(created.error) throw created.error;
+        data = created.data;
+      }
+
+      if(!data?.ok){
+        const message = ({
+          MEMBER_LOGIN_REQUIRED:"회원 로그인이 필요합니다.",
+          LEADER_REQUIRED:"크루 개설자만 초대 QR을 만들 수 있습니다.",
+          CREW_NOT_FOUND:"크루 정보를 찾지 못했습니다."
+        })[data?.error] || "크루 초대 QR을 만들지 못했습니다.";
+        shell.innerHTML = `<p class="crew-join-state">${escapeHtml(message)}</p>`;
+        return;
+      }
+
+      const token = String(data.token || "").trim();
+      const shareUrl = crewInviteShareUrl(token);
+      const expires = formatRemaining(data.expires_at);
+      const uses = Number(data.use_count || 0);
+      const maxUses = Number(data.max_uses || config.crew_qr_max_uses || 30);
+
+      shell.innerHTML = `
+        <div class="crew-invite-head">
+          <span>크루 초대</span>
+          <strong>${escapeHtml(organization?.name || data.crew_name || "Crew")}</strong>
+          <p>QR을 스캔하면 크루 정보를 확인한 뒤 가입할 수 있습니다.</p>
+        </div>
+
+        <div class="crew-invite-qr-wrap">
+          <div id="crewInviteQr" class="crew-invite-qr" aria-label="크루 초대 QR"></div>
+        </div>
+
+        <div class="crew-invite-facts">
+          <span>Expires ${escapeHtml(expires)}</span>
+          <span>${uses}/${maxUses}명 참여</span>
+        </div>
+
+        <div class="crew-invite-actions">
+          <button id="crewInviteShareBtn" class="primary-btn" type="button">QR 공유</button>
+          <button id="crewInviteNewBtn" class="secondary-btn" type="button">새 QR</button>
+          <button id="crewInviteRevokeBtn" class="text-btn danger-text" type="button">QR 폐기</button>
+        </div>
+
+        <details class="crew-id-invite">
+          <summary>ID로 초대</summary>
+          <div class="form-grid organization-invite-form">
+            <label>
+              사용자 ID
+              <input id="organizationInviteUsername" class="input" maxlength="32" autocapitalize="none" autocomplete="off" placeholder="username" />
+            </label>
+            <p>ID 초대는 보조 수단입니다. 상대방이 수락해야 가입됩니다.</p>
+            <button id="organizationInviteSubmit" class="secondary-btn" type="button">ID 초대 보내기</button>
+          </div>
+        </details>
+      `;
+
+      renderCrewInviteQr(shareUrl);
+
+      $("#crewInviteShareBtn")?.addEventListener("click", () => shareCrewInvite(shareUrl));
+      $("#crewInviteNewBtn")?.addEventListener("click", rotateCrewInviteQr);
+      $("#crewInviteRevokeBtn")?.addEventListener("click", revokeCrewInviteQr);
+      $("#organizationInviteSubmit")?.addEventListener("click", sendOrganizationInvite);
+    }catch(error){
+      console.warn("BiteBoss crew invite QR:", error);
+      shell.innerHTML = `<p class="crew-join-state">크루 초대 QR을 불러오지 못했습니다.</p>`;
+    }
+  }
+
+  function renderCrewInviteQr(value){
+    const target = $("#crewInviteQr");
+    if(!target) return;
+
+    target.innerHTML = "";
+
+    if(!window.QRCode){
+      target.innerHTML = `<div class="crew-qr-fallback">QR을 사용할 수 없습니다.</div>`;
+      return;
+    }
+
+    new QRCode(target, {
+      text:value,
+      width:220,
+      height:220,
+      correctLevel:QRCode.CorrectLevel.M
+    });
+  }
+
+  async function shareCrewInvite(url){
+    const shareValue = String(url || "");
+    const isPublicUrl = /^https?:\/\//i.test(shareValue);
+
+    if(!isPublicUrl){
+      toast("앱 출시 전 app-config.js의 publicAppUrl에 공개 HTTPS 주소를 설정하세요.");
+      return;
+    }
+
+    const payload = {
+      title:`${organization?.name || "BiteBoss Crew"} · BiteBoss`,
+      text:`Join ${organization?.name || "my Crew"} on BiteBoss`,
+      url:shareValue
+    };
+
+    try{
+      if(navigator.share){
+        await navigator.share(payload);
+        return;
+      }
+
+      if(navigator.clipboard?.writeText){
+        await navigator.clipboard.writeText(shareValue);
+        toast("Crew 초대 링크를 복사했습니다.");
+        return;
+      }
+
+      toast("이 기기에서는 공유 기능을 사용할 수 없습니다.");
+    }catch(error){
+      if(error?.name !== "AbortError") console.warn("BiteBoss crew share:", error);
+    }
+  }
+
+  async function rotateCrewInviteQr(){
+    const button = $("#crewInviteNewBtn");
+    if(button) button.disabled = true;
+
+    try{
+      const revoked = await sb.rpc("biteboss_revoke_crew_qr_invite_v624");
+      if(revoked.error) throw revoked.error;
+      await loadCrewInviteQr(true);
+    }catch(error){
+      console.warn("BiteBoss rotate crew QR:", error);
+      toast("새 Crew QR을 만들지 못했습니다.");
+    }finally{
+      if(button) button.disabled = false;
+    }
+  }
+
+  async function revokeCrewInviteQr(){
+    const button = $("#crewInviteRevokeBtn");
+    if(button) button.disabled = true;
+
+    try{
+      const { data, error } = await sb.rpc("biteboss_revoke_crew_qr_invite_v624");
+      if(error) throw error;
+      if(!data?.ok) throw new Error(data?.error || "REVOKE_FAILED");
+
+      const shell = $(".crew-invite-shell");
+      if(shell){
+        shell.innerHTML = `
+          <div class="crew-invite-revoked">
+            <strong>QR이 폐기되었습니다</strong>
+            <p>기존 QR은 더 이상 사용할 수 없습니다.</p>
+            <button id="crewInviteCreateAgainBtn" class="primary-btn" type="button">새 QR 만들기</button>
+          </div>
+        `;
+        $("#crewInviteCreateAgainBtn")?.addEventListener("click", () => loadCrewInviteQr(true));
+      }
+    }catch(error){
+      console.warn("BiteBoss revoke crew QR:", error);
+      toast("Crew QR을 취소하지 못했습니다.");
+    }finally{
+      if(button) button.disabled = false;
+    }
+  }
+
+  async function sendOrganizationInvite(){
+    const username = String($("#organizationInviteUsername")?.value || "").trim().toLowerCase();
+    if(!username){
+      toast("초대할 회원 ID를 입력하세요.");
+      return;
+    }
+
+    const button = $("#organizationInviteSubmit");
+    if(button) button.disabled = true;
+
+    try{
+      const { data, error } = await sb.rpc("biteboss_organization_invite_member_v62", {
+        p_username:username
+      });
+      if(error) throw error;
+
+      if(!data?.ok){
+        const message = ({
+          MEMBER_LOGIN_REQUIRED:"회원 로그인이 필요합니다.",
+          USERNAME_REQUIRED:"회원 ID를 입력하세요.",
+          LEADER_REQUIRED:"Founder만 초대할 수 있습니다.",
+          MEMBER_NOT_FOUND:"해당 회원 ID를 찾지 못했습니다.",
+          CANNOT_INVITE_SELF:"자기 자신은 초대할 수 없습니다.",
+          ALREADY_IN_CREW:"이미 크루에 소속된 회원입니다.",
+          INVITE_ALREADY_PENDING:"이미 초대를 보낸 회원입니다.",
+          INVITE_RATE_LIMIT_TARGET:data?.retry_at ? `같은 회원은 ${formatRemaining(data.retry_at)} 뒤 다시 초대할 수 있습니다.` : "같은 회원에게 너무 자주 초대했습니다.",
+          INVITE_RATE_LIMIT_DAILY:"오늘 보낼 수 있는 Crew 초대 한도에 도달했습니다.",
+          CREW_COOLDOWN:data?.cooldown_until
+            ? `상대방의 Crew 쿨다운이 ${formatRemaining(data.cooldown_until)} 남았습니다.`
+            : "상대방이 Crew 쿨다운 중입니다."
+        })[data?.error] || "초대를 보내지 못했습니다.";
+
+        toast(message);
+        return;
+      }
+
+      toast(`${data.invitee_username || username}에게 Crew 초대를 보냈습니다.`);
+    }catch(error){
+      console.warn("BiteBoss crew ID invite:", error);
+      toast("Crew 초대를 보내지 못했습니다.");
+    }finally{
+      if(button) button.disabled = false;
+    }
+  }
+
+
+  async function handleOrganizationInviteAction(event){
+    const button = event.target.closest("[data-org-invite]");
+    if(!button) return;
+
+    const inviteId = button.dataset.orgInvite;
+    const accept = button.dataset.accept === "true";
+    if(!inviteId) return;
+
+    button.disabled = true;
+
+    try{
+      const { data, error } = await sb.rpc("biteboss_respond_organization_invite", {
+        p_invite_id:inviteId,
+        p_accept:accept
+      });
+      if(error) throw error;
+
+      if(!data?.ok){
+        const message = ({
+          MEMBER_LOGIN_REQUIRED:"회원 로그인이 필요합니다.",
+          INVITE_NOT_FOUND:"초대를 찾지 못했습니다.",
+          INVITE_NOT_PENDING:"이미 만료되거나 처리된 초대입니다.",
+          ALREADY_IN_CREW:"이미 조직에 소속되어 있습니다.",
+          CREW_NOT_FOUND:"조직이 존재하지 않습니다.",
+          CREW_COOLDOWN:data?.cooldown_until
+            ? `조직 가입 쿨다운이 ${formatRemaining(data.cooldown_until)} 남았습니다.`
+            : "조직 가입 쿨다운 중입니다."
+        })[data?.error] || "초대를 처리하지 못했습니다.";
+
+        toast(message);
+        await loadMyOrganization();
+        return;
+      }
+
+      if(data.accepted){
+        organization = data.organization || null;
+        organizationInvites = [];
+        toast(`${organization?.name || "조직"}에 가입했습니다.`);
+      }else{
+        toast("Crew 초대를 거절했습니다.");
+      }
+
+      await loadMyOrganization();
+    }catch(error){
+      console.warn("BiteBoss organization invitation response:", error);
+      toast("초대를 처리하지 못했습니다.");
+    }finally{
+      button.disabled = false;
+    }
+  }
+
+  function openOrganizationLeave(){
+    if(!organization?.id){
+      toast("소속된 크루가 없습니다.");
+      return;
+    }
+
+    const isLeader = Boolean(organization.is_leader);
+    const memberCount = Number(organization.member_count || 0);
+
+    if(isLeader && memberCount > 1){
+      toast("멤버가 남아 있습니다. 개설자를 먼저 이전해야 합니다.");
+      return;
+    }
+
+    const penaltyPercent = isLeader ? 15 : 10;
+    const cooldownDays = isLeader ? 14 : 7;
+    const title = isLeader ? "크루 해산" : "크루 탈퇴";
+    const orgName = String(organization.name || "크루").trim();
+
+    openModal(title, `
+      <div class="organization-leave-confirm">
+        <strong>${escapeHtml(orgName)}</strong>
+        <p>현재 보스 매장은 유지되지만 이 크루의 점령지에서는 제외됩니다.</p>
+        <p>탈퇴 후 XP는 최대 ${penaltyPercent}% 차감되고 ${cooldownDays}일 동안 조직 가입·창설이 제한됩니다.</p>
+        ${isLeader ? `
+          <label>
+            해산 확인
+            <input id="organizationDisbandNameConfirm" class="input" autocomplete="off" placeholder="${escapeAttr(orgName)}" />
+          </label>
+          <p class="organization-create-note">실수 방지를 위해 조직명을 정확히 입력해야 해산할 수 있습니다.</p>
+        ` : ""}
+        <button id="organizationLeaveConfirm" class="danger-btn" type="button">${isLeader ? "크루 해산" : "크루 탈퇴"}</button>
+      </div>
+    `);
+
+    $("#organizationLeaveConfirm")?.addEventListener("click", leaveOrganization);
+  }
+
+  async function leaveOrganization(){
+    const button = $("#organizationLeaveConfirm");
+    if(button) button.disabled = true;
+
+    const isLeader = Boolean(organization?.is_leader);
+    const confirmation = isLeader
+      ? String($("#organizationDisbandNameConfirm")?.value || "").trim().replace(/\s+/g," ")
+      : "";
+
+    if(isLeader && confirmation !== String(organization?.name || "").trim().replace(/\s+/g," ")){
+      toast("조직명을 정확히 입력하세요.");
+      if(button) button.disabled = false;
+      return;
+    }
+
+    try{
+      const { data, error } = await sb.rpc("biteboss_leave_organization_v62", {
+        p_confirm_name:confirmation || null
+      });
+      if(error) throw error;
+
+      if(!data?.ok){
+        const message = ({
+          MEMBER_LOGIN_REQUIRED:"회원 로그인이 필요합니다.",
+          NOT_IN_CREW:"소속된 크루가 없습니다.",
+          CREW_NOT_FOUND:"조직 정보를 찾지 못했습니다.",
+          LEADER_TRANSFER_REQUIRED:"멤버가 남아 있습니다. 개설자를 먼저 이전해야 합니다.",
+          DISBAND_CONFIRMATION_REQUIRED:"해산하려면 조직명을 정확히 입력해야 합니다."
+        })[data?.error] || "조직을 탈퇴하지 못했습니다.";
+
+        toast(message);
+        return;
+      }
+
+      organization = null;
+      organizationCooldown = {
+        active:true,
+        cooldown_until:data.cooldown_until,
+        seconds_remaining:0,
+        reason:"leave"
+      };
+
+      closeModal();
+
+      await Promise.all([
+        loadHome(),
+        loadMyOrganization()
+      ]);
+
+      const penalty = Number(data.xp_penalty || 0);
+      const days = Number(data.cooldown_days || 0);
+      toast(`크루 탈퇴 완료 · XP -${penalty.toLocaleString("ko-KR")} · ${days}일 제한`);
+    }catch(error){
+      console.warn("BiteBoss leave organization:", error);
+      toast("크루를 탈퇴하지 못했습니다.");
+    }finally{
+      if(button) button.disabled = false;
+    }
+  }
+
+
+  function updateProfileUi(){
+    const loggedIn = Boolean(playerSession?.authenticated);
+    const profilePage = $("#page-profile");
+    profilePage?.classList.toggle("is-guest", !loggedIn);
+    profilePage?.classList.toggle("is-member", loggedIn);
+
+    const nickname = loggedIn ? (profile?.nickname || "보스") : "게스트";
+    const avatar = loggedIn ? (profile?.avatar_url || "") : "";
+    const organizationName = loggedIn ? String(organization?.name || "").trim() : "";
+    const homeDisplayName = organizationName ? `${nickname} · ${organizationName}` : nickname;
+
+    setText("#profileName", nickname);
+    setText("#homeProfileName", homeDisplayName);
+    const profileMeta = $("#profileMeta");
+    if(profileMeta){
+      const metaText = loggedIn
+        ? "개인 프로필"
+        : "로그인하면 점령 기록과 크루를 관리할 수 있습니다.";
+      profileMeta.textContent = metaText;
+      profileMeta.classList.toggle("hidden", !metaText);
+    }
+    setText("#homeProfileMeta", loggedIn
+      ? (organizationName ? `${organizationName} · 점령지 ${Number(organization.territory_count || 0)}개` : "매장 가까이 머물거나 QR을 스캔해 보스를 차지하세요.")
+      : "로그인하면 보스 기록을 쌓을 수 있습니다.");
+
+    renderProfilePhoto("#homeProfilePhoto", "#homeProfileFallback", avatar);
+    renderProfilePhoto("#profilePhoto", "#profileFallback", avatar);
+
+    const login = $("#memberLoginBtn");
+    const register = $("#memberRegisterBtn");
+    const addStore = $("#addStoreBtn");
+    const notificationSettings = $("#notificationSettingsBtn");
+    const deleteAccount = $("#deleteAccountBtn");
+    const logout = $("#logoutBtn");
+    login?.classList.toggle("hidden", loggedIn);
+    register?.classList.toggle("hidden", loggedIn);
+    addStore?.classList.toggle("hidden", !loggedIn);
+    notificationSettings?.classList.toggle("hidden", !loggedIn);
+    deleteAccount?.classList.toggle("hidden", !loggedIn);
+    logout?.classList.toggle("hidden", !loggedIn);
+    renderNotificationSettingsState();
+    setText("#memberSessionLabel", "");
+    renderOrganizationUi();
+  }
+
+  function resetMemberSummaryUi(){
+    summary = null;
+    setText("#homeBossCount", 0);
+    setText("#myBossCount", 0);
+    setText("#myCrewCount", 0);
+    setText("#myLevel", "Lv 1");
+    setText("#homeCheckinCount", 0);
+    setText("#myCheckinCount", 0);
+    setText("#homeStreakCount", 0);
+    setText("#homeXp", "Lv 1 · 0 XP");
+    updateHomeProtectionMeter(null);
+    updateProfileMeter(0);
+    updateRankMeter(0);
+    const history = $("#myHistory");
+    if(history) history.innerHTML = `<div class="activity-empty">로그인 후 전투 기록을 확인할 수 있습니다.</div>`;
+    const activity = $("#profileActivity");
+    if(activity) activity.innerHTML = `<div class="activity-empty">로그인 후 전투 기록을 확인할 수 있습니다.</div>`;
+  }
+
+  function renderProfilePhoto(imageSelector, fallbackSelector, url){
+    const image = $(imageSelector);
+    const fallback = $(fallbackSelector);
+    const hasPhoto = Boolean(url);
+    if(image){
+      if(hasPhoto){
+        image.src = url;
+        image.classList.remove("hidden");
+      }else{
+        image.removeAttribute("src");
+        image.classList.add("hidden");
+      }
+    }
+    fallback?.classList.toggle("hidden", hasPhoto);
+  }
+
+
+  function isNativeApp(){
+    try{
+      return Boolean(window.Capacitor?.isNativePlatform?.()) ||
+        (typeof window.Capacitor?.getPlatform === "function" && window.Capacitor.getPlatform() !== "web");
+    }catch{
+      return false;
+    }
+  }
+
+  function pushPlugin(){
+    return window.Capacitor?.Plugins?.PushNotifications || null;
+  }
+
+  function notificationKindLabel(kind){
+    return ({
+      boss_lost:"보스",
+      boss_won:"보스",
+      boss_protection:"보스",
+      crew_invite:"크루",
+      crew_joined:"크루",
+      crew_member_joined:"크루",
+      crew_member_left:"크루",
+      store_offer:"매장",
+      system:"시스템"
+    })[String(kind || "")] || "BiteBoss";
+  }
+
+  async function setupPushListeners(){
+    if(pushListenersBound || !isNativeApp()) return;
+    const push = pushPlugin();
+    if(!push?.addListener) return;
+    pushListenersBound = true;
+
+    await push.addListener("registration", async token => {
+      pushDeviceToken = String(token?.value || "").trim();
+      if(!pushDeviceToken || !playerSession?.authenticated) return;
+      try{
+        const { data, error } = await sb.rpc("biteboss_register_push_device_v627", {
+          p_token:pushDeviceToken,
+          p_platform:"ios",
+          p_environment:String(cfg.pushEnvironment || "production")
+        });
+        if(error) throw error;
+        if(!data?.ok) throw new Error(data?.error || "PUSH_REGISTER_FAILED");
+        try{ localStorage.setItem("biteboss-push-token", pushDeviceToken); }catch{}
+        renderNotificationSettingsState();
+      }catch(error){
+        console.warn("BiteBoss push token register:", error);
+      }
+    });
+
+    await push.addListener("registrationError", error => {
+      console.warn("BiteBoss push registration:", error);
+      pushPermissionState = "error";
+      renderNotificationSettingsState();
+    });
+
+    await push.addListener("pushNotificationReceived", async notification => {
+      const data = notification?.data || {};
+      const title = String(notification?.title || notificationKindLabel(data.kind));
+      if(title) toast(title);
+      await refreshPushInboxSummary();
+    });
+
+    await push.addListener("pushNotificationActionPerformed", async action => {
+      const data = action?.notification?.data || {};
+      await handlePushAction(data);
+      await refreshPushInboxSummary();
+    });
+  }
+
+  async function handlePushAction(data = {}){
+    const kind = String(data.kind || "");
+    const storeId = String(data.store_id || "").trim();
+
+    if(storeId){
+      openTab("stores");
+      await loadStores();
+      await openStoreDetail(storeId);
+      return;
+    }
+
+    if(kind.startsWith("crew_")){
+      openTab("profile");
+      await loadMyOrganization();
+      await loadGameActivity();
+      return;
+    }
+
+    openTab("profile");
+  }
+
+  async function readPushPermission(){
+    if(!isNativeApp()){
+      pushPermissionState = "web";
+      return pushPermissionState;
+    }
+    const push = pushPlugin();
+    if(!push?.checkPermissions){
+      pushPermissionState = "unavailable";
+      return pushPermissionState;
+    }
+    try{
+      const result = await push.checkPermissions();
+      pushPermissionState = String(result?.receive || "prompt");
+    }catch(error){
+      console.warn("BiteBoss push permission:", error);
+      pushPermissionState = "error";
+    }
+    return pushPermissionState;
+  }
+
+  async function registerPushIfGranted(){
+    if(!isNativeApp() || !playerSession?.authenticated) return false;
+    const push = pushPlugin();
+    if(!push?.register) return false;
+    const permission = await readPushPermission();
+    if(permission !== "granted") return false;
+    try{
+      await setupPushListeners();
+      await push.register();
+      return true;
+    }catch(error){
+      console.warn("BiteBoss push register:", error);
+      return false;
+    }
+  }
+
+  async function enablePushNotifications(){
+    if(!playerSession?.authenticated){
+      openMemberLogin();
+      return;
+    }
+    if(!isNativeApp()){
+      toast("푸시 알림은 iOS 앱에서 사용할 수 있습니다.");
+      return;
+    }
+    const push = pushPlugin();
+    if(!push?.requestPermissions || !push?.register){
+      toast("이 빌드에서는 푸시 알림을 사용할 수 없습니다.");
+      return;
+    }
+
+    try{
+      await setupPushListeners();
+      let permission = await readPushPermission();
+      if(permission !== "granted"){
+        const result = await push.requestPermissions();
+        permission = String(result?.receive || "denied");
+        pushPermissionState = permission;
+      }
+
+      if(permission !== "granted"){
+        toast("알림 권한이 허용되지 않았습니다. iPhone 설정에서 BiteBoss 알림을 허용해 주세요.");
+        renderNotificationSettingsState();
+        return;
+      }
+
+      await push.register();
+      await sb.rpc("biteboss_update_notification_preferences_v627", {
+        p_push_enabled:true,
+        p_boss_events:pushPreferences?.boss_events ?? true,
+        p_crew_events:pushPreferences?.crew_events ?? true,
+        p_store_offers:pushPreferences?.store_offers ?? false,
+        p_system_events:pushPreferences?.system_events ?? true
+      });
+      await refreshNotificationState();
+      await loadNotificationInbox();
+      renderNotificationSettingsModal();
+      toast("BiteBoss 알림을 켰습니다.");
+    }catch(error){
+      console.warn("BiteBoss enable push:", error);
+      toast("알림을 켜지 못했습니다.");
+    }
+  }
+
+  async function disablePushNotifications(){
+    if(!playerSession?.authenticated) return;
+    try{
+      await sb.rpc("biteboss_update_notification_preferences_v627", {
+        p_push_enabled:false,
+        p_boss_events:pushPreferences?.boss_events ?? true,
+        p_crew_events:pushPreferences?.crew_events ?? true,
+        p_store_offers:pushPreferences?.store_offers ?? false,
+        p_system_events:pushPreferences?.system_events ?? true
+      });
+      if(pushDeviceToken){
+        await sb.rpc("biteboss_unregister_push_device_v627", { p_token:pushDeviceToken });
+      }
+      await refreshNotificationState();
+      await loadNotificationInbox();
+      renderNotificationSettingsModal();
+      toast("BiteBoss 푸시 알림을 껐습니다.");
+    }catch(error){
+      console.warn("BiteBoss disable push:", error);
+      toast("알림 설정을 변경하지 못했습니다.");
+    }
+  }
+
+  async function refreshNotificationState({ registerIfGranted = false } = {}){
+    if(!playerSession?.authenticated){
+      pushPreferences = null;
+      pushUnreadCount = 0;
+      pushPermissionState = isNativeApp() ? "unknown" : "web";
+      renderNotificationSettingsState();
+      return;
+    }
+
+    await Promise.all([
+      loadNotificationPreferences(),
+      refreshPushInboxSummary(),
+      readPushPermission()
+    ]);
+
+    if(registerIfGranted && pushPermissionState === "granted" && pushPreferences?.push_enabled !== false){
+      await registerPushIfGranted();
+    }
+    renderNotificationSettingsState();
+  }
+
+  async function loadNotificationPreferences(){
+    try{
+      const { data, error } = await sb.rpc("biteboss_my_notification_preferences_v627");
+      if(error) throw error;
+      pushPreferences = data || null;
+    }catch(error){
+      console.warn("BiteBoss notification preferences:", error);
+      pushPreferences = null;
+    }
+  }
+
+  async function refreshPushInboxSummary(){
+    if(!playerSession?.authenticated){
+      pushUnreadCount = 0;
+      renderNotificationSettingsState();
+      return;
+    }
+    try{
+      const { data, error } = await sb.rpc("biteboss_notification_summary_v627");
+      if(error) throw error;
+      pushUnreadCount = Math.max(0, Number(data?.unread_count || 0));
+      renderNotificationSettingsState();
+    }catch(error){
+      console.warn("BiteBoss notification summary:", error);
+    }
+  }
+
+  function renderNotificationSettingsState(){
+    const row = $("#notificationSettingsState");
+    if(!row) return;
+    if(!playerSession?.authenticated){
+      row.textContent = "";
+      return;
+    }
+    if(!isNativeApp()){
+      row.textContent = pushUnreadCount ? `${pushUnreadCount} new` : "iOS app";
+      return;
+    }
+    const enabled = pushPreferences?.push_enabled === true && pushPermissionState === "granted";
+    row.textContent = pushUnreadCount
+      ? `${pushUnreadCount} new`
+      : enabled
+        ? "On"
+        : pushPermissionState === "denied"
+          ? "Off"
+          : "Setup";
+  }
+
+  async function openNotificationSettings(){
+    if(!playerSession?.authenticated){
+      openMemberLogin();
+      return;
+    }
+    await refreshNotificationState();
+    await markNotificationsRead();
+    await loadNotificationInbox();
+    renderNotificationSettingsModal();
+  }
+
+  async function markNotificationsRead(){
+    try{
+      const { error } = await sb.rpc("biteboss_mark_notifications_read_v627");
+      if(error) throw error;
+      pushUnreadCount = 0;
+      renderNotificationSettingsState();
+    }catch(error){
+      console.warn("BiteBoss mark notifications read:", error);
+    }
+  }
+
+  async function loadNotificationInbox(){
+    try{
+      const { data, error } = await sb.rpc("biteboss_my_notifications_v627", { p_limit:20 });
+      if(error) throw error;
+      window.__BITEBOSS_NOTIFICATION_INBOX__ = Array.isArray(data) ? data : [];
+    }catch(error){
+      console.warn("BiteBoss notification inbox:", error);
+      window.__BITEBOSS_NOTIFICATION_INBOX__ = [];
+    }
+  }
+
+  function notificationToggleRow(key, label, description){
+    const value = pushPreferences?.[key] === true;
+    return `
+      <button class="notification-pref-row ${value ? "is-on" : ""}" type="button" data-notification-pref="${escapeAttr(key)}">
+        <span>
+          <strong>${escapeHtml(label)}</strong>
+          <small>${escapeHtml(description)}</small>
+        </span>
+        <b>${value ? "ON" : "OFF"}</b>
+      </button>
+    `;
+  }
+
+  function renderNotificationSettingsModal(){
+    const inbox = Array.isArray(window.__BITEBOSS_NOTIFICATION_INBOX__) ? window.__BITEBOSS_NOTIFICATION_INBOX__ : [];
+    const native = isNativeApp();
+    const pushEnabled = pushPreferences?.push_enabled === true && pushPermissionState === "granted";
+
+    openModal("알림", `
+      <div class="notification-settings">
+        <div class="notification-master">
+          <div>
+            <span>푸시 알림</span>
+            <strong>${pushEnabled ? "알림 켜짐" : "알림 꺼짐"}</strong>
+            <p>${native ? "중요한 Boss와 Crew 변화를 iPhone으로 알려줍니다." : "푸시 알림은 iOS 앱에서 사용할 수 있습니다."}</p>
+          </div>
+          ${native ? `<button id="notificationMasterBtn" class="${pushEnabled ? "secondary-btn" : "primary-btn"}" type="button">${pushEnabled ? "끄기" : "알림 켜기"}</button>` : ""}
+        </div>
+
+        <div class="notification-pref-list ${pushEnabled ? "" : "is-disabled"}">
+          ${notificationToggleRow("boss_events", "보스 · 점령지", "Boss를 빼앗기거나 보호시간이 곧 끝날 때")}
+          ${notificationToggleRow("crew_events", "Crew", "초대, 가입, 새 멤버와 Territory 변화")}
+          ${notificationToggleRow("store_offers", "매장 혜택", "매장 혜택과 이벤트 · 기본 OFF")}
+          ${notificationToggleRow("system_events", "시스템", "계정과 서비스에 필요한 중요 안내")}
+        </div>
+
+        <section class="notification-inbox">
+          <div class="notification-inbox-head"><span>최근 알림</span><strong>${inbox.length}</strong></div>
+          <div class="notification-inbox-list">
+            ${inbox.map(item => `
+              <button class="notification-inbox-row" type="button"
+                data-notification-kind="${escapeAttr(item.kind || "")}"
+                data-notification-store="${escapeAttr(item.data?.store_id || "")}">
+                <span>${escapeHtml(notificationKindLabel(item.kind))}</span>
+                <strong>${escapeHtml(item.title || "BiteBoss")}</strong>
+                <p>${escapeHtml(item.body || "")}</p>
+                <small>${escapeHtml(formatDate(item.created_at))}</small>
+              </button>
+            `).join("") || `<p class="notification-empty">아직 알림이 없습니다.</p>`}
+          </div>
+        </section>
+      </div>
+    `);
+
+    $("#notificationMasterBtn")?.addEventListener("click", () => pushEnabled ? disablePushNotifications() : enablePushNotifications());
+
+    $$("[data-notification-pref]").forEach(button => {
+      button.addEventListener("click", async () => {
+        if(!pushEnabled){
+          toast("먼저 푸시 알림을 켜주세요.");
+          return;
+        }
+        const key = button.dataset.notificationPref;
+        if(!key || !pushPreferences) return;
+
+        const next = {
+          push_enabled:true,
+          boss_events:pushPreferences.boss_events === true,
+          crew_events:pushPreferences.crew_events === true,
+          store_offers:pushPreferences.store_offers === true,
+          system_events:pushPreferences.system_events === true
+        };
+        next[key] = !next[key];
+
+        try{
+          const { data, error } = await sb.rpc("biteboss_update_notification_preferences_v627", {
+            p_push_enabled:next.push_enabled,
+            p_boss_events:next.boss_events,
+            p_crew_events:next.crew_events,
+            p_store_offers:next.store_offers,
+            p_system_events:next.system_events
+          });
+          if(error) throw error;
+          pushPreferences = data || next;
+          renderNotificationSettingsModal();
+          renderNotificationSettingsState();
+        }catch(error){
+          console.warn("BiteBoss notification pref update:", error);
+          toast("알림 설정을 변경하지 못했습니다.");
+        }
+      });
+    });
+
+    $$(".notification-inbox-row").forEach(button => {
+      button.addEventListener("click", async () => {
+        const data = {
+          kind:button.dataset.notificationKind || "",
+          store_id:button.dataset.notificationStore || ""
+        };
+        closeModal();
+        await handlePushAction(data);
+      });
+    });
+  }
+
+  async function unregisterCurrentPushDevice(){
+    const token = pushDeviceToken || (() => {
+      try{ return localStorage.getItem("biteboss-push-token") || ""; }catch{ return ""; }
+    })();
+    if(!token || !playerSession?.authenticated) return;
+
+    try{
+      await sb.rpc("biteboss_unregister_push_device_v627", { p_token:token });
+    }catch(error){
+      console.warn("BiteBoss push unregister:", error);
+    }
+
+    try{ localStorage.removeItem("biteboss-push-token"); }catch{}
+    pushDeviceToken = "";
+  }
+
+  function openDeleteAccount(){
+    if(!playerSession?.authenticated){
+      toast("회원 로그인이 필요합니다.");
+      return;
+    }
+
+    openModal("계정 삭제", `
+      <div class="account-delete-form">
+        <strong>이 작업은 되돌릴 수 없습니다.</strong>
+        <p>프로필, 점령·방문 기록, Crew 소속 등 BiteBoss 계정과 연결된 데이터를 삭제합니다.</p>
+        <label>
+          6-digit PIN
+          <input id="deleteAccountPin" class="input" type="password" inputmode="numeric" maxlength="6" autocomplete="current-password" placeholder="000000" />
+        </label>
+        <label class="account-delete-confirm">
+          확인 문구
+          <input id="deleteAccountPhrase" class="input" maxlength="6" autocomplete="off" placeholder="DELETE" />
+        </label>
+        <button id="deleteAccountConfirmBtn" class="primary-btn danger-action" type="button">DELETE ACCOUNT</button>
+        <p id="deleteAccountStatus" class="inline-status" aria-live="polite"></p>
+      </div>
+    `);
+
+    $("#deleteAccountConfirmBtn")?.addEventListener("click", deleteMyAccount);
+  }
+
+  async function removeAvatarBeforeAccountDelete(){
+    const avatarUrl = String(profile?.avatar_url || "").trim();
+    if(!avatarUrl || !window.sb) return;
+
+    try{
+      const marker = "/object/public/biteboss-avatars/";
+      const index = avatarUrl.indexOf(marker);
+      if(index < 0) return;
+
+      const rawPath = avatarUrl.slice(index + marker.length).split("?")[0];
+      const path = decodeURIComponent(rawPath);
+      if(!path) return;
+
+      await sb.storage.from("biteboss-avatars").remove([path]);
+    }catch(error){
+      console.warn("BiteBoss avatar cleanup:", error);
+    }
+  }
+
+  async function deleteMyAccount(){
+    const pin = String($("#deleteAccountPin")?.value || "").trim();
+    const phrase = String($("#deleteAccountPhrase")?.value || "").trim().toUpperCase();
+    const status = $("#deleteAccountStatus");
+    const button = $("#deleteAccountConfirmBtn");
+
+    if(!/^\\d{6}$/.test(pin)){
+      setStatus(status, "PIN은 숫자 6자리입니다.");
+      return;
+    }
+    if(phrase !== "DELETE"){
+      setStatus(status, "DELETE를 입력해 주세요.");
+      return;
+    }
+
+    if(button) button.disabled = true;
+    setStatus(status, "계정을 삭제하는 중…");
+
+    try{
+      await removeAvatarBeforeAccountDelete();
+
+      const { data, error } = await sb.rpc("biteboss_delete_my_account_v625", {
+        p_pin:pin
+      });
+      if(error) throw error;
+
+      if(!data?.ok){
+        const message = ({
+          MEMBER_LOGIN_REQUIRED:"회원 로그인이 필요합니다.",
+          INVALID_PIN:"PIN이 올바르지 않습니다.",
+          MEMBER_NOT_FOUND:"회원 계정을 찾지 못했습니다."
+        })[data?.error] || "계정을 삭제하지 못했습니다.";
+        setStatus(status, message);
+        return;
+      }
+
+      try{ localStorage.removeItem("biteboss-push-token"); }catch{}
+      pushDeviceToken = "";
+      pushPreferences = null;
+      pushUnreadCount = 0;
+      try{ await sb.auth.signOut({ scope:"local" }); }catch{}
+
+      closeModal();
+      playerSession = null;
+      authUser = null;
+      profile = null;
+      summary = null;
+      organization = null;
+      organizationCooldown = null;
+      organizationInvites = [];
+      organizationMembers = [];
+      storeRoleMap.clear();
+      presenceBlockedReason = "MEMBER_LOGIN_REQUIRED";
+      presenceState.clear();
+      stopPresenceTracking();
+      resetMemberSummaryUi();
+      updateProfileUi();
+      renderOrganizationUi();
+
+      toast("BiteBoss 계정이 삭제되었습니다.");
+      openTab("home");
+    }catch(error){
+      console.warn("BiteBoss account deletion:", error);
+      setStatus(status, "계정을 삭제하지 못했습니다. 네트워크 연결 후 다시 시도하세요.");
+    }finally{
+      if(button) button.disabled = false;
+    }
+  }
+
+
+  async function logout(){
+    await unregisterCurrentPushDevice();
+    try{ await sb.rpc("biteboss_player_logout"); }catch(error){ console.warn(error); }
+    playerSession = null;
+    profile = null;
+    summary = null;
+    organization = null;
+    organizationCooldown = null;
+    organizationInvites = [];
+    organizationMembers = [];
+    storeRoleMap.clear();
+    presenceBlockedReason = "MEMBER_LOGIN_REQUIRED";
+    presenceState.clear();
+    stopPresenceTracking();
+    resetMemberSummaryUi();
+    updateProfileUi();
+    renderOrganizationUi();
+    await loadStores();
+  }
+
+  async function getPositionSafe(showErrors = false, options = {}){
+    const timeout = Math.max(1000, Number(options.timeout || 10000));
+    const maximumAge = Math.max(0, Number(options.maximumAge ?? 10000));
+    const enableHighAccuracy = options.enableHighAccuracy !== false;
+
+    try{
+      const geo = window.Capacitor?.Plugins?.Geolocation;
+      if(geo){
+        const result = await geo.getCurrentPosition({
+          enableHighAccuracy,
+          timeout,
+          maximumAge
+        });
+        return result || null;
+      }
+    }catch(error){
+      if(showErrors) console.warn("Native geolocation:", error);
+    }
+
+    return new Promise(resolve => {
+      if(!navigator.geolocation) return resolve(null);
+      navigator.geolocation.getCurrentPosition(
+        position => resolve(position),
+        error => {
+          if(showErrors) console.warn("Web geolocation:", error);
+          resolve(null);
+        },
+        { enableHighAccuracy, timeout, maximumAge }
+      );
+    });
+  }
+
+  function updateRankMeter(xp = 0){
+    const target = 500;
+    const current = Math.max(0, Number(xp) || 0);
+    const inLevel = current % target;
+    const value = inLevel === 0 && current > 0 ? target : inLevel;
+
+    const valueEl = $("#rankMeterValue");
+    const barEl = $("#rankMeterBar");
+    const percent = Math.max(0, Math.min(100, (value / target) * 100));
+
+    if(valueEl) valueEl.textContent = `${value} / ${target} XP`;
+    if(barEl) barEl.style.width = `${percent}%`;
+  }
+
+  function updateProfileMeter(count = 0){
+    const active = Math.max(0, Number(count) || 0);
+    setPageMeter(
+      "profile",
+      active ? "활동 중" : "활동 없음",
+      `${active}곳`,
+      active ? 100 : 0,
+      active === 0
+    );
+  }
+
+  function updateAlertMeter(count = 0){
+    const unread = Math.max(0, Number(count) || 0);
+    setPageMeter("alerts", unread ? "Store updates" : "No new updates", `${unread}`, unread ? 100 : 0, unread === 0);
+  }
+
+  function setPageMeter(prefix, title, value, percent, muted = false){
+    const titleEl = $(`#${prefix}MeterTitle`);
+    const valueEl = $(`#${prefix}MeterValue`);
+    const barEl = $(`#${prefix}MeterBar`);
+    const safePercent = Math.max(0, Math.min(100, Number(percent) || 0));
+    if(titleEl) titleEl.textContent = title;
+    if(valueEl) valueEl.textContent = value;
+    if(barEl){
+      barEl.style.width = `${safePercent}%`;
+      barEl.classList.toggle("muted", muted);
+    }
+  }
+
+  function partnershipLabel(status){
+    if(status === "partnered") return "Partner";
+    if(status === "claimed") return "Managed";
+    return "Listed";
+  }
+
+  function partnershipClass(status){
+    if(status === "partnered") return "partnered";
+    if(status === "claimed") return "claimed";
+    return "unclaimed";
+  }
+
+  function categoryLabel(category){
+    return ({
+      cafe:"카페",
+      restaurant:"음식점",
+      dessert:"디저트",
+      bakery:"베이커리",
+      fastfood:"패스트푸드",
+      pub:"펍"
+    })[category] || category || "매장";
+  }
+
+  function formatRemaining(value){
+    const diff = new Date(value).getTime() - Date.now();
+    if(!Number.isFinite(diff) || diff <= 0) return "종료";
+    const minutes = Math.ceil(diff / 60000);
+    if(minutes < 60) return `${minutes}분`;
+    const hours = Math.floor(minutes / 60);
+    const restMinutes = minutes % 60;
+    if(hours < 24) return `${hours}시간${restMinutes ? ` ${restMinutes}분` : ""}`;
+    const days = Math.floor(hours / 24);
+    const restHours = hours % 24;
+    return `${days}일${restHours ? ` ${restHours}시간` : ""}`;
+  }
+
+  function formatDistance(value){
+    const meters = Number(value);
+    if(!Number.isFinite(meters)) return "";
+    if(meters < 1000) return `${Math.round(meters)}m`;
+    return `${(meters / 1000).toFixed(meters < 10000 ? 1 : 0)}km`;
+  }
+
+  function formatDate(value){
+    if(!value) return "-";
+    try{
+      return new Intl.DateTimeFormat("ko-KR", {
+        month:"short",
+        day:"numeric",
+        hour:"2-digit",
+        minute:"2-digit"
+      }).format(new Date(value));
+    }catch{
+      return "-";
+    }
+  }
+
+
+  function updateNetworkState(){
+    $("#offlineBanner")?.classList.toggle("hidden", navigator.onLine !== false);
+  }
+
+  function openModal(title, body, options = {}){
+    stopScanner();
+
+    const modal = $("#modal");
+    const modalType = String(options?.type || "").trim();
+
+    modal?.classList.toggle("store-detail-modal", modalType === "store-detail");
+
+    setText("#modalTitle", title);
+
+    const bodyEl = $("#modalBody");
+    if(bodyEl) bodyEl.innerHTML = body;
+
+    modal?.classList.remove("hidden");
+  }
+
+  function closeModal(){
+    stopScanner();
+
+    const modal = $("#modal");
+    modal?.classList.add("hidden");
+    modal?.classList.remove("store-detail-modal");
+  }
+
+  function toast(message){
+    openModal("BiteBoss", `
+      <div class="modal-message">${escapeHtml(message)}</div>
+      <button class="primary-btn modal-confirm" id="toastOk" type="button">확인</button>
+    `);
+    $("#toastOk").onclick = closeModal;
+  }
+
+  function fatalError(error){
+    console.error(error);
+    openModal("BiteBoss", `
+      <div class="app-state is-error">
+        <strong>앱을 시작하지 못했습니다.</strong>
+        <span>네트워크 연결을 확인한 뒤 다시 실행해 주세요.</span>
+      </div>
+    `);
+  }
+
+  function setText(selector, value){
+    const el = $(selector);
+    if(el) el.textContent = String(value ?? "");
+  }
+
+  function escapeHtml(value){
+    return String(value ?? "").replace(/[&<>"']/g, char => ({
+      "&":"&amp;",
+      "<":"&lt;",
+      ">":"&gt;",
+      '"':"&quot;",
+      "'":"&#039;"
+    }[char]));
+  }
+
+  function escapeAttr(value){
+    return escapeHtml(value).replace(/`/g, "&#096;");
+  }
+
+  function imageFileToJpegBlob(file, maxWidth, maxHeight, quality){
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = reject;
+      reader.onload = () => {
+        const image = new Image();
+        image.onerror = reject;
+        image.onload = () => {
+          const scale = Math.min(1, maxWidth / image.width, maxHeight / image.height);
+          const width = Math.max(1, Math.round(image.width * scale));
+          const height = Math.max(1, Math.round(image.height * scale));
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const context = canvas.getContext("2d");
+          context.drawImage(image, 0, 0, width, height);
+          canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error("Image conversion failed")), "image/jpeg", quality);
+        };
+        image.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function registerServiceWorker(){
+    let native = false;
+    try{
+      native = Boolean(window.Capacitor?.isNativePlatform?.()) ||
+        (typeof window.Capacitor?.getPlatform === "function" && window.Capacitor.getPlatform() !== "web");
+    }catch{}
+
+    // Capacitor/WKWebView uses packaged files. A service worker adds no value
+    // there and can create stale-web-asset behavior during app updates.
+    if(native) return;
+    if(!("serviceWorker" in navigator)) return;
+    if(location.protocol !== "https:" && location.hostname !== "localhost") return;
+
+    navigator.serviceWorker.register("./service-worker.js")
+      .catch(error => console.warn("SW:", error));
+  }
+
+})();

@@ -1,0 +1,23 @@
+{
+  "appId": "com.dasaft.biteboss",
+  "appName": "BiteBoss",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": false
+  },
+  "plugins": {
+    "Geolocation": {
+      "permissions": [
+        "location"
+      ]
+    }
+  },
+  "ios": {
+    "contentInset": "automatic",
+    "handleApplicationNotifications": true
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}

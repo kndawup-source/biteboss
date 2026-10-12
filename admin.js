@@ -1,0 +1,1551 @@
+(() => {
+  "use strict";
+  if(window.__BITEBOSS_ADMIN_BOOTED__) return;
+  window.__BITEBOSS_ADMIN_BOOTED__ = true;
+
+  const $ = q => document.querySelector(q);
+  const $$ = q => [...document.querySelectorAll(q)];
+
+  const adminCfg = window.BITEBOSS_CONFIG || {};
+  const adminSb = window.supabase?.createClient && adminCfg.supabaseUrl && adminCfg.supabaseAnonKey
+    ? window.supabase.createClient(adminCfg.supabaseUrl, adminCfg.supabaseAnonKey, {
+        auth:{
+          persistSession:true,
+          autoRefreshToken:true,
+          detectSessionInUrl:false,
+          storageKey:"biteboss-admin-auth"
+        },
+        global:{ headers:{ "x-client-info":"biteboss-admin-web/66.5" } }
+      })
+    : null;
+
+  let session = null;
+  let admin = null;
+  let stores = [];
+  let appConfig = {};
+  const activationCodes = new Map();
+  let editingStoreId = null;
+  let editingStoreBundle = null;
+  let adCampaigns = [];
+  let partnerRequests = [];
+
+  init().catch(showFatal);
+
+  async function init(){
+    bindNav();
+    bindLogin();
+    bindForms();
+    bindActions();
+
+    if(!adminSb) throw new Error("Supabase unavailable");
+    await ensureAdminAuthSession();
+    await restoreAdminSession();
+  }
+
+  async function ensureAdminAuthSession(){
+    const current = await adminSb.auth.getSession();
+    session = current.data?.session || null;
+    if(session) return session;
+
+    const { data, error } = await adminSb.auth.signInAnonymously();
+    if(error) throw error;
+    session = data.session;
+    return session;
+  }
+
+  async function restoreAdminSession(){
+    const { data, error } = await adminSb.rpc("biteboss_admin_session");
+    if(error || !data?.authenticated){
+      admin = null;
+      showAuthGate();
+      return;
+    }
+
+    admin = data;
+    hideAuthGate();
+    setText("#adminRole", admin.role || "admin");
+    await refreshAll();
+  }
+
+  function bindLogin(){
+    $("#adminLoginForm")?.addEventListener("submit", async event => {
+      event.preventDefault();
+      const form = new FormData(event.currentTarget);
+      const username = String(form.get("admin_id") || "").trim().toLowerCase();
+      const pin = String(form.get("pin") || "").trim();
+      const status = $("#adminLoginStatus");
+
+      if(!username || !/^\d{6}$/.test(pin)){
+        if(status) status.textContent = "ID와 6자리 PIN을 확인하세요.";
+        return;
+      }
+
+      if(status) status.textContent = "로그인 중…";
+
+      try{
+        await ensureAdminAuthSession();
+        const { data, error } = await adminSb.rpc("biteboss_admin_login", {
+          p_username:username,
+          p_pin:pin
+        });
+        if(error) throw error;
+
+        if(!data?.ok){
+          if(status){
+            status.textContent = data?.error === "LOCKED"
+              ? "잠시 후 다시 시도하세요."
+              : "ID 또는 PIN이 올바르지 않습니다.";
+          }
+          return;
+        }
+
+        if(status) status.textContent = "";
+        await restoreAdminSession();
+      }catch(error){
+        console.warn(error);
+        if(status) status.textContent = "로그인에 실패했습니다.";
+      }
+    });
+  }
+
+  function showAuthGate(){
+    $("#adminAuthGate")?.classList.remove("hidden");
+    $("#adminApp")?.classList.add("hidden");
+  }
+
+  function hideAuthGate(){
+    $("#adminAuthGate")?.classList.add("hidden");
+    $("#adminApp")?.classList.remove("hidden");
+  }
+
+  const ADMIN_GROUPS = {
+    overview:["dashboard"],
+    stores:["stores","partner-requests","qr"],
+    game:["gameops","rules","users"],
+    settings:["assets","ads","maintenance"]
+  };
+
+  let activeAdminGroup = "overview";
+  let activeAdminPage = "dashboard";
+
+  function syncAdminNavigation(group, page){
+    activeAdminGroup = group;
+    activeAdminPage = page;
+
+    $$(".admin-primary-nav-btn").forEach(button => {
+      button.classList.toggle("active", button.dataset.adminGroup === group);
+    });
+
+    $$(".admin-section-nav").forEach(button => {
+      const sameGroup = button.dataset.adminGroup === group;
+      button.classList.toggle("hidden", !sameGroup);
+      button.classList.toggle("active", sameGroup && button.dataset.admin === page);
+    });
+  }
+
+  async function openAdminPage(page, group = null){
+    const target = $(`#admin-${page}`);
+    if(!target) return;
+
+    const resolvedGroup = group ||
+      Object.entries(ADMIN_GROUPS).find(([, pages]) => pages.includes(page))?.[0] ||
+      "overview";
+
+    syncAdminNavigation(resolvedGroup, page);
+
+    $$(".admin-page").forEach(section => {
+      section.classList.toggle("active", section === target);
+    });
+
+    window.scrollTo({ top:0, behavior:"auto" });
+    await refreshPage(page);
+  }
+
+  function bindNav(){
+    $$(".admin-primary-nav-btn").forEach(button => {
+      button.addEventListener("click", async () => {
+        const group = String(button.dataset.adminGroup || "overview");
+        const fallback = String(
+          button.dataset.adminDefault ||
+          ADMIN_GROUPS[group]?.[0] ||
+          "dashboard"
+        );
+
+        const currentStillValid = ADMIN_GROUPS[group]?.includes(activeAdminPage);
+        await openAdminPage(currentStillValid ? activeAdminPage : fallback, group);
+      });
+    });
+
+    $$(".admin-section-nav").forEach(button => {
+      button.addEventListener("click", async () => {
+        await openAdminPage(
+          String(button.dataset.admin || "dashboard"),
+          String(button.dataset.adminGroup || activeAdminGroup)
+        );
+      });
+    });
+  }
+
+  function bindActions(){
+    $("#adminLogoutBtn")?.addEventListener("click", async () => {
+      try{ await adminSb.rpc("biteboss_admin_logout"); }catch(error){ console.warn(error); }
+      await adminSb.auth.signOut();
+      session = null;
+      admin = null;
+      location.reload();
+    });
+    $("#userSearch")?.addEventListener("input", loadUsers);
+    $("#adCampaignCancel")?.addEventListener("click", resetAdCampaignForm);
+    $("#partnerRequestFilter")?.addEventListener("change", loadPartnerRequests);
+    $("#refreshPartnerRequests")?.addEventListener("click", loadPartnerRequests);
+
+    $$('[data-close-store-editor]').forEach(node => node.addEventListener('click', closeStoreEditor));
+    $("#adminStoreEditForm")?.addEventListener("submit", saveAdminStoreInfo);
+    $("#adminPhotoForm")?.addEventListener("submit", addAdminStorePhoto);
+    $("#adminMenuForm")?.addEventListener("submit", saveAdminMenu);
+    $("#adminOfferForm")?.addEventListener("submit", saveAdminOffer);
+    $("#adminMenuCancel")?.addEventListener("click", resetAdminMenuForm);
+    $("#adminOfferCancel")?.addEventListener("click", resetAdminOfferForm);
+    $("#adminDeleteStoreBtn")?.addEventListener("click", deleteCurrentStore);
+    $$('[data-reset-mode]').forEach(btn => btn.addEventListener('click', () => runAdminReset(btn.dataset.resetMode, btn)));
+  }
+
+  function bindForms(){
+    $("#storeForm")?.addEventListener("submit", createStore);
+    $("#useCurrentLocationBtn")?.addEventListener("click", fillCurrentStoreLocation);
+    $("#rulesForm")?.addEventListener("submit", saveRules);
+    $("#splashForm")?.addEventListener("submit", saveSplash);
+    $("#homeCopyForm")?.addEventListener("submit", saveHomeCopy);
+    $("#adCampaignForm")?.addEventListener("submit", saveAdCampaign);
+  }
+
+  async function fillCurrentStoreLocation(){
+    const button = $("#useCurrentLocationBtn");
+    const status = $("#locationStatus");
+    const latInput = document.querySelector('#storeForm [name="latitude"]');
+    const lngInput = document.querySelector('#storeForm [name="longitude"]');
+
+    if(!latInput || !lngInput) return;
+
+    if(button) button.disabled = true;
+    if(status) status.textContent = "현재 위치 확인 중…";
+
+    try{
+      let coords = null;
+
+      const nativeGeo = window.Capacitor?.Plugins?.Geolocation;
+      if(nativeGeo?.getCurrentPosition){
+        try{
+          const position = await nativeGeo.getCurrentPosition({
+            enableHighAccuracy:true,
+            timeout:12000,
+            maximumAge:0
+          });
+          coords = position?.coords || null;
+        }catch(error){
+          console.warn("Native geolocation failed, falling back to browser geolocation.", error);
+        }
+      }
+
+      if(!coords){
+        if(!navigator.geolocation) throw new Error("이 기기에서는 위치 정보를 사용할 수 없습니다.");
+        coords = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(
+            position => resolve(position.coords),
+            error => reject(error),
+            { enableHighAccuracy:true, timeout:12000, maximumAge:0 }
+          );
+        });
+      }
+
+      const latitude = Number(coords.latitude);
+      const longitude = Number(coords.longitude);
+      if(!Number.isFinite(latitude) || !Number.isFinite(longitude)){
+        throw new Error("GPS 좌표를 확인할 수 없습니다.");
+      }
+
+      latInput.value = latitude.toFixed(7);
+      lngInput.value = longitude.toFixed(7);
+      latInput.dispatchEvent(new Event("input", { bubbles:true }));
+      lngInput.dispatchEvent(new Event("input", { bubbles:true }));
+
+      const accuracy = Number(coords.accuracy);
+      if(status){
+        status.textContent = Number.isFinite(accuracy)
+          ? `현재 위치 입력 완료 · 정확도 약 ${Math.round(accuracy)}m`
+          : "현재 위치 입력 완료";
+      }
+    }catch(error){
+      console.error("BiteBoss admin geolocation failed:", error);
+      let message = error?.message || "위치 정보를 불러오지 못했습니다.";
+      if(error?.code === 1) message = "위치 권한을 허용해 주세요.";
+      if(error?.code === 2) message = "현재 위치를 확인할 수 없습니다.";
+      if(error?.code === 3) message = "위치 확인 시간이 초과됐습니다.";
+      if(status) status.textContent = message;
+    }finally{
+      if(button) button.disabled = false;
+    }
+  }
+
+  async function refreshAll(){
+    await Promise.all([loadDashboard(), loadStores(), loadConfig(), loadBosses(), loadUsers(), loadGameOps(), loadAssets(), loadAds(), loadPartnerRequests()]);
+    renderRules();
+  }
+
+  async function refreshPage(page){
+    if(page === "dashboard"){
+      await Promise.all([loadDashboard(), loadBosses()]);
+    }
+    if(page === "stores" || page === "qr") await loadStores();
+    if(page === "rules") { await loadConfig(); renderRules(); }
+    if(page === "bosses") await loadBosses();
+    if(page === "users") await loadUsers();
+    if(page === "gameops") await loadGameOps();
+    if(page === "assets") await loadAssets();
+    if(page === "ads") await loadAds();
+    if(page === "partner-requests") await loadPartnerRequests();
+  }
+
+
+  async function loadPartnerRequests(){
+    const box = $("#partnerRequestList");
+    if(!box) return;
+    const filter = String($("#partnerRequestFilter")?.value || "pending");
+    const statuses = ["pending", "approved", "rejected"];
+    const [currentResult, ...countResults] = await Promise.all([
+      adminSb.rpc("biteboss_admin_partner_requests", {p_status: filter, p_limit: 100}),
+      ...statuses.map(status => adminSb.rpc("biteboss_admin_partner_requests", {p_status: status, p_limit: 1000}))
+    ]);
+    const {data,error} = currentResult;
+    if(error){ console.warn("BiteBoss partner requests:", error); box.innerHTML = `<div class="timeline-item muted">제휴 신청을 불러오지 못했습니다.</div>`; return; }
+    partnerRequests = Array.isArray(data) ? data : [];
+    const counts = Object.fromEntries(statuses.map((status, index) => {
+      const result = countResults[index];
+      return [status, result && !result.error && Array.isArray(result.data) ? result.data.length : 0];
+    }));
+    setText("#partnerCountPending", counts.pending || 0);
+    setText("#partnerCountApproved", counts.approved || 0);
+    setText("#partnerCountRejected", counts.rejected || 0);
+    renderPartnerRequests();
+  }
+
+  function renderPartnerRequests(){
+    const box = $("#partnerRequestList");
+    if(!box) return;
+    box.innerHTML = partnerRequests.length ? partnerRequests.map(row => {
+      const status = String(row.status || "pending");
+      const canReview = status === "pending";
+      const code = String(row.activation_code || "").trim();
+      return `<article class="partner-request-row">
+        <div class="partner-request-row-head"><div><span>${escapeHtml(status.toUpperCase())}</span><strong>${escapeHtml(row.store_name || "Store")}</strong><p>${escapeHtml(row.store_address || "")}</p></div><time>${escapeHtml(formatDate(row.created_at))}</time></div>
+        <div class="partner-request-grid"><div><span>담당자</span><strong>${escapeHtml(row.requester_name || row.requester_nickname || "-")}</strong></div><div><span>연락처</span><strong>${escapeHtml(row.contact || "-")}</strong></div><div><span>사업자번호</span><strong>${escapeHtml(formatBusinessNumber(row.business_number || ""))}</strong></div><div><span>신청자</span><strong>${escapeHtml(row.requester_nickname || "-")}</strong></div></div>
+        ${(row.website_url||row.sns_url)?`<div class="partner-evidence">${row.website_url?`<a href="${escapeAttr(row.website_url)}" target="_blank" rel="noopener noreferrer">공식 홈페이지 확인</a>`:""}${row.sns_url?`<a href="${escapeAttr(row.sns_url)}" target="_blank" rel="noopener noreferrer">공식 SNS 확인</a>`:""}</div>`:""}
+        ${row.message ? `<p class="partner-request-message">${escapeHtml(row.message)}</p>` : ""}
+        ${code ? `<div class="partner-activation-code"><span>활성화 코드</span><code>${escapeHtml(code)}</code><button class="text-btn" data-copy-partner-code="${escapeAttr(code)}" type="button">복사</button></div>` : ""}
+        ${canReview ? `<div class="partner-request-actions"><button class="primary-btn" data-partner-approve="${escapeAttr(row.id)}" type="button">제휴 승인</button><button class="secondary-btn" data-partner-reject="${escapeAttr(row.id)}" type="button">거절</button></div>` : ""}
+      </article>`;
+    }).join("") : `<div class="timeline-item muted">해당 상태의 제휴 신청이 없습니다.</div>`;
+    $$('[data-partner-approve]').forEach(btn => btn.onclick = () => reviewPartnerRequest(btn.dataset.partnerApprove, "approve", btn));
+    $$('[data-partner-reject]').forEach(btn => btn.onclick = () => reviewPartnerRequest(btn.dataset.partnerReject, "reject", btn));
+    $$('[data-copy-partner-code]').forEach(btn => btn.onclick = async () => { try{ await navigator.clipboard.writeText(btn.dataset.copyPartnerCode || ""); btn.textContent="복사됨"; setTimeout(()=>btn.textContent="복사",1200); }catch{ alert(btn.dataset.copyPartnerCode || ""); } });
+  }
+
+  async function reviewPartnerRequest(requestId, decision, button){
+    if(!requestId) return;
+    if(button) button.disabled = true;
+    try{
+      const { data, error } = await adminSb.rpc("biteboss_admin_review_partner_request", { p_request_id:requestId, p_decision:decision });
+      if(error) throw error;
+      if(!data?.ok){ alert(data?.error || "처리하지 못했습니다."); return; }
+      if(decision === "approve" && data.activation_code) alert(`제휴 승인 완료\n활성화 코드: ${data.activation_code}`);
+      await Promise.all([loadPartnerRequests(), loadStores(), loadDashboard()]);
+    }catch(error){ console.warn("BiteBoss partner request review:", error); alert(error?.message || "처리하지 못했습니다."); }
+    finally{ if(button) button.disabled = false; }
+  }
+
+  function formatBusinessNumber(value){ const digits=String(value||"").replace(/\D/g,""); return digits.length===10 ? `${digits.slice(0,3)}-${digits.slice(3,5)}-${digits.slice(5)}` : (value||"-"); }
+
+  async function loadDashboard(){
+    const [{ data:stats, error:statsError }, { data:logs, error:logsError }] = await Promise.all([
+      adminSb.rpc("biteboss_admin_dashboard"),
+      adminSb.from("biteboss_event_logs")
+        .select("id,event_type,payload,created_at,biteboss_stores(name)")
+        .order("created_at", { ascending:false })
+        .limit(12)
+    ]);
+
+    if(!statsError && stats){
+      setText("#statScans", stats.today_checkins || 0);
+      setText("#statClaims", stats.today_claims || 0);
+      setText("#statStores", stats.active_stores || 0);
+      setText("#statSuspicious", stats.suspicious_today || 0);
+    }
+
+    const box = $("#adminLogs");
+    if(!box) return;
+    if(logsError){
+      box.innerHTML = `<div class="timeline-item muted">로그를 불러오지 못했습니다.</div>`;
+      return;
+    }
+
+    box.innerHTML = (logs || []).map(row => `
+      <div class="timeline-item">
+        <strong>${escapeHtml(logLabel(row.event_type))}</strong>
+        <div class="meta">${escapeHtml(row.biteboss_stores?.name || "BiteBoss")} · ${escapeHtml(formatDate(row.created_at))}</div>
+      </div>
+    `).join("") || `<div class="timeline-item muted">아직 로그가 없습니다.</div>`;
+  }
+
+  async function loadStores(){
+    const { data, error } = await adminSb
+      .from("biteboss_stores")
+      .select("*")
+      .order("created_at", { ascending:false });
+
+    if(error){
+      console.warn(error);
+      return;
+    }
+    stores = data || [];
+    renderStores();
+    await renderQr();
+  }
+
+  async function createStore(event){
+    event.preventDefault();
+
+    const formEl = event.currentTarget;
+    const form = new FormData(formEl);
+    const status = $("#storeCreateStatus");
+    const submit = formEl.querySelector('button[type="submit"]');
+
+    const name = String(form.get("name") || "").trim();
+    const latitude = Number(form.get("latitude"));
+    const longitude = Number(form.get("longitude"));
+    if(!name || !Number.isFinite(latitude) || !Number.isFinite(longitude)){
+      if(status) status.textContent = "매장명과 위도/경도를 확인하세요.";
+      return;
+    }
+    if(latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180){
+      if(status) status.textContent = "위도/경도 범위를 확인하세요.";
+      return;
+    }
+
+    if(status) status.textContent = "매장을 등록하는 중…";
+    if(submit) submit.disabled = true;
+
+    try{
+      await ensureAdminAuthSession();
+
+      const { data, error } = await adminSb.rpc("biteboss_admin_create_store", {
+        p_name:name,
+        p_brand_name:String(form.get("brand_name") || "").trim(),
+        p_category:String(form.get("category") || "restaurant"),
+        p_city:String(form.get("city") || "").trim(),
+        p_district:String(form.get("district") || "").trim(),
+        p_address:String(form.get("address") || "").trim(),
+        p_latitude:latitude,
+        p_longitude:longitude,
+        p_partnership_status:"unclaimed",
+        p_photo_url:String(form.get("photo_url") || "").trim(),
+        p_store_admin_id:null,
+        p_store_admin_pin:null
+      });
+
+      if(error) throw error;
+      if(!data?.ok) throw new Error(data?.message || data?.error || "STORE_CREATE_FAILED");
+
+      formEl.reset();
+      if(status) status.textContent = `등록 완료 · ${data.store?.name || name} · 비제휴 매장은 GPS 체류 자동 점령으로 운영됩니다.`;
+
+      await Promise.all([loadStores(), loadDashboard()]);
+    }catch(error){
+      console.error("BiteBoss store create failed:", error);
+      if(status) status.textContent = `등록 실패 · ${error?.message || "알 수 없는 오류"}`;
+    }finally{
+      if(submit) submit.disabled = false;
+    }
+  }
+  function renderStores(){
+    const box = $("#adminStoreList");
+    if(!box) return;
+
+    box.innerHTML = stores.map(store => {
+      const isPartner = store.partnership_status === "partnered";
+      return `
+        <article class="admin-store-row">
+          <div class="admin-store-summary">
+            ${store.photo_url ? `<img class="admin-store-thumb" src="${escapeAttr(store.photo_url)}" alt="" />` : ""}
+            <div class="admin-store-copy">
+              <strong>${escapeHtml(store.name)}</strong>
+              <p>${escapeHtml([store.city, store.district].filter(Boolean).join(" ") || "지역 미등록")} · ${escapeHtml(categoryLabel(store.category))}</p>
+              <p class="admin-store-coords">${store.latitude ?? "-"}, ${store.longitude ?? "-"}</p>
+            </div>
+            <span class="partner-badge ${partnershipClass(store.partnership_status)}">${escapeHtml(partnershipLabel(store.partnership_status))}</span>
+          </div>
+          <div class="admin-store-actions">
+            <button class="text-btn" data-edit-store="${escapeAttr(store.id)}" type="button">수정</button>
+            ${isPartner
+              ? `<a class="text-link" href="./store-admin.html">매장 어드민</a><span class="admin-action-note">직원이 활성화 코드로 계정을 생성합니다.</span>`
+              : `<button class="text-btn" data-partner-store="${escapeAttr(store.id)}" type="button">제휴 전환</button><span class="admin-action-note">GPS 체류 자동점령</span>`}
+            <button class="text-btn ${store.status === "active" ? "danger-text" : ""}" data-toggle-store="${escapeAttr(store.id)}" type="button">${store.status === "active" ? "비활성화" : "활성화"}</button>
+            <button class="text-btn danger-text" data-delete-store="${escapeAttr(store.id)}" type="button">삭제</button>
+          </div>
+          ${activationCodes.has(String(store.id)) ? (() => { const item = activationCodes.get(String(store.id)); return `<div class="activation-result" data-activation-result="${escapeAttr(store.id)}"><strong>직원 활성화 코드</strong><code>${escapeHtml(item.code)}</code><button class="secondary-btn" data-copy-code="${escapeAttr(item.code)}" type="button">코드 복사</button><p>${escapeHtml(item.expires || "7일 안에 Store Admin에서 직원이 ID/PIN을 직접 등록합니다.")}</p></div>`; })() : `<div class="activation-result hidden" data-activation-result="${escapeAttr(store.id)}"></div>`}
+        </article>`;
+    }).join("") || `<div class="admin-empty">등록된 매장이 없습니다.</div>`;
+
+    $$('[data-edit-store]').forEach(btn => {
+      btn.onclick = () => openStoreEditor(btn.dataset.editStore);
+    });
+
+    $$('[data-delete-store]').forEach(btn => {
+      btn.onclick = () => deleteStoreById(btn.dataset.deleteStore);
+    });
+
+    $$('[data-partner-store]').forEach(btn => {
+      btn.onclick = async () => {
+        const store = stores.find(item => item.id === btn.dataset.partnerStore);
+        if(!store) return;
+        if(!confirm(`${store.name} 매장을 정식 제휴로 전환할까요?`)) return;
+        btn.disabled = true;
+        const original = btn.textContent;
+        btn.textContent = "전환 중…";
+        try{
+          const { data, error } = await adminSb.rpc("biteboss_admin_partner_store", { p_store_id:store.id });
+          if(error) throw error;
+          if(!data?.ok) throw new Error(data?.error || "PARTNER_FAILED");
+          activationCodes.set(String(store.id), {
+            code:String(data.activation_code || ""),
+            expires:data.activation_expires_at ? `유효기간: ${formatDate(data.activation_expires_at)}` : "7일 안에 Store Admin에서 직원이 ID/PIN을 직접 등록합니다."
+          });
+          await Promise.all([loadDashboard(), loadStores()]);
+        }catch(error){
+          console.error(error);
+          alert(error?.message || "제휴 전환에 실패했습니다.");
+          btn.textContent = original;
+        }finally{
+          btn.disabled = false;
+        }
+      };
+    });
+
+    $$('[data-copy-code]').forEach(btn => {
+      btn.onclick = async () => {
+        await navigator.clipboard.writeText(btn.dataset.copyCode || "");
+        const original = btn.textContent;
+        btn.textContent = "복사됨";
+        setTimeout(() => { btn.textContent = original; }, 1000);
+      };
+    });
+
+    $$('[data-toggle-store]').forEach(btn => {
+      btn.onclick = async () => {
+        const store = stores.find(item => item.id === btn.dataset.toggleStore);
+        if(!store) return;
+        const next = store.status === "active" ? "inactive" : "active";
+        const { error } = await adminSb.from("biteboss_stores").update({ status:next, updated_at:new Date().toISOString() }).eq("id", store.id);
+        if(error) return alert(error.message);
+        await loadStores();
+      };
+    });
+  }
+
+  async function renderQr(){
+    const box = $("#qrList");
+    if(!box) return;
+    const partnerStores = stores.filter(store => store.partnership_status === "partnered");
+    const nonPartnerStores = stores.filter(store => store.partnership_status !== "partnered");
+    const ids = partnerStores.map(store => store.id);
+
+    let map = new Map();
+    if(ids.length){
+      const { data, error } = await adminSb.from("biteboss_qr_codes")
+        .select("store_id,token,is_active,expires_at,created_at")
+        .in("store_id", ids).eq("is_active", true);
+      if(error){ box.innerHTML = `<div class="admin-empty">QR을 불러오지 못했습니다.</div>`; return; }
+      map = new Map((data || []).map(row => [row.store_id, row]));
+    }
+
+    box.innerHTML = [
+      ...partnerStores.map(store => {
+        const qr = map.get(store.id);
+        const link = qr ? `${location.origin}${location.pathname.replace(/admin\.html.*$/, "index.html")}?claim=${encodeURIComponent(qr.token)}` : "";
+        return `<article class="admin-qr-row">
+          <div class="admin-qr-head"><div><strong>${escapeHtml(store.name)}</strong><p>정식 제휴 · QR 즉시 점령</p></div><span class="admin-qr-state ${qr ? "is-active" : ""}">${qr ? "활성" : "QR 없음"}</span></div>
+          ${qr ? `<div class="admin-qr-data"><div><span>Token</span><code>${escapeHtml(qr.token)}</code></div><div><span>Link</span><p>${escapeHtml(link)}</p></div></div>` : ""}
+          <div class="admin-qr-actions">${link ? `<button class="secondary-btn" data-copy="${escapeAttr(link)}" type="button">링크 복사</button>` : ""}<button class="secondary-btn" data-rotate="${escapeAttr(store.id)}" type="button">${qr ? "재발급" : "QR 발급"}</button></div>
+        </article>`;
+      }),
+      ...nonPartnerStores.map(store => `<article class="admin-qr-row"><div class="admin-qr-head"><div><strong>${escapeHtml(store.name)}</strong><p>비제휴 · QR 없음 · GPS 체류 자동점령</p></div><span class="admin-qr-state">GPS</span></div></article>`)
+    ].join("") || `<div class="admin-empty">등록된 매장이 없습니다.</div>`;
+
+    $$('[data-copy]').forEach(btn => btn.onclick = async () => { await navigator.clipboard.writeText(btn.dataset.copy); btn.textContent = "복사됨"; });
+    $$('[data-rotate]').forEach(btn => btn.onclick = async () => {
+      const hasQr = btn.closest('.admin-qr-row')?.querySelector('.admin-qr-state.is-active');
+      if(hasQr && !confirm("기존 QR은 즉시 무효화됩니다. 재발급할까요?")) return;
+      const { error } = await adminSb.rpc("biteboss_rotate_qr", { p_store_id:btn.dataset.rotate });
+      if(error) return alert(error.message.includes('PARTNER_ONLY_QR') ? '정식 제휴 매장만 QR을 사용할 수 있습니다.' : error.message);
+      await renderQr();
+    });
+  }
+
+  async function loadConfig(){
+    const { data, error } = await adminSb.from("biteboss_app_config").select("key,value");
+    if(error) return console.warn(error);
+    appConfig = Object.fromEntries((data || []).map(row => [row.key, row.value]));
+  }
+
+  function renderRules(){
+    const form = $("#rulesForm");
+    if(!form) return;
+    [...form.elements].forEach(input => {
+      if(!input.name || !(input.name in appConfig)) return;
+      input.value = String(appConfig[input.name]);
+    });
+  }
+
+  async function saveRules(event){
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const numeric = new Set([
+      "protect_minutes","reclaim_cooldown_minutes","gps_radius_m","max_location_accuracy_m",
+      "gps_dwell_seconds","gps_presence_ping_seconds","daily_store_limit","nearby_radius_m","nearby_limit",
+      "xp_per_level","xp_visit","xp_boss_win","xp_crew","xp_defense_success",
+      "store_bonus_visits_per_point","store_bonus_max","challenge_cooldown_minutes",
+      "defense_decay_day_1","defense_decay_day_2","defense_decay_day_3","defense_decay_day_4",
+      "defense_decay_value_1","defense_decay_value_2","defense_decay_value_3","defense_decay_value_4",
+      "organization_leave_xp_percent","organization_leave_cooldown_days",
+      "organization_leader_leave_xp_percent","organization_leader_leave_cooldown_days",
+      "organization_invite_days"
+    ]);
+    const boolean = new Set(["feature_ranking","feature_offers"]);
+    const rows = [];
+
+    for(const [key, raw] of form.entries()){
+      let value = raw;
+      if(numeric.has(key)) value = Number(raw);
+      if(boolean.has(key)) value = raw === "true";
+      rows.push({ key, value, updated_by:session.user.id, updated_at:new Date().toISOString() });
+    }
+
+    const { error } = await adminSb.from("biteboss_app_config").upsert(rows, { onConflict:"key" });
+    if(error) return alert(error.message);
+    await loadConfig();
+    renderRules();
+    alert("게임 규칙을 저장했습니다.");
+  }
+
+  async function loadBosses(){
+    const box = $("#bossList");
+    if(!box) return;
+
+    const { data, error } = await adminSb.rpc("biteboss_admin_bosses");
+
+    if(error){
+      console.warn("BiteBoss admin bosses:", error);
+      box.innerHTML = `<div class="admin-empty">보스 현황을 불러오지 못했습니다.</div>`;
+      return;
+    }
+
+    const rows = Array.isArray(data) ? data : [];
+
+    box.innerHTML = rows.map(row => {
+      const storeName = String(row.store_name || "매장").trim();
+      const bossName = String(row.nickname || "").trim();
+      const isOccupied = Boolean(bossName);
+
+      const category = String(
+        row.category_label ||
+        row.category_name ||
+        row.category ||
+        ""
+      ).trim();
+
+      const protectionActive = Boolean(
+        row.protected_until &&
+        new Date(row.protected_until).getTime() > Date.now()
+      );
+
+      const stateLabel = isOccupied ? bossName : "미점령";
+      const statusLabel = protectionActive
+        ? `보호 ${formatRemaining(row.protected_until)}`
+        : isOccupied
+          ? "도전 가능"
+          : "Open";
+
+      const meta = [category, statusLabel].filter(Boolean).join(" · ");
+      const xp = Math.max(0, Number(row.claims_for_user || 0) * 120);
+
+      return `
+        <article class="admin-boss-row ${isOccupied ? "is-occupied" : "is-unclaimed"}">
+          <div class="admin-boss-copy">
+            <strong class="admin-boss-store">${escapeHtml(storeName)}</strong>
+            <span class="admin-boss-owner">${escapeHtml(stateLabel)}</span>
+            <small class="admin-boss-meta">${escapeHtml(meta)}</small>
+          </div>
+          <div class="admin-boss-xp" aria-label="${xp} XP">
+            <strong>${xp}</strong>
+            <span>XP</span>
+          </div>
+        </article>
+      `;
+    }).join("") || `<div class="admin-empty">활성 매장이 없습니다.</div>`;
+  }
+
+  async function loadUsers(){
+    const box = $("#userList");
+    if(!box) return;
+    const keyword = String($("#userSearch")?.value || "").trim();
+    const { data, error } = await adminSb.rpc("biteboss_admin_list_users", { p_query:keyword || null, p_limit:100 });
+    if(error){
+      console.warn(error);
+      box.innerHTML = `<div class="timeline-item muted">사용자를 불러오지 못했습니다.</div>`;
+      return;
+    }
+
+    box.innerHTML = (data || []).map(row => `
+      <article class="admin-user-row">
+        <div class="admin-user-copy">
+          <strong>${escapeHtml(row.nickname || row.username || "Member")}</strong>
+          <p>${row.username ? `@${escapeHtml(row.username)} · ` : ""}${escapeHtml(row.status || "active")} · ${escapeHtml(formatDate(row.created_at))}</p>
+        </div>
+        <div class="admin-user-actions">
+          <button class="text-btn ${row.status === "active" ? "danger-text" : "good"}" data-user-status="${escapeAttr(row.user_id)}" data-next-status="${row.status === "active" ? "blocked" : "active"}" type="button">${row.status === "active" ? "차단" : "해제"}</button>
+          <button class="text-btn danger-text" data-delete-user="${escapeAttr(row.user_id)}" data-user-label="${escapeAttr(row.nickname || row.username || "Member")}" type="button">삭제</button>
+        </div>
+      </article>
+    `).join("") || `<div class="timeline-item muted">검색 결과가 없습니다.</div>`;
+
+    $$('[data-user-status]').forEach(btn => btn.onclick = async () => {
+      const { data:updateData, error:updateError } = await adminSb.rpc("biteboss_admin_set_user_status", {
+        p_user_id:btn.dataset.userStatus,
+        p_status:btn.dataset.nextStatus
+      });
+      if(updateError || !updateData?.ok) return alert(updateError?.message || updateData?.error || "상태 변경 실패");
+      await loadUsers();
+    });
+
+    $$('[data-delete-user]').forEach(btn => btn.onclick = async () => {
+      const label = btn.dataset.userLabel || "회원";
+      const typed = prompt(`${label} 회원을 완전히 삭제합니다. 계속하려면 DELETE를 입력하세요.`);
+      if(typed !== "DELETE") return;
+      btn.disabled = true;
+      try{
+        const { data:deleted, error:deleteError } = await adminSb.rpc("biteboss_admin_delete_user", { p_user_id:btn.dataset.deleteUser });
+        if(deleteError) throw deleteError;
+        if(!deleted?.ok) throw new Error(deleted?.error || "USER_DELETE_FAILED");
+        await Promise.all([loadUsers(), loadDashboard(), loadBosses()]);
+      }catch(error){
+        alert(error?.message || "회원 삭제에 실패했습니다.");
+      }finally{
+        btn.disabled = false;
+      }
+    });
+  }
+
+
+  async function loadGameOps(){
+    const summaryBox = $("#gameOpsSummary");
+    const storesBox = $("#gameOpsStores");
+    const orgsBox = $("#gameOpsOrganizations");
+    if(!summaryBox && !storesBox && !orgsBox) return;
+
+    const [overviewResult, controlsResult, orgsResult] = await Promise.all([
+      adminSb.rpc("biteboss_admin_game_overview"),
+      adminSb.rpc("biteboss_admin_game_store_controls"),
+      adminSb.rpc("biteboss_admin_game_organizations")
+    ]);
+
+    if(summaryBox){
+      if(overviewResult.error){
+        console.warn(overviewResult.error);
+        summaryBox.innerHTML = `<div class="admin-empty">게임 현황을 불러오지 못했습니다.</div>`;
+      }else{
+        const data = overviewResult.data || {};
+        summaryBox.innerHTML = `
+          <div><span>Players</span><strong>${Number(data.players || 0)}</strong></div>
+          <div><span>Boss Stores</span><strong>${Number(data.bosses || 0)}</strong></div>
+          <div><span>Crew</span><strong>${Number(data.crews || 0)}</strong></div>
+          <div><span>Organizations</span><strong>${Number(data.organizations || 0)}</strong></div>
+          <div><span>Org Territories</span><strong>${Number(data.organization_territories || 0)}</strong></div>
+          <div><span>Challenges</span><strong>${Number(data.challenges || 0)}</strong></div>
+        `;
+      }
+    }
+
+    if(storesBox){
+      if(controlsResult.error){
+        console.warn(controlsResult.error);
+        storesBox.innerHTML = `<div class="admin-empty">매장 점령 상태를 불러오지 못했습니다.</div>`;
+      }else{
+        const rows = Array.isArray(controlsResult.data) ? controlsResult.data : [];
+        storesBox.innerHTML = rows.map(row => {
+          const boss = row.boss_user_id
+            ? [row.boss_nickname || "Boss", row.organization_name].filter(Boolean).join(" · ")
+            : "Unclaimed";
+          const protection = row.protected_until && new Date(row.protected_until).getTime() > Date.now()
+            ? `Protected ${formatRemaining(row.protected_until)}`
+            : row.boss_user_id ? "Challengeable" : "Open";
+          return `
+            <article class="gameops-store-row">
+              <div>
+                <strong>${escapeHtml(row.store_name || "Store")}</strong>
+                <p>${escapeHtml([row.city,row.district].filter(Boolean).join(" "))}</p>
+              </div>
+              <div class="gameops-store-status">
+                <strong>${escapeHtml(boss)}</strong>
+                <span>${escapeHtml(protection)}${row.boss_user_id ? ` · Defense ${Number(row.boss_defense || 0)} · Lv ${Number(row.boss_level || 1)}` : ""}</span>
+              </div>
+              <div class="gameops-store-action">
+                ${row.boss_user_id ? `<button class="text-btn danger-text" data-release-boss="${escapeAttr(row.store_id)}" data-store-name="${escapeAttr(row.store_name || "Store")}" type="button">Boss 해제</button>` : ""}
+              </div>
+            </article>
+          `;
+        }).join("") || `<div class="admin-empty">등록된 매장이 없습니다.</div>`;
+
+        $$('[data-release-boss]').forEach(btn => btn.onclick = () => releaseStoreBoss(btn));
+      }
+    }
+
+    if(orgsBox){
+      if(orgsResult.error){
+        console.warn(orgsResult.error);
+        orgsBox.innerHTML = `<div class="admin-empty">조직 현황을 불러오지 못했습니다.</div>`;
+      }else{
+        const rows = Array.isArray(orgsResult.data) ? orgsResult.data : [];
+        orgsBox.innerHTML = rows.map(row => `
+          <article class="gameops-org-row">
+            <div>
+              <strong>${escapeHtml(row.name || "Organization")}</strong>
+              <p>Founder ${escapeHtml(row.leader_name || "—")}</p>
+            </div>
+            <div>
+              <b>${Number(row.member_count || 0)}</b><span>Members</span>
+            </div>
+            <div>
+              <b>${Number(row.territory_count || 0)}</b><span>Territories</span>
+            </div>
+          </article>
+        `).join("") || `<div class="admin-empty">조직이 없습니다.</div>`;
+      }
+    }
+  }
+
+  async function releaseStoreBoss(button){
+    const storeId = button?.dataset?.releaseBoss;
+    const storeName = button?.dataset?.storeName || "매장";
+    if(!storeId) return;
+
+    const typed = prompt(`${storeName}의 현재 Boss를 강제로 해제합니다.\n방문/XP/Store Bonus는 유지됩니다.\n계속하려면 RELEASE를 입력하세요.`);
+    if(typed !== "RELEASE") return;
+
+    button.disabled = true;
+
+    try{
+      const { data, error } = await adminSb.rpc("biteboss_admin_release_store_boss", {
+        p_store_id:storeId
+      });
+      if(error) throw error;
+      if(!data?.ok) throw new Error(data?.error || "RELEASE_FAILED");
+
+      await Promise.all([loadGameOps(), loadBosses(), loadDashboard()]);
+    }catch(error){
+      console.warn(error);
+      alert(error?.message || "Boss 해제에 실패했습니다.");
+    }finally{
+      button.disabled = false;
+    }
+  }
+
+  async function loadAssets(){
+    if(!Object.keys(appConfig).length) await loadConfig();
+    const url = String(appConfig.home_splash_image_url || "");
+    const preview = $("#splashPreview");
+    if(preview) preview.innerHTML = url ? `<img src="${escapeAttr(url)}" alt="Splash" />` : `<span>SPLASH</span>`;
+
+    const hookEnabled = String(appConfig.home_hook_enabled ?? "true").toLowerCase() !== "false";
+    const hookText = String(appConfig.home_hook_text || "");
+    const primary = String(appConfig.home_primary_cta || "QR 스캔하기");
+    const secondary = String(appConfig.home_secondary_cta || "내 주변 보스 찾기");
+
+    if($("#homeHookEnabled")) $("#homeHookEnabled").value = hookEnabled ? "true" : "false";
+    if($("#homeHookText")) $("#homeHookText").value = hookText;
+    if($("#homePrimaryCta")) $("#homePrimaryCta").value = primary;
+    if($("#homeSecondaryCta")) $("#homeSecondaryCta").value = secondary;
+
+    const copyPreview = $("#homeCopyPreview");
+    if(copyPreview){
+      copyPreview.innerHTML = `
+        <span>HOME PREVIEW</span>
+        <strong>${hookEnabled && hookText ? escapeHtml(hookText) : "훅 문구 숨김"}</strong>
+        <p>${escapeHtml(primary)} · ${escapeHtml(secondary)}</p>
+      `;
+    }
+  }
+
+  async function saveSplash(event){
+    event.preventDefault();
+    const status = $("#splashStatus");
+    const file = $("#splashFile")?.files?.[0];
+    if(!file) return;
+    if(status) status.textContent = "업로드 중…";
+
+    try{
+      const blob = await imageFileToJpegBlob(file, 1440, 2560, 0.88);
+      const path = "public/home-splash.jpg";
+      const upload = await adminSb.storage.from("biteboss-assets").upload(path, blob, { upsert:true, contentType:"image/jpeg", cacheControl:"3600" });
+      if(upload.error) throw upload.error;
+      const { data } = adminSb.storage.from("biteboss-assets").getPublicUrl(path);
+      const url = `${data.publicUrl}?v=${Date.now()}`;
+      const { error } = await adminSb.from("biteboss_app_config").upsert({ key:"home_splash_image_url", value:url, updated_by:session.user.id, updated_at:new Date().toISOString() }, { onConflict:"key" });
+      if(error) throw error;
+      appConfig.home_splash_image_url = url;
+      await loadAssets();
+      if(status) status.textContent = "저장되었습니다.";
+    }catch(error){
+      console.warn(error);
+      if(status) status.textContent = "저장에 실패했습니다.";
+    }
+  }
+
+
+  async function saveHomeCopy(event){
+    event.preventDefault();
+    const status = $("#homeCopyStatus");
+    const button = event.currentTarget?.querySelector('button[type="submit"]');
+    const hookEnabled = $("#homeHookEnabled")?.value !== "false";
+    const hookText = String($("#homeHookText")?.value || "").trim().slice(0,48);
+    const primary = String($("#homePrimaryCta")?.value || "").trim().slice(0,24);
+    const secondary = String($("#homeSecondaryCta")?.value || "").trim().slice(0,24);
+
+    if(!primary || !secondary){
+      if(status) status.textContent = "버튼 문구는 비워둘 수 없습니다.";
+      return;
+    }
+
+    if(button) button.disabled = true;
+    if(status) status.textContent = "저장 중…";
+
+    const now = new Date().toISOString();
+    const rows = [
+      { key:"home_hook_enabled", value:hookEnabled, updated_by:session.user.id, updated_at:now },
+      { key:"home_hook_text", value:hookText, updated_by:session.user.id, updated_at:now },
+      { key:"home_primary_cta", value:primary, updated_by:session.user.id, updated_at:now },
+      { key:"home_secondary_cta", value:secondary, updated_by:session.user.id, updated_at:now }
+    ];
+
+    try{
+      const { error } = await adminSb.from("biteboss_app_config").upsert(rows, { onConflict:"key" });
+      if(error) throw error;
+      rows.forEach(row => { appConfig[row.key] = row.value; });
+      await loadAssets();
+      if(status) status.textContent = "저장되었습니다.";
+    }catch(error){
+      console.warn(error);
+      if(status) status.textContent = "저장에 실패했습니다.";
+    }finally{
+      if(button) button.disabled = false;
+    }
+  }
+
+
+  async function openStoreEditor(storeId){
+    if(!storeId) return;
+    editingStoreId = storeId;
+    editingStoreBundle = null;
+    const editor = $("#adminStoreEditor");
+    editor?.classList.remove("hidden");
+    editor?.setAttribute("aria-hidden", "false");
+    document.body.classList.add("admin-editor-open");
+    $("#adminStoreEditorLoading")?.classList.remove("hidden");
+    $("#adminStoreEditorBody")?.classList.add("hidden");
+    resetAdminMenuForm();
+    resetAdminOfferForm();
+
+    try{
+      const { data, error } = await adminSb.rpc("biteboss_admin_store_detail", { p_store_id:storeId });
+      if(error) throw error;
+      if(!data?.ok) throw new Error(data?.error || "STORE_LOAD_FAILED");
+      editingStoreBundle = data;
+      renderAdminStoreEditor();
+    }catch(error){
+      console.error(error);
+      setText("#adminStoreEditorLoading", `불러오기 실패 · ${error?.message || "알 수 없는 오류"}`);
+    }
+  }
+
+  function closeStoreEditor(){
+    editingStoreId = null;
+    editingStoreBundle = null;
+    $("#adminStoreEditor")?.classList.add("hidden");
+    $("#adminStoreEditor")?.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("admin-editor-open");
+  }
+
+  function renderAdminStoreEditor(){
+    const bundle = editingStoreBundle || {};
+    const store = bundle.store || {};
+    setText("#adminStoreEditorTitle", store.name || "매장 수정");
+    setText("#adminStoreEditorMeta", `${partnershipLabel(store.partnership_status)} · ${store.partnership_status === "partnered" ? "QR 점령" : "GPS 자동점령"}`);
+
+    const form = $("#adminStoreEditForm");
+    if(form){
+      ["name","brand_name","category","status","city","district","address","latitude","longitude","hours","phone","notice"].forEach(key => {
+        if(form.elements[key]) form.elements[key].value = store[key] ?? "";
+      });
+    }
+
+    renderAdminPhotos(bundle.photos || []);
+    renderAdminMenu(bundle.menu || []);
+    renderAdminOffers(bundle.offers || []);
+    $("#adminStoreEditorLoading")?.classList.add("hidden");
+    $("#adminStoreEditorBody")?.classList.remove("hidden");
+  }
+
+  async function reloadStoreEditor(){
+    if(!editingStoreId) return;
+    const { data, error } = await adminSb.rpc("biteboss_admin_store_detail", { p_store_id:editingStoreId });
+    if(error) throw error;
+    if(!data?.ok) throw new Error(data?.error || "STORE_LOAD_FAILED");
+    editingStoreBundle = data;
+    renderAdminStoreEditor();
+  }
+
+  async function saveAdminStoreInfo(event){
+    event.preventDefault();
+    if(!editingStoreId) return;
+    const formEl = event.currentTarget;
+    const form = new FormData(formEl);
+    const lat = Number(form.get("latitude"));
+    const lng = Number(form.get("longitude"));
+    const status = $("#adminStoreEditStatus");
+    if(!String(form.get("name") || "").trim()) return setStatusText(status, "매장명을 입력하세요.");
+    if(!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) return setStatusText(status, "위도/경도를 확인하세요.");
+    const submit = formEl.querySelector('button[type="submit"]');
+    if(submit) submit.disabled = true;
+    setStatusText(status, "저장 중…");
+    try{
+      const { data, error } = await adminSb.rpc("biteboss_admin_update_store", {
+        p_store_id:editingStoreId,
+        p_name:String(form.get("name") || "").trim(),
+        p_brand_name:String(form.get("brand_name") || "").trim(),
+        p_category:String(form.get("category") || "restaurant"),
+        p_city:String(form.get("city") || "").trim(),
+        p_district:String(form.get("district") || "").trim(),
+        p_address:String(form.get("address") || "").trim(),
+        p_latitude:lat,
+        p_longitude:lng,
+        p_hours:String(form.get("hours") || "").trim(),
+        p_phone:String(form.get("phone") || "").trim(),
+        p_notice:String(form.get("notice") || "").trim(),
+        p_status:String(form.get("status") || "active")
+      });
+      if(error) throw error;
+      if(!data?.ok) throw new Error(data?.error || "STORE_UPDATE_FAILED");
+      setStatusText(status, "저장되었습니다.");
+      await Promise.all([reloadStoreEditor(), loadStores(), loadDashboard()]);
+    }catch(error){
+      setStatusText(status, `저장 실패 · ${error?.message || "다시 시도하세요."}`);
+    }finally{
+      if(submit) submit.disabled = false;
+    }
+  }
+
+  function renderAdminPhotos(rows){
+    const box = $("#adminPhotoList");
+    if(!box) return;
+    box.innerHTML = rows.map(photo => `
+      <article class="admin-media-row">
+        <img src="${escapeAttr(photo.image_url)}" alt="" />
+        <div><strong>${escapeHtml(photo.caption || (photo.is_cover ? "대표 사진" : "매장 사진"))}</strong><p>${photo.is_cover ? "대표 이미지" : "추가 이미지"}</p></div>
+        <button class="text-btn danger-text" data-admin-delete-photo="${escapeAttr(photo.id)}" data-storage-path="${escapeAttr(photo.storage_path || "")}" type="button">삭제</button>
+      </article>
+    `).join("") || `<div class="admin-empty">등록된 사진이 없습니다.</div>`;
+
+    $$('[data-admin-delete-photo]').forEach(btn => btn.onclick = async () => {
+      if(!confirm("이 사진을 삭제할까요?")) return;
+      const path = btn.dataset.storagePath || "";
+      try{
+        if(path){
+          const removed = await adminSb.storage.from("biteboss-store-images").remove([path]);
+          if(removed.error) throw removed.error;
+        }
+        const { data, error } = await adminSb.rpc("biteboss_admin_delete_photo", { p_photo_id:btn.dataset.adminDeletePhoto });
+        if(error) throw error;
+        if(!data?.ok) throw new Error(data?.error || "PHOTO_DELETE_FAILED");
+        await Promise.all([reloadStoreEditor(), loadStores()]);
+      }catch(error){ alert(error?.message || "사진 삭제 실패"); }
+    });
+  }
+
+  async function addAdminStorePhoto(event){
+    event.preventDefault();
+    const form = event.currentTarget;
+    if(!editingStoreId) return;
+    const file = $("#adminPhotoFile")?.files?.[0];
+    const inputUrl = String($("#adminPhotoUrl")?.value || "").trim();
+    const isCover = Boolean($("#adminPhotoCover")?.checked);
+    const status = $("#adminPhotoStatus");
+    if(!file && !inputUrl) return setStatusText(status, "사진 파일 또는 URL을 입력하세요.");
+    setStatusText(status, "사진 저장 중…");
+    let imageUrl = inputUrl;
+    let storagePath = "";
+    try{
+      if(file){
+        const blob = await imageFileToJpegBlob(file, 1600, 1600, 0.88);
+        storagePath = `${editingStoreId}/${crypto.randomUUID()}.jpg`;
+        const upload = await adminSb.storage.from("biteboss-store-images").upload(storagePath, blob, { contentType:"image/jpeg", cacheControl:"86400" });
+        if(upload.error) throw upload.error;
+        imageUrl = adminSb.storage.from("biteboss-store-images").getPublicUrl(storagePath).data.publicUrl;
+      }
+      const { data, error } = await adminSb.rpc("biteboss_admin_add_photo", {
+        p_store_id:editingStoreId,
+        p_image_url:imageUrl,
+        p_storage_path:storagePath || null,
+        p_caption:"",
+        p_is_cover:isCover
+      });
+      if(error) throw error;
+      if(!data?.ok) throw new Error(data?.error || "PHOTO_ADD_FAILED");
+      form?.reset();
+      setStatusText(status, "사진이 등록되었습니다.");
+      await Promise.all([reloadStoreEditor(), loadStores()]);
+    }catch(error){
+      if(storagePath){ try{ await adminSb.storage.from("biteboss-store-images").remove([storagePath]); }catch{} }
+      setStatusText(status, `사진 등록 실패 · ${error?.message || "다시 시도하세요."}`);
+    }
+  }
+
+  function renderAdminMenu(rows){
+    const box = $("#adminMenuList");
+    if(!box) return;
+    box.innerHTML = rows.map(item => `
+      <article class="admin-data-row">
+        <div><strong>${escapeHtml(item.name)}</strong><p>${item.price != null ? `${Number(item.price).toLocaleString("ko-KR")}원` : "가격 미정"}${item.is_signature ? " · Signature" : ""}${item.description ? ` · ${escapeHtml(item.description)}` : ""}</p></div>
+        <div class="admin-data-actions"><button class="text-btn" data-edit-menu="${escapeAttr(item.id)}" type="button">수정</button><button class="text-btn danger-text" data-delete-menu="${escapeAttr(item.id)}" type="button">삭제</button></div>
+      </article>
+    `).join("") || `<div class="admin-empty">등록된 메뉴가 없습니다.</div>`;
+    $$('[data-edit-menu]').forEach(btn => btn.onclick = () => editAdminMenu(btn.dataset.editMenu));
+    $$('[data-delete-menu]').forEach(btn => btn.onclick = () => deleteAdminMenu(btn.dataset.deleteMenu));
+  }
+
+  function editAdminMenu(id){
+    const item = (editingStoreBundle?.menu || []).find(x => String(x.id) === String(id));
+    if(!item) return;
+    $("#adminMenuId").value = item.id;
+    $("#adminMenuName").value = item.name || "";
+    $("#adminMenuPrice").value = item.price ?? "";
+    $("#adminMenuDescription").value = item.description || "";
+    $("#adminMenuSignature").value = String(Boolean(item.is_signature));
+    $("#adminMenuCancel")?.classList.remove("hidden");
+  }
+
+  function resetAdminMenuForm(){
+    $("#adminMenuForm")?.reset();
+    if($("#adminMenuId")) $("#adminMenuId").value = "";
+    $("#adminMenuCancel")?.classList.add("hidden");
+  }
+
+  async function saveAdminMenu(event){
+    event.preventDefault();
+    if(!editingStoreId) return;
+    const id = $("#adminMenuId")?.value || null;
+    const name = String($("#adminMenuName")?.value || "").trim();
+    if(!name) return;
+    const { data, error } = await adminSb.rpc("biteboss_admin_upsert_menu", {
+      p_store_id:editingStoreId,
+      p_item_id:id || null,
+      p_name:name,
+      p_price:$("#adminMenuPrice")?.value ? Number($("#adminMenuPrice").value) : null,
+      p_description:String($("#adminMenuDescription")?.value || "").trim(),
+      p_is_signature:String($("#adminMenuSignature")?.value) === "true"
+    });
+    if(error || !data?.ok) return alert(error?.message || data?.error || "메뉴 저장 실패");
+    resetAdminMenuForm();
+    await reloadStoreEditor();
+  }
+
+  async function deleteAdminMenu(id){
+    if(!confirm("이 메뉴를 삭제할까요?")) return;
+    const { data, error } = await adminSb.rpc("biteboss_admin_delete_menu", { p_item_id:id });
+    if(error || !data?.ok) return alert(error?.message || data?.error || "메뉴 삭제 실패");
+    await reloadStoreEditor();
+  }
+
+  function renderAdminOffers(rows){
+    const box = $("#adminOfferList");
+    if(!box) return;
+    box.innerHTML = rows.map(item => `
+      <article class="admin-data-row">
+        <div><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.status || "draft")} · ${escapeHtml((item.minimum_role || (item.boss_only ? "boss" : "visitor")) === "boss" ? "Boss only" : (item.minimum_role === "crew" ? "Crew + Boss" : "Everyone"))}${item.description ? ` · ${escapeHtml(item.description)}` : ""}</p></div>
+        <div class="admin-data-actions"><button class="text-btn" data-edit-offer="${escapeAttr(item.id)}" type="button">수정</button><button class="text-btn danger-text" data-delete-offer="${escapeAttr(item.id)}" type="button">삭제</button></div>
+      </article>
+    `).join("") || `<div class="admin-empty">등록된 혜택이 없습니다.</div>`;
+    $$('[data-edit-offer]').forEach(btn => btn.onclick = () => editAdminOffer(btn.dataset.editOffer));
+    $$('[data-delete-offer]').forEach(btn => btn.onclick = () => deleteAdminOffer(btn.dataset.deleteOffer));
+  }
+
+  function editAdminOffer(id){
+    const item = (editingStoreBundle?.offers || []).find(x => String(x.id) === String(id));
+    if(!item) return;
+    $("#adminOfferId").value = item.id;
+    $("#adminOfferTitle").value = item.title || "";
+    $("#adminOfferDescription").value = item.description || "";
+    $("#adminOfferStatus").value = item.status || "draft";
+    $("#adminOfferMinimumRole").value = item.minimum_role || (item.boss_only ? "boss" : "visitor");
+    $("#adminOfferCancel")?.classList.remove("hidden");
+  }
+
+  function resetAdminOfferForm(){
+    $("#adminOfferForm")?.reset();
+    if($("#adminOfferId")) $("#adminOfferId").value = "";
+    $("#adminOfferCancel")?.classList.add("hidden");
+  }
+
+  async function saveAdminOffer(event){
+    event.preventDefault();
+    if(!editingStoreId) return;
+    const title = String($("#adminOfferTitle")?.value || "").trim();
+    if(!title) return;
+    const { data, error } = await adminSb.rpc("biteboss_admin_upsert_offer_v2", {
+      p_store_id:editingStoreId,
+      p_offer_id:$("#adminOfferId")?.value || null,
+      p_title:title,
+      p_description:String($("#adminOfferDescription")?.value || "").trim(),
+      p_status:String($("#adminOfferStatus")?.value || "draft"),
+      p_minimum_role:String($("#adminOfferMinimumRole")?.value || "visitor")
+    });
+    if(error || !data?.ok) return alert(error?.message || data?.error || "혜택 저장 실패");
+    resetAdminOfferForm();
+    await reloadStoreEditor();
+  }
+
+  async function deleteAdminOffer(id){
+    if(!confirm("이 혜택을 삭제할까요?")) return;
+    const { data, error } = await adminSb.rpc("biteboss_admin_delete_offer", { p_offer_id:id });
+    if(error || !data?.ok) return alert(error?.message || data?.error || "혜택 삭제 실패");
+    await reloadStoreEditor();
+  }
+
+  async function deleteStoreById(storeId){
+    const store = stores.find(item => String(item.id) === String(storeId));
+    if(!store) return;
+    const typed = prompt(`매장과 연결된 메뉴, 사진, 혜택, QR, 점령/방문 기록이 함께 삭제됩니다.\n계속하려면 매장명 “${store.name}”을 정확히 입력하세요.`);
+    if(typed !== store.name) return;
+    try{
+      const detail = await adminSb.rpc("biteboss_admin_store_detail", { p_store_id:storeId });
+      if(detail.error) throw detail.error;
+      const paths = (detail.data?.photos || []).map(x => x.storage_path).filter(Boolean);
+      if(paths.length){
+        const removed = await adminSb.storage.from("biteboss-store-images").remove(paths);
+        if(removed.error) throw removed.error;
+      }
+      const { data, error } = await adminSb.rpc("biteboss_admin_delete_store", { p_store_id:storeId });
+      if(error) throw error;
+      if(!data?.ok) throw new Error(data?.error || "STORE_DELETE_FAILED");
+      activationCodes.delete(String(storeId));
+      if(editingStoreId === storeId) closeStoreEditor();
+      await Promise.all([loadStores(), loadDashboard(), loadBosses()]);
+    }catch(error){
+      alert(error?.message || "매장 삭제에 실패했습니다.");
+    }
+  }
+
+  async function deleteCurrentStore(){
+    if(editingStoreId) await deleteStoreById(editingStoreId);
+  }
+
+  async function runAdminReset(mode, button){
+    const phrases = { claims:"RESET CLAIMS", checkins:"RESET VISITS", game:"RESET GAME", factory:"RESET BITEBOSS" };
+    const labels = { claims:"점령 기록", checkins:"방문 기록", game:"게임 기록 전체", factory:"BiteBoss 운영 데이터 전체" };
+    const phrase = phrases[mode];
+    if(!phrase) return;
+    const typed = prompt(`${labels[mode]}를 초기화합니다. 되돌릴 수 없습니다.\n계속하려면 ${phrase} 를 입력하세요.`);
+    if(typed !== phrase) return;
+    const status = $("#maintenanceStatus");
+    if(button) button.disabled = true;
+    setStatusText(status, "초기화 중…");
+    try{
+      if(mode === "factory"){
+        const { data:adPaths, error:adPathsError } = await adminSb.rpc("biteboss_admin_ad_storage_paths");
+        if(adPathsError) throw adPathsError;
+        const adAssetPaths = (adPaths || []).map(x => x.storage_path).filter(Boolean);
+        for(let i=0;i<adAssetPaths.length;i+=100){
+          const removedAds = await adminSb.storage.from("biteboss-assets").remove(adAssetPaths.slice(i, i+100));
+          if(removedAds.error) throw removedAds.error;
+        }
+        const { data:allPhotos, error:pathsError } = await adminSb.rpc("biteboss_admin_storage_paths");
+        if(pathsError) throw pathsError;
+        const paths = (allPhotos || []).map(x => x.storage_path).filter(Boolean);
+        for(let i=0;i<paths.length;i+=100){
+          const removed = await adminSb.storage.from("biteboss-store-images").remove(paths.slice(i, i+100));
+          if(removed.error) throw removed.error;
+        }
+      }
+      const { data, error } = await adminSb.rpc("biteboss_admin_reset", { p_mode:mode });
+      if(error) throw error;
+      if(!data?.ok) throw new Error(data?.error || "RESET_FAILED");
+      setStatusText(status, `완료 · ${labels[mode]} 초기화`);
+      closeStoreEditor();
+      await refreshAll();
+    }catch(error){
+      setStatusText(status, `실패 · ${error?.message || "초기화하지 못했습니다."}`);
+    }finally{
+      if(button) button.disabled = false;
+    }
+  }
+
+  function setStatusText(node, text){ if(node) node.textContent = String(text || ""); }
+
+
+  async function loadAds(){
+    const box = $("#adCampaignList");
+    if(!box) return;
+    const { data, error } = await adminSb.rpc("biteboss_admin_list_campaigns");
+    if(error){
+      console.warn(error);
+      box.innerHTML = `<div class="admin-empty">광고 캠페인을 불러오지 못했습니다.</div>`;
+      return;
+    }
+    adCampaigns = Array.isArray(data) ? data : [];
+    renderAds();
+    if(!$("#adCampaignId")?.value) ensureAdStartDefault();
+  }
+
+  function renderAds(){
+    const box = $("#adCampaignList");
+    if(!box) return;
+    const now = Date.now();
+    box.innerHTML = adCampaigns.map(item => {
+      const start = item.starts_at ? new Date(item.starts_at).getTime() : 0;
+      const end = item.ends_at ? new Date(item.ends_at).getTime() : Infinity;
+      const live = item.is_active && start <= now && end > now;
+      const impressions = Number(item.impressions || 0);
+      const clicks = Number(item.clicks || 0);
+      const ctr = impressions > 0 ? (clicks / impressions * 100).toFixed(1) : "0.0";
+      return `
+        <article class="admin-ad-row">
+          <img class="admin-ad-thumb" src="${escapeAttr(item.image_url)}" alt="" />
+          <div class="admin-ad-copy">
+            <div class="admin-ad-title"><strong>${escapeHtml(item.campaign_name)}</strong><span>${live ? "LIVE" : (item.is_active ? "SCHEDULED" : "OFF")}</span></div>
+            <p>${escapeHtml(item.advertiser_name)} · ${escapeHtml(formatAdPeriod(item.starts_at, item.ends_at))}</p>
+            <div class="admin-ad-stats"><span>${impressions.toLocaleString("ko-KR")} 노출</span><span>${clicks.toLocaleString("ko-KR")} 클릭</span><span>CTR ${ctr}%</span></div>
+          </div>
+          <div class="admin-data-actions">
+            <button class="text-btn" data-edit-ad="${escapeAttr(item.id)}" type="button">수정</button>
+            <button class="text-btn danger-text" data-delete-ad="${escapeAttr(item.id)}" type="button">삭제</button>
+          </div>
+        </article>`;
+    }).join("") || `<div class="admin-empty">등록된 광고 캠페인이 없습니다.</div>`;
+
+    $$('[data-edit-ad]').forEach(btn => btn.onclick = () => editAdCampaign(btn.dataset.editAd));
+    $$('[data-delete-ad]').forEach(btn => btn.onclick = () => deleteAdCampaign(btn.dataset.deleteAd));
+  }
+
+  function editAdCampaign(id){
+    const item = adCampaigns.find(row => String(row.id) === String(id));
+    if(!item) return;
+    $("#adCampaignId").value = item.id;
+    $("#adAdvertiserName").value = item.advertiser_name || "";
+    $("#adCampaignName").value = item.campaign_name || "";
+    $("#adClickUrl").value = item.click_url || "";
+    $("#adStartsAt").value = toDateTimeLocal(item.starts_at);
+    $("#adEndsAt").value = toDateTimeLocal(item.ends_at);
+    $("#adIsActive").value = String(Boolean(item.is_active));
+    $("#adSortOrder").value = Number(item.sort_order || 0);
+    $("#adCampaignCancel")?.classList.remove("hidden");
+    setStatusText($("#adCampaignStatus"), "새 이미지를 선택하지 않으면 기존 배너가 유지됩니다.");
+    $("#adCampaignForm")?.scrollIntoView({ behavior:"smooth", block:"start" });
+  }
+
+  function resetAdCampaignForm(){
+    const form = $("#adCampaignForm");
+    form?.reset();
+    if($("#adCampaignId")) $("#adCampaignId").value = "";
+    if($("#adIsActive")) $("#adIsActive").value = "true";
+    if($("#adSortOrder")) $("#adSortOrder").value = "0";
+    $("#adCampaignCancel")?.classList.add("hidden");
+    setStatusText($("#adCampaignStatus"), "");
+    ensureAdStartDefault();
+  }
+
+  function ensureAdStartDefault(){
+    const input = $("#adStartsAt");
+    if(input && !input.value) input.value = toDateTimeLocal(new Date().toISOString());
+  }
+
+  async function saveAdCampaign(event){
+    event.preventDefault();
+    const form = event.currentTarget;
+    const status = $("#adCampaignStatus");
+    const submit = form?.querySelector('button[type="submit"]');
+    const id = String($("#adCampaignId")?.value || "").trim();
+    const previous = id ? adCampaigns.find(item => String(item.id) === id) : null;
+    const file = $("#adImageFile")?.files?.[0] || null;
+    const startsRaw = String($("#adStartsAt")?.value || "").trim();
+    const endsRaw = String($("#adEndsAt")?.value || "").trim();
+    let imageUrl = previous?.image_url || "";
+    let storagePath = previous?.storage_path || "";
+    let newStoragePath = "";
+
+    if(!file && !imageUrl){
+      setStatusText(status, "배너 이미지를 선택하세요.");
+      return;
+    }
+    if(!startsRaw){
+      setStatusText(status, "시작일시를 입력하세요.");
+      return;
+    }
+
+    if(submit) submit.disabled = true;
+    setStatusText(status, "캠페인 저장 중…");
+
+    try{
+      if(file){
+        const blob = await imageFileToJpegBlob(file, 1800, 600, 0.9);
+        newStoragePath = `ads/${crypto.randomUUID()}.jpg`;
+        const upload = await adminSb.storage.from("biteboss-assets").upload(newStoragePath, blob, {
+          contentType:"image/jpeg",
+          cacheControl:"86400",
+          upsert:false
+        });
+        if(upload.error) throw upload.error;
+        imageUrl = adminSb.storage.from("biteboss-assets").getPublicUrl(newStoragePath).data.publicUrl;
+        storagePath = newStoragePath;
+      }
+
+      const { data, error } = await adminSb.rpc("biteboss_admin_upsert_campaign", {
+        p_id:id || null,
+        p_advertiser_name:String($("#adAdvertiserName")?.value || "").trim(),
+        p_campaign_name:String($("#adCampaignName")?.value || "").trim(),
+        p_image_url:imageUrl,
+        p_storage_path:storagePath || null,
+        p_click_url:String($("#adClickUrl")?.value || "").trim(),
+        p_starts_at:new Date(startsRaw).toISOString(),
+        p_ends_at:endsRaw ? new Date(endsRaw).toISOString() : null,
+        p_is_active:String($("#adIsActive")?.value || "true") === "true",
+        p_sort_order:Number($("#adSortOrder")?.value || 0)
+      });
+      if(error) throw error;
+      if(!data?.ok) throw new Error(data?.error || "CAMPAIGN_SAVE_FAILED");
+
+      if(newStoragePath && previous?.storage_path && previous.storage_path !== newStoragePath){
+        const removed = await adminSb.storage.from("biteboss-assets").remove([previous.storage_path]);
+        if(removed.error) console.warn("Old ad asset cleanup:", removed.error);
+      }
+
+      resetAdCampaignForm();
+      setStatusText(status, "캠페인이 저장되었습니다.");
+      await loadAds();
+    }catch(error){
+      if(newStoragePath){
+        try{ await adminSb.storage.from("biteboss-assets").remove([newStoragePath]); }catch{}
+      }
+      setStatusText(status, `저장 실패 · ${error?.message || "다시 시도하세요."}`);
+    }finally{
+      if(submit) submit.disabled = false;
+    }
+  }
+
+  async function deleteAdCampaign(id){
+    const item = adCampaigns.find(row => String(row.id) === String(id));
+    if(!item) return;
+    if(!confirm(`${item.campaign_name} 캠페인을 삭제할까요?`)) return;
+    try{
+      const { data, error } = await adminSb.rpc("biteboss_admin_delete_campaign", { p_campaign_id:item.id });
+      if(error) throw error;
+      if(!data?.ok) throw new Error(data?.error || "CAMPAIGN_DELETE_FAILED");
+      if(data.storage_path){
+        const removed = await adminSb.storage.from("biteboss-assets").remove([data.storage_path]);
+        if(removed.error) console.warn("Ad asset cleanup:", removed.error);
+      }
+      if(String($("#adCampaignId")?.value || "") === String(id)) resetAdCampaignForm();
+      await loadAds();
+    }catch(error){
+      alert(error?.message || "캠페인 삭제에 실패했습니다.");
+    }
+  }
+
+  function formatAdPeriod(start, end){
+    const startText = start ? new Date(start).toLocaleDateString("ko-KR") : "즉시";
+    const endText = end ? new Date(end).toLocaleDateString("ko-KR") : "종료일 없음";
+    return `${startText} ~ ${endText}`;
+  }
+
+  function toDateTimeLocal(value){
+    if(!value) return "";
+    const date = new Date(value);
+    if(Number.isNaN(date.getTime())) return "";
+    const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+    return local.toISOString().slice(0,16);
+  }
+
+  function logLabel(type){
+    return ({
+      boss_claimed:"Boss 점령",
+      boss_released:"Boss 해제",
+      qr_rotated:"QR 재발급",
+      claim_rejected_distance:"GPS 거리 차단"
+    })[type] || type || "Event";
+  }
+
+  function categoryLabel(value){
+    return ({ restaurant:"식당", cafe:"카페", dessert:"디저트", bakery:"베이커리", fastfood:"패스트푸드", pub:"펍" })[value] || value || "매장";
+  }
+
+  function partnershipLabel(value){
+    return ({ unclaimed:"비제휴", claimed:"관리중", partnered:"정식 제휴" })[value] || "비제휴";
+  }
+
+  function partnershipClass(value){
+    if(value === "partnered") return "partnered";
+    if(value === "claimed") return "claimed";
+    return "unclaimed";
+  }
+
+  function formatRemaining(value){
+    const diff = new Date(value).getTime() - Date.now();
+    if(diff <= 0) return "만료";
+    const minutes = Math.ceil(diff / 60000);
+    if(minutes < 60) return `${minutes}분`;
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+    return `${hours}시간${rest ? ` ${rest}분` : ""}`;
+  }
+
+  function formatDate(value){
+    return value ? new Date(value).toLocaleString("ko-KR") : "-";
+  }
+
+  function imageFileToJpegBlob(file, maxWidth, maxHeight, quality){
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = reject;
+      reader.onload = () => {
+        const image = new Image();
+        image.onerror = reject;
+        image.onload = () => {
+          const scale = Math.min(1, maxWidth / image.width, maxHeight / image.height);
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round(image.width * scale));
+          canvas.height = Math.max(1, Math.round(image.height * scale));
+          canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+          canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error("Image conversion failed")), "image/jpeg", quality);
+        };
+        image.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function showFatal(error){
+    console.error(error);
+    showAuthGate();
+    setText("#adminLoginStatus", error?.message === "NOT_ADMIN" ? "BiteBoss 운영자 권한이 없습니다." : "초기화에 실패했습니다.");
+  }
+
+  function setText(selector, value){ const el = $(selector); if(el) el.textContent = String(value ?? ""); }
+  function escapeHtml(value){ return String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c])); }
+  function escapeAttr(value){ return escapeHtml(value).replace(/`/g, "&#096;"); }
+})();

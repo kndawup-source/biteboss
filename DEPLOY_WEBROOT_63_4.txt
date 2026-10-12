@@ -1,0 +1,48 @@
+BiteBoss v63.4 WEBROOT
+
+이번 버전에서 수정한 실제 오류:
+1. 웹 배포에서 존재하지 않는 /vendor/* 를 먼저 요청하던 404 제거
+   - WEB에서는 CDN을 직접 사용
+   - Capacitor native에서만 로컬 vendor 사용
+2. Supabase `sb.rpc(...).catch()` 런타임 오류 제거
+   - 비동기 try/catch 방식으로 변경
+3. Service Worker가 존재하지 않는 vendor 파일을 precache하던 문제 제거
+4. app.js 강제 버전: ?v=63.4
+5. build marker: window.__BITEBOSS_BUILD__ === "63.4"
+
+배포:
+이 ZIP의 파일을 Vercel 프로젝트의 실제 WEB ROOT에 그대로 덮어쓰세요.
+
+/index.html
+/app.js
+/styles.css
+/bootstrap.js
+/app-config.js
+/supabase.js
+/service-worker.js
+/manifest.webmanifest
+...
+
+확인:
+Console:
+window.__BITEBOSS_BUILD__
+=> "63.4"
+
+Network:
+- /vendor/leaflet.css 요청이 없어야 정상
+- /vendor/supabase.js 요청이 없어야 정상
+- /vendor/html5-qrcode.min.js 요청이 없어야 정상
+- /vendor/qrcode.min.js 요청이 없어야 정상
+- /vendor/leaflet.js 요청이 없어야 정상
+
+Console:
+`sb.rpc(...).catch is not a function` 오류가 없어야 정상.
+
+매장 상세 정상 화면:
+현재 보스
+[프로필 이미지] 하하호호
+크루명
+방어력 1
+
+Supabase:
+list_v631 / nearby_v631 / search_v631 / board_v631 = true 상태면 SQL 추가 실행 없음.

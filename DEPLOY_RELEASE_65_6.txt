@@ -1,0 +1,33 @@
+BiteBoss v65.6 RELEASE
+
+개인 순위 프로필 이미지 데이터 경로 수정.
+
+문제
+- 프론트에는 프로필 이미지 UI가 있었지만,
+  순위 응답 avatar_url이 비어 있으면 첫 글자 fallback이 표시됨.
+- 기존 biteboss_game_rankings 함수가 서버에서 구버전인 경우
+  프론트만 배포해도 개인 avatar_url을 받을 수 없음.
+
+정식 수정
+- 신규 버전 RPC: biteboss_game_rankings_v656
+- 사용자 순위 avatar_url은 오직 biteboss_profiles.avatar_url만 반환
+- 크루 프로필 이미지는 개인 순위에 절대 사용하지 않음
+- 크루 순위에서는 biteboss_organizations.avatar_url 사용
+- 로그인한 내 행은 현재 로드된 profile.avatar_url도 추가 fallback으로 사용
+- 기존 UI/점령/크루 기능 유지
+
+적용 순서
+1. Supabase SQL Editor에서
+   BITEBOSS_V65_6_PERSONAL_RANK_AVATAR.sql 실행
+2. rankings_v656_rpc = true 확인
+3. 아래 결과의 personal_avatar_url 컬럼 확인
+   - 개인 프로필 사진을 등록한 사용자는 URL이 나와야 정상
+4. v65.6 웹 배포
+
+주의
+personal_avatar_url 자체가 빈 문자열이면
+그 사용자의 biteboss_profiles.avatar_url에 개인 사진이 저장되지 않은 상태입니다.
+
+확인
+window.__BITEBOSS_BUILD__
+=> "65.6"
