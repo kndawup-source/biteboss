@@ -200,3 +200,12 @@ test("challenge HOT pulse is full-width, opens normalized store ids, and store i
   assert.match(css, /\.game-pulse-info,\.game-pulse-item\{width:100%/);
   assert.match(css, /\.store-avatar-fallback,\.occupied-store-half-fallback\{font-size:15px;font-weight:700\}/);
 });
+
+
+test("roleCopy regression: store detail defines role label before rendering", () => {
+  const src = readFileSync(new URL("../app.js", import.meta.url), "utf8");
+  assert.match(src, /const roleCopy = isBoss \? "보스" : \(isCrew \? "크루" : "방문자"\);/);
+  const def = src.indexOf("const roleCopy =");
+  const use = src.indexOf("escapeHtml(roleCopy)");
+  assert.ok(def >= 0 && use > def);
+});

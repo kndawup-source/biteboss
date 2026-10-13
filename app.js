@@ -1329,6 +1329,7 @@
     const myRole = String(game.my_role || "visitor");
     const isBoss = myRole === "boss";
     const isCrew = myRole === "crew";
+    const roleCopy = isBoss ? "보스" : (isCrew ? "크루" : "방문자");
 
     const myLevel = Math.max(1, Number(game.my_level || summary?.level || 1));
     const myLevelBonus = Math.max(0, Number(game.my_level_bonus ?? 0));
