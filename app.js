@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.19";
+  const BITEBOSS_BUILD = "75.20";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -2254,9 +2254,8 @@
           ${thumb}
           <span class="profile-record-main">
             <strong class="profile-record-title">${escapeHtml(title)}</strong>
-            <span class="profile-record-meta">${escapeHtml(storeName)} · ${escapeHtml(detail)}</span>
+            <span class="profile-record-meta profile-record-meta-with-time"><span>${escapeHtml(storeName)} · ${escapeHtml(detail)}</span><time class="profile-record-time">${escapeHtml(formatActivityTime(row.created_at))}</time></span>
           </span>
-          <time class="profile-record-time">${escapeHtml(formatActivityTime(row.created_at))}</time>
         </button>
       `;
     }).join("");
@@ -2715,7 +2714,7 @@
       items.push(`<button class="game-pulse-item is-retake" type="button" data-pulse-store="${escapeAttr(retakes[0].store_id)}" data-pulse-name="${escapeAttr(retakes[0].store_name||"")}"><span>RETAKE</span><strong>${escapeHtml(retakes[0].store_name||"빼앗긴 매장")}</strong><small>다시 가져오기</small></button>`);
     }
     if(hot[0]){
-      items.push(`<button class="game-pulse-item is-hot" type="button" data-pulse-store="${escapeAttr(hot[0].store_id)}" data-pulse-name="${escapeAttr(hot[0].store_name||"")}"><span class="hot-flame" aria-hidden="true">🔥</span><strong>${escapeHtml(hot[0].store_name||"인기 매장")}</strong><small>지금 가장 치열한 점령지</small></button>`);
+      items.push(`<button class="game-pulse-item is-hot" type="button" data-pulse-store="${escapeAttr(hot[0].store_id)}" data-pulse-name="${escapeAttr(hot[0].store_name||"")}"><span class="hot-flame" aria-hidden="true">🔥</span><strong>${escapeHtml(hot[0].store_name||"인기 매장")}</strong><small>가장 치열한 점령지</small></button>`);
     }
     if(newcomer && !items.length){
       items.push(`<div class="game-pulse-info"><span>NEW BOSS</span><strong>첫 점령 가이드</strong><small>가까운 미점령 매장부터 시작해 보세요.</small></div>`);
@@ -3162,6 +3161,26 @@
     renderRankPage();
   }
 
+  async function filterActivePlayerRankRows(rows){
+    const source = Array.isArray(rows) ? rows : [];
+    const ids = [...new Set(source.map(row => String(row?.user_id || "").trim()).filter(Boolean))];
+    if(!ids.length) return [];
+
+    try{
+      const { data, error } = await sb.rpc("biteboss_active_player_ids_v7520", { p_user_ids:ids });
+      if(error){
+        const message = String(error.message || "");
+        if(!message.includes("biteboss_active_player_ids_v7520")) console.warn("BiteBoss active ranking players:", error);
+        return source;
+      }
+      const activeIds = new Set((Array.isArray(data) ? data : []).map(value => String(value || "")));
+      return source.filter(row => activeIds.has(String(row?.user_id || "")));
+    }catch(error){
+      console.warn("BiteBoss active ranking players:", error);
+      return source;
+    }
+  }
+
   async function loadRank(){
     const box = $("#rankList");
     const myBox = $("#myRankSummary");
@@ -3255,7 +3274,7 @@
       return;
     }
 
-    const rows = Array.isArray(data) ? data : [];
+    let rows = Array.isArray(data) ? data : [];
 
     if(currentRank === "organizations"){
       setRankItems(rows.map((row,index)=>`
@@ -3310,6 +3329,8 @@
     // Ranking rows use BiteBoss's stable logical player ID.
     // A member login can run on top of a different anonymous Supabase auth ID,
     // so authUser.id must not be used as the primary identity here.
+    rows = await filterActivePlayerRankRows(rows);
+
     const myId=String(
       playerSession?.player_user_id ||
       profile?.user_id ||

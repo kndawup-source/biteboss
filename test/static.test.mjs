@@ -350,7 +350,7 @@ test('v75.18 crew pagination HOT emphasis and stable countdown typography',()=>{
   assert.match(css,/\.crew-profile-overview/);
 });
 
-test('v75.19 crew leader actions fill one row and invite detail has explicit hierarchy',()=>{
+test('v75.20 crew leader actions fill one row and invite detail has explicit hierarchy',()=>{
   const app=read('app.js').toString();
   const css=read('styles.css').toString();
   assert.match(app,/is-leader-actions/);
@@ -360,12 +360,27 @@ test('v75.19 crew leader actions fill one row and invite detail has explicit hie
   assert.match(app,/새 QR 만들기/);
 });
 
-test('v75.19 HOT banner uses circular fire emoji and no challenge-count copy',()=>{
+test('v75.20 HOT banner uses circular fire emoji and no challenge-count copy',()=>{
   const app=read('app.js').toString();
   const css=read('styles.css').toString();
   assert.match(app,/class="hot-flame"[^>]*>🔥<\/span>/);
-  assert.match(app,/지금 가장 치열한 점령지/);
+  assert.match(app,/가장 치열한 점령지/);
   assert.doesNotMatch(app,/class="game-pulse-item is-hot"[\s\S]{0,400}명 도전/);
   assert.match(css,/\.game-pulse-item\.is-hot \.hot-flame\{[\s\S]*border-radius:50%/);
   assert.match(css,/Apple Color Emoji/);
+});
+
+
+test('v75.20 challenge HOT QR battle spacing and active ranking cleanup are release-safe',()=>{
+  const html=read('index.html').toString();
+  const app=read('app.js').toString();
+  const css=read('styles.css').toString();
+  assert.match(html,/가까운 매장을 찾아 점령하세요\./);
+  assert.match(css,/\.game-pulse-item\.is-hot \.hot-flame\{[^}]*background:rgba\(0,0,0,\.12\)/);
+  assert.match(css,/\.crew-invite-qr\{[^}]*border-radius:0/);
+  assert.match(css,/\.crew-invite-qr img,\.crew-invite-qr canvas\{[^}]*border-radius:0!important/);
+  assert.match(app,/profile-record-meta-with-time/);
+  assert.match(css,/\.profile-record-meta-with-time\{[^}]*gap:2px 6px/);
+  assert.match(app,/biteboss_active_player_ids_v7520/);
+  assert.match(app,/rows = await filterActivePlayerRankRows\(rows\)/);
 });
