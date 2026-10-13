@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.7";
+  const BITEBOSS_BUILD = "75.10";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1142,8 +1142,7 @@
     if(url){
       return `<img class="${escapeAttr(className)}" src="${escapeAttr(url)}" alt="${escapeAttr(name)} 프로필" />`;
     }
-    const initial = Array.from(name)[0] || "B";
-    return `<span class="${escapeAttr(className)} boss-avatar-fallback" aria-hidden="true">${escapeHtml(initial)}</span>`;
+    return `<span class="${escapeAttr(className)} boss-avatar-fallback" aria-hidden="true"></span>`;
   }
 
   function occupiedStoreAvatarMarkup(storePhotoUrl, storeName, bossAvatarUrl, bossName, className = "store-card-photo"){
@@ -1152,7 +1151,6 @@
     const bossUrl = String(bossAvatarUrl || "").trim();
     const bossLabel = String(bossName || "보스").trim();
     const storeInitial = Array.from(storeLabel)[0] || "B";
-    const bossInitial = Array.from(bossLabel)[0] || "B";
 
     const storeHalf = storeUrl
       ? `<img src="${escapeAttr(storeUrl)}" alt="" />`
@@ -1160,7 +1158,7 @@
 
     const bossHalf = bossUrl
       ? `<img src="${escapeAttr(bossUrl)}" alt="" />`
-      : `<span class="occupied-boss-half-fallback">${escapeHtml(bossInitial)}</span>`;
+      : `<span class="occupied-boss-half-fallback" aria-hidden="true"></span>`;
 
     return `
       <span class="${escapeAttr(className)} occupied-store-avatar" role="img" aria-label="${escapeAttr(storeLabel)} · 현재 보스 ${escapeAttr(bossLabel)}">
@@ -2034,7 +2032,7 @@
         <button class="nearby-boss" type="button" data-tab="stores">
           ${boss !== "보스 없음"
             ? bossAvatarMarkup(avatar, boss, "nearby-avatar")
-            : `<span class="nearby-avatar boss-avatar-fallback" aria-hidden="true">?</span>`}
+            : `<span class="nearby-avatar boss-avatar-fallback" aria-hidden="true"></span>`}
           <strong>${escapeHtml(boss)}</strong>
           <small>${escapeHtml(label)}</small>
         </button>

@@ -225,3 +225,10 @@ test("HOT pulse remains visible for owned stores and legal pages use BiteBoss ed
   assert.match(css, /\.legal-page-shell\{/);
   assert.match(css, /\.support-faq-item\{/);
 });
+
+test("user avatar fallbacks are intentionally blank", () => {
+  const app = read("app.js").toString();
+  assert.match(app, /return `<span class="\$\{escapeAttr\(className\)\} boss-avatar-fallback" aria-hidden="true"><\/span>`;/);
+  assert.match(app, /<span class="occupied-boss-half-fallback" aria-hidden="true"><\/span>/);
+  assert.doesNotMatch(app, /nearby-avatar boss-avatar-fallback" aria-hidden="true">\?<\/span>/);
+});
