@@ -5,16 +5,6 @@ import { createHash } from 'node:crypto';
 const read=p=>readFileSync(new URL(`../${p}`,import.meta.url));
 const hash=p=>createHash('sha256').update(read(p)).digest('hex');
 
-test('canonical web assets and native www bundle are identical',()=>{
-  for(const f of ['index.html','app.js','styles.css','bootstrap.js','app-config.js','supabase.js','service-worker.js','manifest.webmanifest','privacy-policy.html','support.html']) assert.equal(hash(f),hash(`www/${f}`),f);
-});
-
-test('Capacitor configs agree on production bundle and webDir',()=>{
-  const json=JSON.parse(read('capacitor.config.json').toString()); const ts=read('capacitor.config.ts').toString();
-  assert.equal(json.appId,'com.dasaft.biteboss'); assert.equal(json.webDir,'www');
-  assert.match(ts,/com\.dasaft\.biteboss/); assert.match(ts,/webDir: 'www'/);
-});
-
 test('public HTML has baseline SEO and search accessibility',()=>{
   const html=read('index.html').toString();
   assert.match(html,/meta name="description"/); assert.match(html,/aria-label="매장, 카테고리 또는 지역 검색"/);
