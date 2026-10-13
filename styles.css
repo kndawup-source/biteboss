@@ -83,19 +83,19 @@ body.user-app #page-home{height:100dvh;min-height:0;padding:0;overflow:hidden}
 
 /* challenge */
 .challenge-page{padding-bottom:calc(104px + var(--safe-bottom))!important}
-.takeover-command{display:grid;grid-template-columns:minmax(0,1fr) 76px 86px;gap:8px;margin:0 0 16px;background:transparent;border:0;box-shadow:none}
+.takeover-command{display:grid;grid-template-columns:minmax(0,1fr) 72px 84px;gap:12px;margin:0 0 18px;background:transparent;border:0;box-shadow:none;align-items:stretch}
 .takeover-command-index{display:none}
-.takeover-command-primary{min-height:96px;padding:15px 16px;display:flex;flex-direction:column;justify-content:flex-start;background:#fff;border:0;border-radius:20px;box-shadow:0 8px 22px rgba(0,0,0,.025);min-width:0}
-.takeover-command-primary span,.takeover-command-stat span{color:#9d9da3;font-size:8px;font-weight:820;letter-spacing:.14em}
-.takeover-command-primary strong{margin-top:auto;color:#111;font-size:19px;line-height:1.05;font-weight:860;letter-spacing:-.045em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.takeover-command-primary small{margin-top:5px;color:#929298;font-size:9px;font-weight:650;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.takeover-command-stat{min-height:96px;padding:14px 7px;display:flex;flex-direction:column;background:transparent;border:0;border-radius:0;min-width:0}
-.takeover-command-stat strong{margin-top:auto;color:#111;font-size:20px;line-height:1;font-weight:860;letter-spacing:-.04em;white-space:nowrap}
-.takeover-command-stat small{margin-top:4px;color:#9b9ba1;font-size:8px;line-height:1.2;white-space:nowrap}
+.takeover-command-primary{min-height:104px;padding:17px 18px;display:flex;flex-direction:column;justify-content:flex-start;background:#fff;border:0;border-radius:20px;box-shadow:0 8px 22px rgba(0,0,0,.025);min-width:0}
+.takeover-command-primary span,.takeover-command-stat span{color:#9d9da3;font-size:9px;font-weight:820;letter-spacing:.15em}
+.takeover-command-primary strong{margin-top:auto;color:#111;font-size:18px;line-height:1.08;font-weight:860;letter-spacing:-.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.takeover-command-primary small{margin-top:6px;color:#929298;font-size:10px;font-weight:650;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.takeover-command-stat{min-height:104px;padding:16px 0 13px;display:flex;flex-direction:column;background:transparent;border:0;border-radius:0;min-width:0}
+.takeover-command-stat strong{margin-top:auto;color:#111;font-size:19px;line-height:1;font-weight:860;letter-spacing:-.035em;white-space:nowrap}
+.takeover-command-stat small{margin-top:6px;color:#9b9ba1;font-size:9px;line-height:1.2;white-space:nowrap}
 .challenge-login-note{margin:0 0 11px;color:#8c8c92;font-size:11px}
 .challenge-search{margin:0 0 18px}
-.game-pulse{margin:0 0 14px;padding:16px 18px;background:#fff}
-.game-pulse-info{display:grid;gap:4px}.game-pulse-info strong{font-size:15px}.game-pulse-info span{color:var(--muted);font-size:11px}
+.game-pulse{margin:0 0 16px;padding:0;background:transparent;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none}.game-pulse::-webkit-scrollbar{display:none}
+.game-pulse-info,.game-pulse-item{flex:0 0 auto;min-width:0;padding:11px 13px;border:0;border-radius:14px;background:#fff;text-align:left;display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 8px;align-items:center}.game-pulse-info span,.game-pulse-item span{grid-row:1/3;color:var(--accent);font-size:9px;font-weight:850;letter-spacing:.12em}.game-pulse-info strong,.game-pulse-item strong{font-size:13px;line-height:1.15;font-weight:830;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.game-pulse-info small,.game-pulse-item small{color:#929298;font-size:9px;line-height:1.2}.game-pulse-item{cursor:pointer}
 .store-list{display:grid;gap:13px}
 .store-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:5px 0;background:transparent}
 .store-card-main{display:flex;align-items:center;gap:12px;min-width:0}
@@ -273,4 +273,17 @@ body.biteboss-info-page{min-height:100dvh;background:var(--bg);color:#111}.info-
   .player-profile-stats,.crew-profile-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.player-profile-hero,.crew-profile-hero{grid-template-columns:50px minmax(0,1fr)}.player-profile-avatar,.crew-profile-hero .crew-profile-avatar{width:50px;height:50px;min-width:50px}.player-profile-hero-copy>strong{font-size:20px}
   .store-more-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.form-grid{grid-template-columns:1fr}.store-detail-gallery{grid-template-columns:1fr 1fr}
   .takeover-bottom-grid{display:grid;gap:5px}.takeover-live-mark{justify-self:start}.takeover-store-name{font-size:27px}.takeover-count{font-size:clamp(68px,25vw,128px)}
+}
+
+/* v74.5 challenge hierarchy */
+@media(max-width:430px){
+  .challenge-page .challenge-head{margin-bottom:20px}
+  .challenge-page .challenge-head h2{font-size:34px}
+  .challenge-page .challenge-head p{font-size:12px;line-height:1.45}
+  .takeover-command{grid-template-columns:minmax(0,1fr) 64px 76px;gap:9px}
+  .takeover-command-primary{min-height:98px;padding:15px 16px}
+  .takeover-command-primary strong{font-size:17px}
+  .takeover-command-stat{min-height:98px;padding-top:15px}
+  .takeover-command-stat strong{font-size:18px}
+  .challenge-search .input{height:50px;font-size:13px}
 }

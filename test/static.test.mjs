@@ -62,7 +62,8 @@ test('owned store takeover suppression persists immediately after a successful c
   assert.match(app,/locallyOwnedStoreIds\.get\(storeId\)/);
   assert.match(app,/markStoreOwnedLocally\(nearest\.store\)/);
   assert.match(app,/const next = challengeableRows\[0\] \|\| null/);
-  assert.match(app,/const next=stores\.find\(store=>!isMyBossStore\(store\)\)/);
+  assert.match(app,/if\(!items\.length\)\{\s*box\.innerHTML="";\s*box\.classList\.add\("hidden"\)/);
+  assert.doesNotMatch(app,/READY TO TAKE OVER/);
   assert.match(app,/status = protectedNow[\s\S]*내 점령지/);
   assert.match(app,/ownedByMe \? \{label:"내 점령지", cls:"owned"\}/);
   assert.match(app,/if\(ownedByMe\)\{\s*action = "";/);
