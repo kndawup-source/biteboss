@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.1";
+  const BITEBOSS_BUILD = "75.2";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -4389,7 +4389,8 @@
               class="organization-member-row"
               data-player-profile="${escapeAttr(member.user_id || "")}"
               data-player-avatar="${escapeAttr(memberAvatar)}">
-              <div>
+              ${bossAvatarMarkup(memberAvatar, memberName, "organization-member-avatar")}
+              <div class="organization-member-copy">
                 <strong>${escapeHtml(member.nickname || member.username || "사용자")}</strong>
                 <span>${escapeHtml(member.role === "leader" ? "개설자" : "멤버")}</span>
               </div>
@@ -4407,6 +4408,12 @@
             </article>
           `;
         }).join("");
+        memberBox.insertAdjacentHTML("afterbegin", `
+          <div class="organization-member-list-head">
+            <span>멤버</span>
+            <strong>${organizationMembers.length}명</strong>
+          </div>
+        `);
       }else{
         memberBox.innerHTML = "";
       }
