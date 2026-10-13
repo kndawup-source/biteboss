@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "72.2";
+  const BITEBOSS_BUILD = "73.0";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
 if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -66,6 +66,9 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
   let storeSearchTimer = null;
   let storeSearchSeq = 0;
   let presenceTimer = null;
+  let delayedTakeoverCloseTimer = null;
+  let takeoverCancelResetTimer = null;
+  const autoImportAttempts = new Map();
   let presenceBusy = false;
   let presenceBlockedReason = "";
   let takeoverUi = null;
@@ -94,27 +97,6 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
 
   init().catch(fatalError);
 
-  async function refreshNearbyOnForeground(){
-    const now = Date.now();
-    if(foregroundRefreshPromise) return foregroundRefreshPromise;
-    if(now - lastForegroundRefreshAt < 8000) return null;
-
-    lastForegroundRefreshAt = now;
-    foregroundRefreshPromise = (async () => {
-      const pos = await getPositionSafe(false, {
-        timeout:5000,
-        maximumAge:5000
-      });
-      if(pos){
-        await refreshStoresForPosition(pos, { force:true });
-      }
-      return pos;
-    })().finally(() => {
-      foregroundRefreshPromise = null;
-    });
-
-    return foregroundRefreshPromise;
-  }
 
   function syncRuntimeShell(){
     let native = false;
@@ -140,12 +122,6 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     syncViewportMetrics();
     bindUi();
     bindStaticUi();
-    document.addEventListener("visibilitychange", () => {
-      if(!document.hidden) void refreshNearbyOnForeground();
-    });
-    window.addEventListener("focus", () => {
-      void refreshNearbyOnForeground();
-    });
     setupNativeUrlListener();
     setupPushListeners();
     updateNetworkState();
@@ -236,15 +212,33 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     window.addEventListener("orientationchange", () => { syncRuntimeShell(); syncViewportMetrics(); }, { passive:true });
     window.visualViewport?.addEventListener("resize", syncViewportMetrics, { passive:true });
 
-    document.addEventListener("visibilitychange", () => {
-      if(document.hidden){
-        stopPresenceTracking();
-        return;
-      }
+    const resume = () => {
+      if(document.hidden) return;
+      startNearbyLocationWatch();
       refreshAfterForeground().catch(error => {
         console.warn("BiteBoss foreground refresh:", error);
       });
+    };
+
+    document.addEventListener("visibilitychange", () => {
+      if(document.hidden){
+        stopPresenceTracking();
+        stopNearbyLocationWatch();
+        return;
+      }
+      resume();
     });
+    window.addEventListener("focus", resume);
+    window.addEventListener("pagehide", cleanupRuntime, { once:false });
+  }
+
+  function cleanupRuntime(){
+    stopPresenceTracking();
+    stopNearbyLocationWatch();
+    if(storeSearchTimer){ clearTimeout(storeSearchTimer); storeSearchTimer = null; }
+    if(takeoverUiTimer){ clearInterval(takeoverUiTimer); takeoverUiTimer = null; }
+    if(delayedTakeoverCloseTimer){ clearTimeout(delayedTakeoverCloseTimer); delayedTakeoverCloseTimer = null; }
+    if(takeoverCancelResetTimer){ clearTimeout(takeoverCancelResetTimer); takeoverCancelResetTimer = null; }
   }
 
   async function refreshAfterForeground(){
@@ -785,9 +779,32 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
 
     await loadStoreRoles(stores);
     stores.sort(compareNearbyStores);
-    void loadGamePulse(true);
+    void loadGamePulse(false);
     renderStores();
     renderHomeNearbyBosses();
+  }
+
+  function autoImportAttemptKey(pos, radius){
+    const lat = Number(pos?.coords?.latitude);
+    const lng = Number(pos?.coords?.longitude);
+    if(!Number.isFinite(lat) || !Number.isFinite(lng)) return "";
+    return `${lat.toFixed(3)}:${lng.toFixed(3)}:${radius}`;
+  }
+
+  function shouldAttemptAutoImport(pos, radius){
+    const key = autoImportAttemptKey(pos, radius);
+    if(!key) return false;
+    const now = Date.now();
+    const last = Number(autoImportAttempts.get(key) || 0);
+    if(now - last < 120000) return false;
+    autoImportAttempts.set(key, now);
+
+    // Bound the small in-memory cache for long driving sessions.
+    if(autoImportAttempts.size > 12){
+      const oldest = [...autoImportAttempts.entries()].sort((a,b) => a[1] - b[1]).slice(0, autoImportAttempts.size - 12);
+      oldest.forEach(([oldKey]) => autoImportAttempts.delete(oldKey));
+    }
+    return true;
   }
 
   async function syncNearbyAutoStores(pos){
@@ -806,6 +823,7 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
       );
 
       if(!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+      if(!shouldAttemptAutoImport(pos, radius)) return null;
 
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 7000);
@@ -2221,7 +2239,7 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
       const elapsed=Math.max(0,(Date.now()-takeoverLastServerAt)/1000);
       const visual=Math.max(0,takeoverRemaining-elapsed);
       renderTakeoverCount(visual);
-    },100);
+    },250);
   }
 
   function renderTakeoverCount(seconds){
@@ -2278,19 +2296,34 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
   }
 
   function closeTakeoverUi(delay=0){
+    if(delayedTakeoverCloseTimer){
+      clearTimeout(delayedTakeoverCloseTimer);
+      delayedTakeoverCloseTimer = null;
+    }
+
     const run=()=>{
       $("#takeoverScreen")?.classList.add("hidden");
       document.body.classList.remove("takeover-active");
       if(takeoverUiTimer){ clearInterval(takeoverUiTimer); takeoverUiTimer=null; }
       takeoverUi=null; takeoverRemaining=0; takeoverRequired=0; takeoverLastServerAt=0;
+      delayedTakeoverCloseTimer = null;
     };
-    if(delay>0) setTimeout(run,delay); else run();
+
+    if(delay>0){
+      delayedTakeoverCloseTimer = window.setTimeout(run, delay);
+    }else{
+      run();
+    }
   }
 
   function cancelTakeoverUi(){
     takeoverCancelledLocally=true;
     closeTakeoverUi();
-    setTimeout(()=>{takeoverCancelledLocally=false;},Math.max(5000,Number(config.gps_presence_ping_seconds||10)*1000));
+    if(takeoverCancelResetTimer) clearTimeout(takeoverCancelResetTimer);
+    takeoverCancelResetTimer = window.setTimeout(()=>{
+      takeoverCancelledLocally=false;
+      takeoverCancelResetTimer=null;
+    },Math.max(5000,Number(config.gps_presence_ping_seconds||10)*1000));
     toast("점령을 취소했습니다.");
   }
 

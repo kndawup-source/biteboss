@@ -1,15 +1,15 @@
-const CACHE_NAME = "biteboss-v72.7";
+const CACHE_NAME = "biteboss-v73.0";
 const SHELL = [
   "./",
-  "./index.html?v=72.7",
-  "./styles.css?v=72.7",
-  "./bootstrap.js?v=72.7",
-  "./app.js?v=72.7",
-  "./app-config.js?v=72.7",
-  "./supabase.js?v=72.7",
-  "./manifest.webmanifest?v=72.7",
-  "./privacy-policy.html?v=72.7",
-  "./support.html?v=72.7"
+  "./index.html?v=73.0",
+  "./styles.css?v=73.0",
+  "./bootstrap.js?v=73.0",
+  "./app.js?v=73.0",
+  "./app-config.js?v=73.0",
+  "./supabase.js?v=73.0",
+  "./manifest.webmanifest?v=73.0",
+  "./privacy-policy.html?v=73.0",
+  "./support.html?v=73.0"
 ];
 
 self.addEventListener("install", event => {
@@ -41,6 +41,12 @@ self.addEventListener("fetch", event => {
   const url = new URL(request.url);
   if(url.origin !== self.location.origin) return;
 
+  // Serverless/API responses are live data and must never be satisfied from the app-shell cache.
+  if(url.pathname.startsWith("/api/")){
+    event.respondWith(fetch(request));
+    return;
+  }
+
   const isNavigation = request.mode === "navigate";
   const isCriticalAsset = /\/(?:app\.js|styles\.css|index\.html)(?:\?|$)/.test(url.pathname + url.search);
 
@@ -55,7 +61,7 @@ self.addEventListener("fetch", event => {
           return response;
         })
         .catch(() =>
-          caches.match(request).then(hit => hit || caches.match("./index.html?v=72.7") || caches.match("./index.html"))
+          caches.match(request).then(hit => hit || caches.match("./index.html?v=73.0") || caches.match("./index.html"))
         )
     );
     return;
@@ -65,8 +71,10 @@ self.addEventListener("fetch", event => {
     caches.match(request).then(hit => {
       const network = fetch(request)
         .then(response => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
+          if(response.ok){
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(request, copy)).catch(() => {});
+          }
           return response;
         })
         .catch(() => hit);
