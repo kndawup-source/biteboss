@@ -1,22 +1,22 @@
-const CACHE_NAME = "biteboss-v75.17";
+const CACHE_NAME = "biteboss-v75.19";
 const SHELL = [
   "./",
-  "./index.html?v=75.17",
-  "./styles.css?v=75.17",
-  "./bootstrap.js?v=75.17",
-  "./app.js?v=75.17",
-  "./app-config.js?v=75.17",
-  "./supabase.js?v=75.17",
-  "./ui-helpers.js?v=75.17",
-  "./manifest.webmanifest?v=75.17",
-  "./privacy-policy.html?v=75.17",
-  "./support.html?v=75.17",
-  "./admin.html?v=75.17",
-  "./admin.css?v=75.17",
-  "./admin.js?v=75.17",
-  "./store-admin.html?v=75.17",
-  "./store-admin.css?v=75.17",
-  "./store-admin.js?v=75.17"
+  "./index.html?v=75.19",
+  "./styles.css?v=75.19",
+  "./bootstrap.js?v=75.19",
+  "./app.js?v=75.19",
+  "./app-config.js?v=75.19",
+  "./supabase.js?v=75.19",
+  "./ui-helpers.js?v=75.19",
+  "./manifest.webmanifest?v=75.19",
+  "./privacy-policy.html?v=75.19",
+  "./support.html?v=75.19",
+  "./admin.html?v=75.19",
+  "./admin.css?v=75.19",
+  "./admin.js?v=75.19",
+  "./store-admin.html?v=75.19",
+  "./store-admin.css?v=75.19",
+  "./store-admin.js?v=75.19"
 ];
 
 self.addEventListener("install", event => {
@@ -68,7 +68,7 @@ self.addEventListener("fetch", event => {
           return response;
         })
         .catch(() =>
-          caches.match(request).then(hit => hit || caches.match("./index.html?v=75.17") || caches.match("./index.html"))
+          caches.match(request).then(hit => hit || caches.match("./index.html?v=75.19") || caches.match("./index.html"))
         )
     );
     return;

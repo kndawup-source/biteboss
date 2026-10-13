@@ -60,13 +60,13 @@
 
     await loadCss(deps.leafletCss);
 
-    await loadScript("./app-config.js?v=75.17");
+    await loadScript("./app-config.js?v=75.19");
     await loadScript(deps.supabase);
     await loadScript(deps.scanner);
     await loadScript(deps.qrcode);
     await loadScript(deps.leaflet);
-    await loadScript("./supabase.js?v=75.17");
-    await loadScript("./ui-helpers.js?v=75.17");
-    await loadScript("./app.js?v=75.17");
+    await loadScript("./supabase.js?v=75.19");
+    await loadScript("./ui-helpers.js?v=75.19");
+    await loadScript("./app.js?v=75.19");
   })().catch(fatal);
 })();

@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.17";
+  const BITEBOSS_BUILD = "75.19";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -2715,7 +2715,7 @@
       items.push(`<button class="game-pulse-item is-retake" type="button" data-pulse-store="${escapeAttr(retakes[0].store_id)}" data-pulse-name="${escapeAttr(retakes[0].store_name||"")}"><span>RETAKE</span><strong>${escapeHtml(retakes[0].store_name||"빼앗긴 매장")}</strong><small>다시 가져오기</small></button>`);
     }
     if(hot[0]){
-      items.push(`<button class="game-pulse-item is-hot" type="button" data-pulse-store="${escapeAttr(hot[0].store_id)}" data-pulse-name="${escapeAttr(hot[0].store_name||"")}"><span>HOT</span><strong>${escapeHtml(hot[0].store_name||"인기 매장")}</strong><small>${Number(hot[0].challenges_24h||0)}명 도전</small></button>`);
+      items.push(`<button class="game-pulse-item is-hot" type="button" data-pulse-store="${escapeAttr(hot[0].store_id)}" data-pulse-name="${escapeAttr(hot[0].store_name||"")}"><span class="hot-flame" aria-hidden="true">🔥</span><strong>${escapeHtml(hot[0].store_name||"인기 매장")}</strong><small>지금 가장 치열한 점령지</small></button>`);
     }
     if(newcomer && !items.length){
       items.push(`<div class="game-pulse-info"><span>NEW BOSS</span><strong>첫 점령 가이드</strong><small>가까운 미점령 매장부터 시작해 보세요.</small></div>`);
@@ -3191,7 +3191,7 @@
         return;
       }
       const rows=Array.isArray(data)?data:[];
-      setRankItems(rows.map((row,index)=>`<article class="rank-card territory-rank-card"><span class="rank-number">${index+1}</span><div><strong>${escapeHtml([row.city,row.district].filter(Boolean).join(" ")||"지역")}</strong><div class="meta">${escapeHtml(row.crew_name||"크루")} · 최근 ${Number(config.season_days||30)}일</div></div><div class="rank-result"><b>${Number(row.store_count||0)}</b><span>점령</span></div></article>`), "이번 시즌 점령 기록이 아직 없습니다.");
+      setRankItems(rows.map((row,index)=>`<article class="rank-card territory-rank-card season-rank-card"><span class="rank-number">${index+1}</span><div><strong>${escapeHtml([row.city,row.district].filter(Boolean).join(" ")||"지역")}</strong><div class="meta">${escapeHtml(row.crew_name||"크루")} · 최근 ${Number(config.season_days||30)}일</div></div><div class="rank-result"><b>${Number(row.store_count||0)}</b><span>점령</span></div></article>`), "이번 시즌 점령 기록이 아직 없습니다.");
       return;
     }
 
@@ -3587,20 +3587,22 @@
         actionHtml = `<p class="crew-join-state">${escapeHtml(label)}</p>`;
       }
 
-      openModal("크루 가입", `
-        <div class="crew-join-preview">
-          <span class="crew-kicker">CREW INVITE</span>
-          <strong>${escapeHtml(data.crew_name || "Crew")}</strong>
-          <p>Founder ${escapeHtml(founder)}</p>
-          <div class="crew-join-stats">
-            <div><span>Members</span><b>${memberCount}</b></div>
-            <div><span>Territories</span><b>${territoryCount}</b></div>
+      openModal("크루 초대", `
+        <div class="crew-join-preview crew-invite-detail">
+          <div class="crew-invite-detail-head">
+            <span class="crew-kicker">크루 초대</span>
+            <strong>${escapeHtml(data.crew_name || "크루")}</strong>
+            <p>개설자 ${escapeHtml(founder)}</p>
+          </div>
+          <div class="crew-join-stats" aria-label="크루 정보">
+            <div><span>멤버</span><b>${memberCount}</b></div>
+            <div><span>점령지</span><b>${territoryCount}</b></div>
           </div>
           <div class="crew-invite-facts">
-            <span>만료 ${escapeHtml(expires)}</span>
-            <span>${remaining} joins left</span>
+            <span>초대 만료 ${escapeHtml(expires)}</span>
+            <span>남은 참여 ${remaining}명</span>
           </div>
-          ${actionHtml}
+          <div class="crew-invite-detail-actions">${actionHtml}</div>
         </div>
       `);
 
@@ -4469,9 +4471,13 @@
       }
     }
 
+    const crewActions = $(".crew-actions");
+    const isCrewLeader = Boolean(hasOrg && organization?.is_leader);
+    crewActions?.classList.toggle("is-leader-actions", isCrewLeader);
+
     const invite = $("#inviteOrganizationMemberBtn");
     if(invite){
-      const canInvite = Boolean(hasOrg && organization?.is_leader);
+      const canInvite = isCrewLeader;
       invite.classList.toggle("hidden", !canInvite);
       invite.disabled = !canInvite;
       invite.textContent = "QR로 초대";
@@ -5347,8 +5353,8 @@
       shell.innerHTML = `
         <div class="crew-invite-head">
           <span>크루 초대</span>
-          <strong>${escapeHtml(organization?.name || data.crew_name || "Crew")}</strong>
-          <p>QR을 스캔하면 크루 정보를 확인한 뒤 가입할 수 있습니다.</p>
+          <strong>${escapeHtml(organization?.name || data.crew_name || "크루")}</strong>
+          <p>QR을 공유하면 상대방이 크루 정보를 확인한 뒤 가입할 수 있습니다.</p>
         </div>
 
         <div class="crew-invite-qr-wrap">
@@ -5356,25 +5362,25 @@
         </div>
 
         <div class="crew-invite-facts">
-          <span>Expires ${escapeHtml(expires)}</span>
+          <span>만료까지 ${escapeHtml(expires)}</span>
           <span>${uses}/${maxUses}명 참여</span>
         </div>
 
         <div class="crew-invite-actions">
-          <button id="crewInviteShareBtn" class="primary-btn" type="button">QR 공유</button>
-          <button id="crewInviteNewBtn" class="secondary-btn" type="button">새 QR</button>
-          <button id="crewInviteRevokeBtn" class="text-btn danger-text" type="button">QR 폐기</button>
+          <button id="crewInviteShareBtn" class="primary-btn crew-invite-share" type="button">QR 공유</button>
+          <button id="crewInviteNewBtn" class="secondary-btn" type="button">새 QR 만들기</button>
+          <button id="crewInviteRevokeBtn" class="secondary-btn danger-text" type="button">QR 폐기</button>
         </div>
 
         <details class="crew-id-invite">
-          <summary>ID로 초대</summary>
-          <div class="form-grid organization-invite-form">
+          <summary>ID로 직접 초대</summary>
+          <div class="organization-invite-form">
             <label>
               사용자 ID
-              <input id="organizationInviteUsername" class="input" maxlength="32" autocapitalize="none" autocomplete="off" placeholder="username" />
+              <input id="organizationInviteUsername" class="input" maxlength="32" autocapitalize="none" autocomplete="off" placeholder="사용자 ID" />
             </label>
-            <p>ID 초대는 보조 수단입니다. 상대방이 수락해야 가입됩니다.</p>
-            <button id="organizationInviteSubmit" class="secondary-btn" type="button">ID 초대 보내기</button>
+            <p>ID 초대는 보조 수단입니다. 상대방이 초대를 수락해야 가입됩니다.</p>
+            <button id="organizationInviteSubmit" class="secondary-btn wide" type="button">초대 보내기</button>
           </div>
         </details>
       `;

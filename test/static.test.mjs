@@ -285,7 +285,7 @@ test('global capture cooldown blocks the next store for 60 minutes',()=>{
   assert.match(admin,/name="capture_cooldown_minutes"/);
 });
 
-test('v75.17 public crew detail exposes members but limits other-crew territory to three',()=>{
+test('v75.18 public crew detail exposes members but limits other-crew territory to three',()=>{
   const app=read('app.js').toString();
   assert.match(app,/publicTerritories = sortedTerritories\.slice\(0,3\)/);
   assert.match(app,/data-crew-detail-tab="territory"/);
@@ -293,7 +293,7 @@ test('v75.17 public crew detail exposes members but limits other-crew territory 
   assert.match(app,/다른 크루의 점령지는 최근 3곳만 공개됩니다/);
 });
 
-test('v75.17 notification center has structured unread rows and pagination',()=>{
+test('v75.18 notification center has structured unread rows and pagination',()=>{
   const app=read('app.js').toString();
   const css=read('styles.css').toString();
   assert.match(app,/NOTIFICATION_PAGE_SIZE = 8/);
@@ -304,14 +304,14 @@ test('v75.17 notification center has structured unread rows and pagination',()=>
   assert.match(css,/\.notification-inbox-row\.is-unread/);
 });
 
-test('v75.17 challenge and ranking pages use compact bottom spacing',()=>{
+test('v75.18 challenge and ranking pages use compact bottom spacing',()=>{
   const css=read('styles.css').toString();
   assert.match(css,/#page-stores,#page-rank\{padding-bottom:calc\(82px \+ var\(--safe-bottom\)\)\}/);
   assert.match(css,/\.challenge-page\{padding-bottom:14px!important\}/);
   assert.match(css,/#page-rank \.inner-page\{padding-bottom:14px\}/);
 });
 
-test('v75.17 new members receive Korean BiteBoss-style suggested nicknames',()=>{
+test('v75.18 new members receive Korean BiteBoss-style suggested nicknames',()=>{
   const app=read('app.js').toString();
   const helpers=read('ui-helpers.js').toString();
   assert.match(app,/generateDefaultNickname\(\)/);
@@ -320,14 +320,14 @@ test('v75.17 new members receive Korean BiteBoss-style suggested nicknames',()=>
   assert.match(helpers,/불주먹/);
 });
 
-test('v75.17 player ranking separates nickname from crew and BOSS metadata',()=>{
+test('v75.18 player ranking separates nickname from crew and BOSS metadata',()=>{
   const app=read('app.js').toString();
   assert.match(app,/const rankMeta=\[crewName, `BOSS \$\{Number\(row\.boss_count \|\| 0\)\}`\]/);
   assert.match(app,/<strong>\$\{escapeHtml\(playerName\)\}<\/strong>/);
   assert.doesNotMatch(app,/const identity=\[playerName,row\.organization_name\]/);
 });
 
-test('v75.17 crew member management actions do not fall through to profile row clicks',()=>{
+test('v75.18 crew member management actions do not fall through to profile row clicks',()=>{
   const app=read('app.js').toString();
   assert.match(app,/actionButton = event\.target\.closest\("\[data-kick-member\],\[data-transfer-leader\]"\)/);
   assert.match(app,/event\.stopPropagation\(\)/);
@@ -336,7 +336,7 @@ test('v75.17 crew member management actions do not fall through to profile row c
   assert.match(app,/biteboss_transfer_organization_leadership/);
 });
 
-test('v75.17 crew pagination HOT emphasis and stable countdown typography',()=>{
+test('v75.18 crew pagination HOT emphasis and stable countdown typography',()=>{
   const app=read('app.js').toString();
   const css=read('styles.css').toString();
   assert.match(app,/const CREW_PAGE_SIZE = 8/);
@@ -344,8 +344,28 @@ test('v75.17 crew pagination HOT emphasis and stable countdown typography',()=>{
   assert.match(app,/data-crew-member-pagination/);
   assert.match(app,/pageSlice\(members, memberPage, CREW_PAGE_SIZE\)/);
   assert.match(app,/isOwnOrganization \? pageSlice\(source, territoryPage, CREW_PAGE_SIZE\)/);
-  assert.match(css,/\.game-pulse-item\.is-hot\{background:var\(--accent\);color:#fff\}/);
+  assert.match(css,/\.game-pulse-item\.is-hot\{[^}]*background:var\(--accent\);[^}]*color:#fff/);
   assert.match(css,/\.takeover-count\{[^}]*font-variant-numeric:tabular-nums[^}]*font-feature-settings:"tnum" 1/);
   assert.match(css,/\.takeover-count\{[^}]*letter-spacing:\.015em/);
   assert.match(css,/\.crew-profile-overview/);
+});
+
+test('v75.19 crew leader actions fill one row and invite detail has explicit hierarchy',()=>{
+  const app=read('app.js').toString();
+  const css=read('styles.css').toString();
+  assert.match(app,/is-leader-actions/);
+  assert.match(css,/\.crew-actions\.is-leader-actions\{[\s\S]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(app,/crew-invite-detail/);
+  assert.match(app,/만료까지/);
+  assert.match(app,/새 QR 만들기/);
+});
+
+test('v75.19 HOT banner uses circular fire emoji and no challenge-count copy',()=>{
+  const app=read('app.js').toString();
+  const css=read('styles.css').toString();
+  assert.match(app,/class="hot-flame"[^>]*>🔥<\/span>/);
+  assert.match(app,/지금 가장 치열한 점령지/);
+  assert.doesNotMatch(app,/class="game-pulse-item is-hot"[\s\S]{0,400}명 도전/);
+  assert.match(css,/\.game-pulse-item\.is-hot \.hot-flame\{[\s\S]*border-radius:50%/);
+  assert.match(css,/Apple Color Emoji/);
 });
