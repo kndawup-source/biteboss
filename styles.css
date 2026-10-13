@@ -7924,7 +7924,7 @@ body.user-app .crew-profile-detail .organization-detail-section{
 }
 
 /* ============================================================
-   BiteBoss v72.1 — Editorial game system
+   BiteBoss v72.2 — Editorial game system
    Canonical user UI. Paper / ink / signal red. No glass, no gradients,
    no decorative cards. The interface is a scoreboard, not a dashboard.
    ============================================================ */
@@ -8490,7 +8490,7 @@ body.takeover-active{overflow:hidden;touch-action:none}
 
 
 /* ============================================================
-   BiteBoss v72.1 — soft mono card redesign inspired by user refs
+   BiteBoss v72.2 — soft mono card redesign inspired by user refs
    ============================================================ */
 body.user-app{
   --bb-soft-bg:#efefee;
@@ -8874,4 +8874,188 @@ body.user-app .capture-board{
   body.user-app .takeover-command-stat{display:grid!important;grid-template-columns:1fr auto!important;align-items:end!important}
   body.user-app .boss-home-runtime{grid-template-columns:1fr!important}
   body.user-app .bottom-nav{height:68px!important}
+}
+
+
+/* ============================================================
+   BiteBoss v72.2 — overflow fix + tighter reference-tone cleanup
+   ============================================================ */
+body.user-app .rank-tabs{
+  display:flex!important;
+  flex-wrap:nowrap!important;
+  gap:10px!important;
+  margin:18px 0 14px!important;
+  padding:0 2px 4px!important;
+  border-bottom:0!important;
+  overflow-x:auto!important;
+}
+body.user-app .rank-tabs .chip{
+  flex:0 0 auto!important;
+  min-height:36px!important;
+  padding:0 14px!important;
+  border-radius:999px!important;
+  border:1px solid var(--bb-soft-line)!important;
+  background:var(--bb-card)!important;
+  color:#7c7c75!important;
+}
+body.user-app .rank-tabs .chip.active{
+  background:#111!important;
+  color:#fff!important;
+  border-color:#111!important;
+}
+body.user-app #page-profile.is-guest .profile-guest-info,
+body.user-app .profile-guest-info{
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  gap:12px!important;
+  margin-top:16px!important;
+  border:0!important;
+}
+body.user-app #page-profile.is-guest .profile-guest-info>div,
+body.user-app .profile-guest-info>div{
+  min-height:108px!important;
+  padding:18px!important;
+  border:1px solid var(--bb-soft-line)!important;
+  border-radius:26px!important;
+  background:var(--bb-card)!important;
+  box-shadow:0 8px 26px rgba(0,0,0,.03)!important;
+}
+body.user-app #page-profile.is-guest .profile-guest-info>div+div,
+body.user-app .profile-guest-info>div+div{
+  padding-left:18px!important;
+  border-left:1px solid var(--bb-soft-line)!important;
+}
+body.user-app #page-profile.is-guest .profile-guest-info span,
+body.user-app .profile-guest-info span{color:#91918a!important;font-size:11px!important;letter-spacing:-.01em!important}
+body.user-app #page-profile.is-guest .profile-guest-info strong,
+body.user-app .profile-guest-info strong{color:#111!important;font-size:18px!important;line-height:1.15!important;letter-spacing:-.03em!important}
+body.user-app .organization-panel,
+body.user-app .profile-settings,
+body.user-app .territory-map-section,
+body.user-app .my-rank-summary,
+body.user-app .visit-summary,
+body.user-app .profile-game-stats,
+body.user-app .visit-log,
+body.user-app .store-detail{
+  margin-top:16px!important;
+}
+body.user-app .organization-panel{padding:20px!important;border-top:0!important;border-bottom:0!important}
+body.user-app .organization-panel-head{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) auto!important;
+  gap:12px!important;
+  align-items:start!important;
+}
+body.user-app .organization-panel-head strong{
+  white-space:normal!important;
+  overflow:visible!important;
+  text-overflow:clip!important;
+  font-size:28px!important;
+  color:#111!important;
+  line-height:.95!important;
+}
+body.user-app .organization-panel-head span,
+body.user-app .organization-panel-head small{color:#909089!important}
+body.user-app .organization-stats{
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  gap:12px!important;
+  margin-top:14px!important;
+  border-top:0!important;
+}
+body.user-app .organization-stats article{
+  padding:18px!important;
+  border:1px solid var(--bb-soft-line)!important;
+  border-radius:24px!important;
+  background:var(--bb-card-2)!important;
+}
+body.user-app .organization-stats b{font-size:30px!important;color:#111!important}
+body.user-app .organization-stats span{font-size:12px!important;color:#94948d!important}
+body.user-app .profile-settings{
+  display:grid!important;
+  gap:10px!important;
+  border-top:0!important;
+}
+body.user-app .profile-setting-row{
+  min-height:60px!important;
+  padding:0 20px!important;
+  border:1px solid var(--bb-soft-line)!important;
+  border-radius:22px!important;
+  background:var(--bb-card)!important;
+  color:#111!important;
+}
+body.user-app .profile-setting-row>span:last-child{color:#96968f!important}
+body.user-app .page-meter-track{height:10px!important;border-radius:999px!important;background:#e6e6e1!important;overflow:hidden!important}
+body.user-app .page-meter-track span{background:#111!important;border-radius:999px!important}
+body.user-app .territory-map-section{
+  padding:20px!important;
+  border:1px solid var(--bb-soft-line)!important;
+  border-radius:28px!important;
+  background:var(--bb-card)!important;
+}
+body.user-app .territory-map-head>span,
+body.user-app .territory-map-legend,
+body.user-app .territory-map-head>strong{color:#8f8f88!important}
+body.user-app .territory-map{border-radius:22px!important;overflow:hidden!important;border:1px solid var(--bb-soft-line)!important}
+body.user-app .takeover-screen{background:#efefee!important;color:#111!important}
+body.user-app .takeover-screen-inner{
+  width:min(100%,720px)!important;
+  margin:0 auto!important;
+  min-height:100dvh!important;
+  padding:max(18px,env(safe-area-inset-top)) 18px max(18px,env(safe-area-inset-bottom))!important;
+}
+body.user-app .takeover-topline,
+body.user-app .takeover-count-rule{border-color:#d7d7d1!important}
+body.user-app .takeover-topline{color:#8c8c85!important}
+body.user-app .takeover-topline span:last-child{color:#111!important}
+body.user-app .takeover-topline span:last-child::before{background:#111!important}
+body.user-app .takeover-eyebrow,
+body.user-app .takeover-status,
+body.user-app .takeover-live-mark,
+body.user-app .takeover-signal-row{color:#8d8d86!important}
+body.user-app .takeover-store-name,
+body.user-app .takeover-count{color:#111!important}
+body.user-app .takeover-progress{height:10px!important;background:#dfdfda!important;border-radius:999px!important;overflow:hidden!important}
+body.user-app .takeover-progress span{background:#111!important}
+body.user-app .takeover-cancel{
+  width:100%!important;
+  height:56px!important;
+  border-radius:24px!important;
+  border:0!important;
+  background:#111!important;
+  color:#fff!important;
+  font-size:15px!important;
+  font-weight:850!important;
+}
+body.user-app .bottom-nav.bottom-nav-four{grid-template-columns:repeat(4,1fr)!important}
+body.user-app .nav-btn{min-width:0!important}
+body.user-app .nav-label{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body.user-app .store-card-main{gap:14px!important}
+body.user-app .store-card-copy{padding-right:8px!important}
+body.user-app .store-card-copy>strong,
+body.user-app .organization-panel-head strong,
+body.user-app .profile-identity h3,
+body.user-app .rank-card strong,
+body.user-app .store-detail-head h3,
+body.user-app .store-detail-head strong,
+body.user-app .modal-card h3,
+body.user-app .inner-head h2{overflow-wrap:anywhere!important;word-break:keep-all}
+@media (max-width:520px){
+  body.user-app .inner-page, body.user-app .home-dashboard{padding-left:16px!important;padding-right:16px!important}
+  body.user-app .inner-head h2,
+  body.user-app .challenge-head h2,
+  body.user-app .rank-head h2,
+  body.user-app .profile-head h2,
+  body.user-app .store-head h2{font-size:34px!important}
+  body.user-app .boss-home-hook{font-size:34px!important;margin-left:16px!important;margin-right:16px!important}
+  body.user-app .boss-home-actions{margin-left:16px!important;margin-right:16px!important}
+  body.user-app .boss-home-runtime{margin-left:16px!important;margin-right:16px!important;padding:18px!important;border-radius:28px!important}
+  body.user-app #page-profile.is-guest .profile-guest-info,
+  body.user-app .profile-guest-info{grid-template-columns:1fr!important}
+  body.user-app .profile-stat-grid,
+  body.user-app .organization-stats{grid-template-columns:1fr 1fr!important}
+  body.user-app .store-card{grid-template-columns:minmax(0,1fr)!important}
+  body.user-app .store-scan-btn,
+  body.user-app .primary-btn,
+  body.user-app .secondary-btn{width:100%!important}
+  body.user-app .bottom-nav{left:10px!important;right:10px!important;bottom:8px!important}
 }
