@@ -1,0 +1,70 @@
+/* BiteBoss Store Admin — light editorial console */
+body.store-admin-app{min-height:100dvh;background:#f1f1f3;color:#111}
+.store-admin-app .auth-gate{min-height:100dvh;display:grid;place-items:center;padding:24px}
+.store-admin-app .auth-panel{width:min(100%,420px);display:grid;gap:12px;padding:24px;border-radius:24px;background:#fff;box-shadow:0 16px 40px rgba(0,0,0,.04)}
+.store-admin-app .auth-panel>span{color:#a0a0a6;font-size:8px;font-weight:850;letter-spacing:.14em}
+.store-admin-app .auth-panel h1{margin:0;font-size:28px;line-height:1;font-weight:860;letter-spacing:-.045em}
+.store-admin-app .auth-panel p{margin:0 0 6px;color:#8f8f96;font-size:11px;line-height:1.5}
+.store-admin-app .auth-panel small{min-height:18px;color:#8f8f96;font-size:10px}
+.store-admin-app .auth-switch{justify-self:start;margin-top:2px}
+
+.store-admin-shell{min-height:100dvh;display:block}
+.store-admin-side{position:sticky;top:0;z-index:60;width:100%;background:rgba(255,255,255,.96);border-bottom:1px solid #e7e7ea;backdrop-filter:blur(12px)}
+.store-admin-brand{height:58px;display:flex;align-items:baseline;gap:8px;padding:0 18px}
+.store-admin-brand span{color:#a0a0a6;font-size:8px;font-weight:850;letter-spacing:.14em}
+.store-admin-brand h1{margin:0;font-size:17px;font-weight:860;letter-spacing:-.035em}
+.store-admin-brand b{margin-left:auto;min-width:0;overflow:hidden;color:#77777d;font-size:10px;font-weight:760;text-overflow:ellipsis;white-space:nowrap}
+.store-selector-row{padding:0 16px 8px}.store-selector{height:40px;border-radius:13px;background:#f4f4f6;font-size:11px}
+.store-nav-scroll{display:flex;align-items:center;gap:18px;padding:0 16px;overflow-x:auto;scrollbar-width:none}.store-nav-scroll::-webkit-scrollbar{display:none}
+.nav-group-label{display:none}
+.store-admin-nav{position:relative;flex:0 0 auto;min-height:44px;color:#96969c;font-size:10px;font-weight:820;white-space:nowrap}
+.store-admin-nav.active{color:#111}.store-admin-nav.active::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;border-radius:2px;background:#d72f38}
+.store-admin-side .admin-side-actions{display:none}
+
+.store-admin-main{width:min(100%,860px);margin:0 auto;padding:26px 18px calc(48px + env(safe-area-inset-bottom))}
+.store-admin-page{display:none}.store-admin-page.active{display:block}
+.store-admin-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin:0 0 22px}
+.store-admin-head .eyebrow{display:block;margin:0 0 6px;color:#a5a5ab;font-size:7px;font-weight:850;letter-spacing:.14em;text-transform:uppercase}
+.store-admin-head h2{margin:0;color:#111;font-size:27px;line-height:1;font-weight:860;letter-spacing:-.045em}
+.store-admin-head p{margin:7px 0 0;color:#929298;font-size:10.5px;line-height:1.45}
+.store-chip{flex:0 0 auto;margin-top:2px;background:#fff;color:#77777d;box-shadow:0 0 0 1px rgba(17,17,19,.04)}
+
+.today-status{display:grid;gap:8px;margin-bottom:22px}
+.today-primary,.today-numbers>div,.store-impact-grid>div,.store-subsection,.store-panel,.benefit-verify,.today-secondary{background:#fff;border-radius:18px;box-shadow:0 8px 22px rgba(0,0,0,.02)}
+.today-primary{padding:17px}.today-primary>span{color:#99999f;font-size:8px;font-weight:800}.today-primary strong{display:block;margin-top:7px;font-size:21px;line-height:1;font-weight:860;letter-spacing:-.035em}.today-primary p{margin:7px 0 0;color:#9b9ba1;font-size:9px}
+.today-numbers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.today-numbers>div{padding:14px 15px}.today-numbers strong{display:block;font-size:18px;line-height:1;font-weight:850}.today-numbers span{display:block;margin-top:6px;color:#9b9ba1;font-size:8px}
+
+.store-impact{margin:0 0 22px}.store-section-head{align-items:flex-start;margin-bottom:10px}.store-section-head h3{font-size:13px}.store-section-head p{margin:4px 0 0;color:#99999f;font-size:9px;line-height:1.4}.impact-period{width:auto;min-width:72px;height:36px;border-radius:12px;font-size:10px}
+.store-impact-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.store-impact-grid>div{padding:14px}.store-impact-grid span{display:block;color:#99999f;font-size:8px}.store-impact-grid strong{display:block;margin-top:7px;font-size:18px;line-height:1;font-weight:850}.store-impact-grid small{display:block;margin-top:5px;color:#a0a0a6;font-size:8px}
+
+.today-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 22px}.today-actions .text-btn{grid-column:1/-1;justify-self:start;padding:6px 2px}
+.today-secondary{padding:15px 16px;margin-bottom:22px}.quick-link-list{display:grid}.quick-link{min-height:48px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;text-align:left;border-top:1px solid #f0f0f2;color:#111;font-size:11px;font-weight:760}.quick-link:first-child{border-top:0}.quick-link b{color:#b0b0b5;font-size:15px;font-weight:600}
+
+.store-subsection,.store-panel,.benefit-verify{padding:16px;margin:0 0 12px}.store-form{display:grid;grid-template-columns:1fr;gap:12px}.store-form label{display:grid;gap:6px;color:#77777d;font-size:9px;font-weight:700}.store-form .wide{grid-column:1}.store-textarea{min-height:96px}.photo-action-row,.store-action-row{display:flex;flex-wrap:wrap;gap:8px}.visually-hidden-file{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%)}
+.store-photo-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:12px}.store-photo-grid img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:12px;background:#ececef}
+.store-owner-card,.store-timeline,.store-list{display:grid;gap:7px}.store-timeline>*{background:#fff;border-radius:14px;padding:12px}
+.benefit-pass-form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}.benefit-pass-result{margin-top:10px;font-size:10px;color:#77777d}
+.qr-display{display:grid;place-items:center;gap:16px}.qr-placeholder{width:min(100%,240px);height:auto;border-radius:14px;background:#fff}.qr-meta{width:100%;min-width:0}.qr-meta strong{font-size:12px}.qr-meta p{overflow-wrap:anywhere;color:#8f8f96;font-size:9px}
+.inline-status{margin-top:8px;color:#8f8f96;font-size:9px}
+
+@media(min-width:760px){
+  .store-admin-shell{display:grid;grid-template-columns:210px minmax(0,1fr)}
+  .store-admin-side{height:100dvh;border-right:1px solid #e7e7ea;border-bottom:0;background:#fff}
+  .store-admin-brand{height:84px;display:grid;align-content:center;gap:3px;padding:0 22px}.store-admin-brand h1{font-size:22px}.store-admin-brand b{margin-left:0}
+  .store-selector-row{padding:0 16px 12px}
+  .store-nav-scroll{display:grid;gap:0;padding:10px 0;overflow:visible}.nav-group-label{display:block;padding:16px 22px 5px;color:#b0b0b5;font-size:7px;font-weight:850;letter-spacing:.14em;text-transform:uppercase}
+  .store-admin-nav{min-height:40px;padding:0 22px;text-align:left}.store-admin-nav.active::after{left:0;right:auto;top:8px;bottom:8px;width:2px;height:auto}
+  .store-admin-side .admin-side-actions{position:absolute;left:22px;right:22px;bottom:22px;display:grid;gap:8px}.store-admin-link{min-height:34px!important;justify-content:flex-start!important;padding:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;color:#88888e!important;font-size:10px!important}
+  .store-admin-main{width:100%;max-width:1060px;margin:0;padding:40px 38px 68px}
+  .today-status{grid-template-columns:minmax(0,1.5fr) minmax(260px,.8fr)}.today-numbers{height:100%}.today-numbers>div{display:flex;flex-direction:column;justify-content:center}
+  .store-impact-grid{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .today-actions{grid-template-columns:auto auto minmax(0,1fr);justify-content:start}.today-actions .text-btn{grid-column:auto;align-self:center}
+  .store-form{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 16px}.store-form .wide{grid-column:1/-1}
+  .store-photo-grid{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .qr-display{grid-template-columns:240px minmax(0,1fr);place-items:center stretch}
+}
+
+@media(max-width:430px){
+  .store-admin-main{padding-left:16px;padding-right:16px}.store-admin-head h2{font-size:25px}.store-admin-brand{padding-left:16px;padding-right:16px}.store-nav-scroll,.store-selector-row{padding-left:16px;padding-right:16px}
+  .today-actions{grid-template-columns:1fr}.today-actions .text-btn{grid-column:1}.store-impact-grid{grid-template-columns:1fr 1fr}.benefit-pass-form{grid-template-columns:1fr}.benefit-pass-form .secondary-btn{width:100%}
+}

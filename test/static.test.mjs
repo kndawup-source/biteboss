@@ -40,7 +40,7 @@ test('v71 game loop ships takeover, retake/hot pulse, history and season UI',()=
   assert.match(html,/id="takeoverScreen"/);
   assert.match(html,/id="gamePulse"/);
   assert.match(html,/data-rank="season"/);
-  assert.match(app,/biteboss_takeover_session_ping_v71/);
+  assert.match(app,/biteboss_takeover_session_ping_v7514/);
   assert.match(app,/biteboss_game_pulse_v71/);
   assert.match(app,/biteboss_store_history_v71/);
   assert.match(css,/\.takeover-count/);
@@ -231,4 +231,56 @@ test("user avatar fallbacks are intentionally blank", () => {
   assert.match(app, /return `<span class="\$\{escapeAttr\(className\)\} boss-avatar-fallback" aria-hidden="true"><\/span>`;/);
   assert.match(app, /<span class="occupied-boss-half-fallback" aria-hidden="true"><\/span>/);
   assert.doesNotMatch(app, /nearby-avatar boss-avatar-fallback" aria-hidden="true">\?<\/span>/);
+});
+
+test('release QA provides retry states for network-bound user views', () => {
+  const app=read('app.js').toString();
+  const css=read('styles.css').toString();
+  assert.match(app, /function setRetryState\(/);
+  assert.match(app, /setRetryState\("#storeList", "매장 정보를 불러오지 못했습니다\.",/);
+  assert.match(app, /setRetryState\(body, "매장 정보를 불러오지 못했습니다\.",/);
+  assert.match(app, /setRetryState\(profileBox, "전투 기록을 불러오지 못했습니다\.",/);
+  assert.match(css, /\.app-state-retry-btn\{/);
+});
+
+test('non-hero runtime images are lazy decoded', () => {
+  const app=read('app.js').toString();
+  const html=read('index.html').toString();
+  assert.match(app, /매장 사진" loading="lazy" decoding="async"/);
+  assert.match(app, /프로필" loading="lazy" decoding="async"/);
+  assert.match(app, /profile-record-thumb[^`]+loading="lazy" decoding="async"/);
+  assert.match(html, /homeSplashImage[^>]+loading="eager"[^>]+fetchpriority="high"/);
+});
+
+test('admin save flows guard against duplicate submissions', () => {
+  const admin=read('admin.js').toString();
+  const storeAdmin=read('store-admin.js').toString();
+  assert.match(admin, /if\(submit\?\.disabled\) return;/);
+  assert.match(storeAdmin, /async function withFormLock\(/);
+  assert.match(storeAdmin, /await withFormLock\(formEl,/);
+});
+
+test("crew management exposes leader kick controls and keeps member self-leave flow", () => {
+  const app = read("app.js").toString();
+  const html = read("index.html").toString();
+  const css = read("styles.css").toString();
+  assert.match(app, /data-kick-member=/);
+  assert.match(app, /biteboss_kick_organization_member_v7513/);
+  assert.match(app, /function openOrganizationKickConfirm\(/);
+  assert.match(app, /function kickOrganizationMember\(/);
+  assert.match(app, /leave\.textContent = organization\?\.is_leader \? "크루 해산" : "크루 탈퇴"/);
+  assert.match(html, /id="leaveOrganizationBtn"/);
+  assert.match(css, /\.organization-kick-btn\{/);
+});
+
+
+test('global capture cooldown blocks the next store for 60 minutes',()=>{
+  const app=read('app.js').toString();
+  const admin=read('admin.html').toString();
+  assert.match(app,/capture_cooldown_minutes:60/);
+  assert.match(app,/biteboss_capture_cooldown_status_v7514/);
+  assert.match(app,/biteboss_takeover_session_ping_v7514/);
+  assert.match(app,/다음 점령 대기 중/);
+  assert.match(app,/if\(captureCooldownActive\(\)\) return ownedByMe/);
+  assert.match(admin,/name="capture_cooldown_minutes"/);
 });

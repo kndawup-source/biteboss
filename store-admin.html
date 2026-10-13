@@ -5,30 +5,31 @@
   <meta name="robots" content="noindex,nofollow,noarchive" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" />
   <title>BiteBoss Store Admin</title>
-  <link rel="stylesheet" href="./styles.css?v=72.2" />
-  <script src="./app-config.js?v=72.2"></script>
+  <link rel="stylesheet" href="./styles.css?v=75.14" />
+  <script src="./app-config.js?v=75.14"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./supabase.js?v=72.2"></script>
+  <script src="./supabase.js?v=75.14"></script>
+  <link rel="stylesheet" href="./store-admin.css?v=75.14" />
 </head>
 <body class="store-admin-app">
 <div id="storeAuthGate" class="auth-gate">
   <form id="storeLoginForm" class="auth-panel">
-    <span>BiteBoss</span><h1>Store Admin</h1>
+    <span>BITEBOSS / STORE</span><h1>매장 관리자</h1>
     <p>발급받은 매장 ID와 6자리 PIN으로 로그인하세요.</p>
     <input class="input" name="store_id" type="text" placeholder="Store ID" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="32" required />
     <input class="input" name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="6-digit PIN" autocomplete="current-password" required />
-    <button class="primary-btn" type="submit">Login</button>
+    <button class="primary-btn" type="submit">로그인</button>
     <small id="storeLoginStatus"></small>
     <button id="openStoreActivationBtn" class="text-btn auth-switch" type="button">처음 등록 · 활성화 코드 사용</button>
   </form>
 
   <form id="storeActivationForm" class="auth-panel hidden">
-    <span>BiteBoss</span><h1>Activate Store</h1>
+    <span>BITEBOSS / STORE</span><h1>매장 활성화</h1>
     <p>제휴 승인 후 받은 활성화 코드로 매장 직원 계정을 만듭니다.</p>
     <input class="input" name="activation_code" type="text" placeholder="Activation code" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" maxlength="16" required />
     <input class="input" name="store_id" type="text" placeholder="새 Store Admin ID" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="32" required />
     <input class="input" name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="새 6-digit PIN" autocomplete="new-password" required />
-    <button class="primary-btn" type="submit">Create Store Admin</button>
+    <button class="primary-btn" type="submit">매장 계정 만들기</button>
     <small id="storeActivationStatus"></small>
     <button id="backToStoreLoginBtn" class="text-btn auth-switch" type="button">기존 계정 로그인</button>
   </form>
@@ -37,16 +38,16 @@
 <div id="storeOnboarding" class="store-onboarding hidden"></div>
 <div id="storeAdminApp" class="store-admin-shell hidden">
   <aside class="store-admin-side">
-    <div class="store-admin-brand"><span>BiteBoss</span><h1>Store</h1><b id="storeSideName">Manager</b></div>
+    <div class="store-admin-brand"><span>BITEBOSS</span><h1>매장</h1><b id="storeSideName">관리자</b></div>
     <div class="store-selector-row"><select id="storeSelector" class="input store-selector"></select></div>
     <div class="admin-nav-scroll store-nav-scroll">
-      <span class="nav-group-label">TODAY</span>
-      <button class="store-admin-nav active" data-store-admin="overview" type="button">Home</button>
+      <span class="nav-group-label">현황</span>
+      <button class="store-admin-nav active" data-store-admin="overview" type="button">오늘</button>
 
-      <span class="nav-group-label">MANAGE</span>
-      <button class="store-admin-nav" data-store-admin="store" type="button">Store</button>
-      <button class="store-admin-nav" data-store-admin="game" type="button">Game</button>
-      <button class="store-admin-nav" data-store-admin="offers" type="button">Benefits</button>
+      <span class="nav-group-label">관리</span>
+      <button class="store-admin-nav" data-store-admin="store" type="button">매장 정보</button>
+      <button class="store-admin-nav" data-store-admin="game" type="button">게임</button>
+      <button class="store-admin-nav" data-store-admin="offers" type="button">혜택</button>
       <button class="store-admin-nav" data-store-admin="qr" type="button">QR</button>
     </div>
     <div class="admin-side-actions">
@@ -59,46 +60,46 @@
   <main class="store-admin-main">
     <section class="store-admin-page active" id="store-admin-overview">
       <div class="store-admin-head simple-head">
-        <div><span class="eyebrow">TODAY</span><h2 id="storeAdminTitle">내 매장</h2><p>지금 확인할 상태와 바로 할 일만 보여줍니다.</p></div>
-        <span id="storeSyncStatus" class="store-chip">server</span>
+        <div><span class="eyebrow">오늘</span><h2 id="storeAdminTitle">내 매장</h2><p>지금 확인할 상태와 바로 할 일만 보여줍니다.</p></div>
+        <span id="storeSyncStatus" class="store-chip">동기화</span>
       </div>
 
       <section class="today-status">
         <div class="today-primary">
-          <span>Current Boss</span>
+          <span>현재 보스</span>
           <strong id="storeMetricBoss">-</strong>
-          <p><span id="storeMetricExpire">-</span> until challengeable</p>
+          <p><span id="storeMetricExpire">-</span> 후 도전 가능</p>
         </div>
         <div class="today-numbers">
-          <div><strong id="storeMetricCheckins">0</strong><span>Visits</span></div>
-          <div><strong id="storeMetricClaims">0</strong><span>Claims</span></div>
+          <div><strong id="storeMetricCheckins">0</strong><span>방문</span></div>
+          <div><strong id="storeMetricClaims">0</strong><span>점령</span></div>
         </div>
       </section>
 
       <section class="store-impact">
-        <div class="store-section-head"><div><h3>Business impact</h3><p>BiteBoss를 통해 실제로 얼마나 방문했는지 보여줍니다.</p></div><select id="storeImpactDays" class="input impact-period" aria-label="통계 기간"><option value="7">7일</option><option value="30" selected>30일</option><option value="90">90일</option></select></div>
-        <div class="store-impact-grid"><div><span>Visits</span><strong id="impactVisits">0</strong><small id="impactVisitsDelta">-</small></div><div><span>Unique visitors</span><strong id="impactUnique">0</strong><small id="impactUniqueDelta">-</small></div><div><span>New visitors</span><strong id="impactNew">0</strong><small id="impactNewDelta">-</small></div><div><span>Repeat visitors</span><strong id="impactRepeat">0</strong><small id="impactRepeatDelta">-</small></div><div><span>Benefits used</span><strong id="impactBenefits">0</strong><small id="impactBenefitsDelta">-</small></div></div>
+        <div class="store-section-head"><div><h3>방문 성과</h3><p>BiteBoss를 통해 실제로 얼마나 방문했는지 보여줍니다.</p></div><select id="storeImpactDays" class="input impact-period" aria-label="통계 기간"><option value="7">7일</option><option value="30" selected>30일</option><option value="90">90일</option></select></div>
+        <div class="store-impact-grid"><div><span>방문</span><strong id="impactVisits">0</strong><small id="impactVisitsDelta">-</small></div><div><span>고유 방문자</span><strong id="impactUnique">0</strong><small id="impactUniqueDelta">-</small></div><div><span>신규 방문자</span><strong id="impactNew">0</strong><small id="impactNewDelta">-</small></div><div><span>재방문자</span><strong id="impactRepeat">0</strong><small id="impactRepeatDelta">-</small></div><div><span>혜택 사용</span><strong id="impactBenefits">0</strong><small id="impactBenefitsDelta">-</small></div></div>
       </section>
 
       <section class="today-actions">
-        <button class="primary-btn" data-open-store-page="offers" type="button">Verify benefit code</button>
-        <button class="secondary-btn" data-open-store-page="qr" type="button">Open QR</button>
-        <button class="text-btn" data-open-store-page="game" type="button">View game status</button>
+        <button class="primary-btn" data-open-store-page="offers" type="button">혜택 코드 확인</button>
+        <button class="secondary-btn" data-open-store-page="qr" type="button">QR 열기</button>
+        <button class="text-btn" data-open-store-page="game" type="button">게임 상태 보기</button>
       </section>
 
       <section class="today-secondary">
-        <div class="store-section-head"><h3>Quick edit</h3></div>
+        <div class="store-section-head"><h3>빠른 관리</h3></div>
         <div class="quick-link-list">
-          <button class="quick-link" data-open-store-page="store" type="button"><span>Store information</span><b>→</b></button>
-          <button id="quickPhotoBtn" class="quick-link" type="button"><span>Add photo</span><b>→</b></button>
-          <button class="quick-link" data-open-store-page="offers" type="button"><span>Create benefit</span><b>→</b></button>
+          <button class="quick-link" data-open-store-page="store" type="button"><span>매장 정보</span><b>→</b></button>
+          <button id="quickPhotoBtn" class="quick-link" type="button"><span>사진 추가</span><b>→</b></button>
+          <button class="quick-link" data-open-store-page="offers" type="button"><span>혜택 만들기</span><b>→</b></button>
         </div>
       </section>
       <span id="storeMetricPartner" class="hidden">비제휴</span>
     </section>
 
     <section class="store-admin-page" id="store-admin-store">
-      <div class="store-admin-head"><div><span class="eyebrow">STORE</span><h2>Store</h2><p>고객에게 보이는 매장 정보를 관리합니다.</p></div></div>
+      <div class="store-admin-head"><div><span class="eyebrow">매장</span><h2>매장 정보</h2><p>고객에게 보이는 매장 정보를 관리합니다.</p></div></div>
 
       <section class="store-subsection">
         <div class="store-section-head"><h3>기본 정보</h3></div>
@@ -141,21 +142,21 @@
     </section>
 
     <section class="store-admin-page" id="store-admin-game">
-      <div class="store-admin-head simple-head"><div><span class="eyebrow">GAME</span><h2>Boss & Crew</h2><p>점령 상태와 최근 변화를 확인합니다.</p></div></div>
+      <div class="store-admin-head simple-head"><div><span class="eyebrow">게임</span><h2>보스 & 크루</h2><p>점령 상태와 최근 변화를 확인합니다.</p></div></div>
 
       <section class="store-subsection game-current">
-        <div class="store-section-head"><h3>Current Boss</h3><button id="clearBossBtn" class="text-btn" type="button">Release</button></div>
+        <div class="store-section-head"><h3>현재 보스</h3><button id="clearBossBtn" class="text-btn" type="button">점령 해제</button></div>
         <div id="storeBossCard" class="store-owner-card"></div>
       </section>
 
       <section class="store-subsection">
-        <div class="store-section-head"><h3>Recent activity</h3></div>
+        <div class="store-section-head"><h3>최근 활동</h3></div>
         <div id="storeActivity" class="store-timeline"></div>
       </section>
     </section>
 
     <section class="store-admin-page" id="store-admin-qr">
-      <div class="store-admin-head"><div><span class="eyebrow">QR</span><h2>Claim QR</h2><p>제휴 매장 방문자가 점령에 사용하는 QR입니다.</p></div></div>
+      <div class="store-admin-head"><div><span class="eyebrow">QR</span><h2>점령 QR</h2><p>제휴 매장 방문자가 점령에 사용하는 QR입니다.</p></div></div>
       <section class="store-panel store-panel-flat">
         <div class="qr-display">
           <img id="storeQrImage" class="qr-placeholder" width="240" height="240" alt="BiteBoss claim QR" />
@@ -165,11 +166,11 @@
     </section>
 
     <section class="store-admin-page" id="store-admin-offers">
-      <div class="store-admin-head"><div><span class="eyebrow">BENEFITS</span><h2>Benefits</h2><p>혜택 등록과 현장 사용 확인을 한 곳에서 처리합니다.</p></div></div>
+      <div class="store-admin-head"><div><span class="eyebrow">혜택</span><h2>혜택 관리</h2><p>혜택 등록과 현장 사용 확인을 한 곳에서 처리합니다.</p></div></div>
       <form id="offerForm" class="store-form compact">
         <label>혜택 이름<input name="title" class="input" required /></label>
         <label>상태<select name="status" class="input"><option value="active">진행중</option><option value="draft">준비중</option><option value="ended">종료</option></select></label>
-        <label>혜택 대상<select name="minimum_role" class="input"><option value="visitor">Everyone</option><option value="crew">Crew + Boss</option><option value="boss">Boss only</option></select></label>
+        <label>혜택 대상<select name="minimum_role" class="input"><option value="visitor">모든 방문자</option><option value="crew">크루 + 보스</option><option value="boss">보스만</option></select></label>
         <label class="wide">설명<input name="description" class="input" /></label>
         <button class="primary-btn wide" type="submit">혜택 추가</button>
       </form>
@@ -178,7 +179,7 @@
         <div class="store-section-head"><h3>혜택 코드 확인</h3><span>1회 사용</span></div>
         <form id="benefitPassForm" class="benefit-pass-form">
           <input id="benefitPassToken" class="input" type="text" maxlength="8" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="8-digit code" />
-          <button class="secondary-btn" type="submit">Verify & Redeem</button>
+          <button class="secondary-btn" type="submit">확인 및 사용 처리</button>
         </form>
         <div id="benefitPassResult" class="benefit-pass-result"></div>
       </section>
@@ -187,6 +188,6 @@
     </section>
   </main>
 </div>
-<script src="./store-admin.js?v=72.2"></script>
+<script src="./store-admin.js?v=75.14"></script>
 </body>
 </html>

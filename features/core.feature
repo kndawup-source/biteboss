@@ -53,3 +53,11 @@ Feature: BiteBoss release-critical flows
     When the user opens the season ranking
     Then recent regional conquests are ranked separately
     And permanent store reign history is not reset
+
+
+  Scenario: Successful takeover starts a 60 minute global cooldown
+    Given a member has just become boss of one store
+    When the member approaches another store within 60 minutes
+    Then a new takeover countdown does not start
+    And the challenge page shows the remaining wait time
+    And the member can still visit their own occupied store

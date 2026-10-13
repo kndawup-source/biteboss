@@ -475,7 +475,7 @@
       return `
         <article class="admin-store-row">
           <div class="admin-store-summary">
-            ${store.photo_url ? `<img class="admin-store-thumb" src="${escapeAttr(store.photo_url)}" alt="" />` : ""}
+            ${store.photo_url ? `<img class="admin-store-thumb" src="${escapeAttr(store.photo_url)}" alt="" loading="lazy" decoding="async" />` : ""}
             <div class="admin-store-copy">
               <strong>${escapeHtml(store.name)}</strong>
               <p>${escapeHtml([store.city, store.district].filter(Boolean).join(" ") || "지역 미등록")} · ${escapeHtml(categoryLabel(store.category))}</p>
@@ -607,9 +607,13 @@
 
   async function saveRules(event){
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formEl = event.currentTarget;
+    const submit = formEl.querySelector('button[type="submit"]');
+    if(submit?.disabled) return;
+    if(submit) submit.disabled = true;
+    const form = new FormData(formEl);
     const numeric = new Set([
-      "protect_minutes","reclaim_cooldown_minutes","gps_radius_m","max_location_accuracy_m",
+      "protect_minutes","reclaim_cooldown_minutes","capture_cooldown_minutes","gps_radius_m","max_location_accuracy_m",
       "gps_dwell_seconds","gps_presence_ping_seconds","daily_store_limit","nearby_radius_m","nearby_limit",
       "xp_per_level","xp_visit","xp_boss_win","xp_crew","xp_defense_success",
       "store_bonus_visits_per_point","store_bonus_max","challenge_cooldown_minutes",
@@ -629,11 +633,17 @@
       rows.push({ key, value, updated_by:session.user.id, updated_at:new Date().toISOString() });
     }
 
-    const { error } = await adminSb.from("biteboss_app_config").upsert(rows, { onConflict:"key" });
-    if(error) return alert(error.message);
-    await loadConfig();
-    renderRules();
-    alert("게임 규칙을 저장했습니다.");
+    try{
+      const { error } = await adminSb.from("biteboss_app_config").upsert(rows, { onConflict:"key" });
+      if(error) throw error;
+      await loadConfig();
+      renderRules();
+      alert("게임 규칙을 저장했습니다.");
+    }catch(error){
+      alert(error?.message || "게임 규칙 저장에 실패했습니다.");
+    }finally{
+      if(submit) submit.disabled = false;
+    }
   }
 
   async function loadBosses(){
@@ -886,9 +896,13 @@
 
   async function saveSplash(event){
     event.preventDefault();
+    const formEl = event.currentTarget;
+    const submit = formEl?.querySelector('button[type="submit"]');
+    if(submit?.disabled) return;
     const status = $("#splashStatus");
     const file = $("#splashFile")?.files?.[0];
     if(!file) return;
+    if(submit) submit.disabled = true;
     if(status) status.textContent = "업로드 중…";
 
     try{
@@ -906,6 +920,8 @@
     }catch(error){
       console.warn(error);
       if(status) status.textContent = "저장에 실패했습니다.";
+    }finally{
+      if(submit) submit.disabled = false;
     }
   }
 
@@ -1057,7 +1073,7 @@
     if(!box) return;
     box.innerHTML = rows.map(photo => `
       <article class="admin-media-row">
-        <img src="${escapeAttr(photo.image_url)}" alt="" />
+        <img src="${escapeAttr(photo.image_url)}" alt="" loading="lazy" decoding="async" />
         <div><strong>${escapeHtml(photo.caption || (photo.is_cover ? "대표 사진" : "매장 사진"))}</strong><p>${photo.is_cover ? "대표 이미지" : "추가 이미지"}</p></div>
         <button class="text-btn danger-text" data-admin-delete-photo="${escapeAttr(photo.id)}" data-storage-path="${escapeAttr(photo.storage_path || "")}" type="button">삭제</button>
       </article>

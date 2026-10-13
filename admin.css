@@ -1,10 +1,9 @@
-/* BiteBoss Admin v66.5
-   Mobile-first hierarchy: 현황 / 매장 / 게임 / 설정
-   Loaded after styles.css.
+/* BiteBoss Admin — light editorial console
+   Matches the public BiteBoss visual system.
 */
 
 body.admin-app{
-  background:#050505;
+  background:#f1f1f3;
 }
 
 .admin-app .admin-layout{
@@ -20,8 +19,8 @@ body.admin-app{
   min-height:0;
   padding:0;
   border-right:0;
-  border-bottom:1px solid #191919;
-  background:rgba(5,5,5,.98);
+  border-bottom:1px solid #e7e7ea;
+  background:rgba(255,255,255,.96);
   backdrop-filter:blur(12px);
 }
 
@@ -32,7 +31,7 @@ body.admin-app{
   justify-content:space-between;
   gap:16px;
   padding:0 18px;
-  border-bottom:1px solid #131313;
+  border-bottom:1px solid #ececef;
 }
 
 .admin-app .admin-brand{
@@ -45,14 +44,14 @@ body.admin-app{
 }
 
 .admin-app .admin-brand span{
-  color:rgba(255,247,232,.34);
+  color:#9b9ba1;
   font-size:8px;
   font-weight:850;
   letter-spacing:.08em;
 }
 
 .admin-app .admin-brand strong{
-  color:#fff7e8;
+  color:#111;
   font-size:15px;
   line-height:1;
   font-weight:950;
@@ -60,7 +59,7 @@ body.admin-app{
 }
 
 .admin-role{
-  color:rgba(255,247,232,.32);
+  color:#a0a0a6;
   font-size:9px;
   font-weight:800;
   text-transform:uppercase;
@@ -71,7 +70,7 @@ body.admin-app{
   display:grid;
   grid-template-columns:repeat(4,minmax(0,1fr));
   padding:0 10px;
-  border-bottom:1px solid #161616;
+  border-bottom:1px solid #ececef;
 }
 
 .admin-primary-nav-btn{
@@ -79,14 +78,14 @@ body.admin-app{
   min-width:0;
   border:0;
   background:transparent;
-  color:rgba(255,247,232,.38);
+  color:#8f8f96;
   font:inherit;
   font-size:11px;
   font-weight:850;
 }
 
 .admin-primary-nav-btn.active{
-  color:#fff7e8;
+  color:#111;
 }
 
 .admin-primary-nav-btn.active::after{
@@ -96,7 +95,7 @@ body.admin-app{
   right:16px;
   bottom:-1px;
   height:1px;
-  background:#fff7e8;
+  background:#111;
 }
 
 .admin-secondary-nav{
@@ -119,7 +118,7 @@ body.admin-app{
   padding:0;
   border:0;
   background:transparent;
-  color:rgba(255,247,232,.36);
+  color:#8f8f96;
   font:inherit;
   font-size:10px;
   font-weight:800;
@@ -127,7 +126,7 @@ body.admin-app{
 }
 
 .admin-section-nav.active{
-  color:#d5232f;
+  color:#d72f38;
 }
 
 .admin-app .admin-side-actions{
@@ -152,13 +151,13 @@ body.admin-app{
 .admin-app .admin-page-head{
   margin:0 0 24px;
   padding:0 0 16px;
-  border-bottom:1px solid #171717;
+  border-bottom:1px solid #e7e7ea;
 }
 
 .admin-app .admin-page-head .eyebrow{
   display:block;
   margin:0 0 6px;
-  color:rgba(255,247,232,.32);
+  color:#a0a0a6;
   font-size:8px;
   font-weight:900;
   letter-spacing:.08em;
@@ -166,7 +165,7 @@ body.admin-app{
 
 .admin-app .admin-page-head h2{
   margin:0;
-  color:#fff7e8;
+  color:#111;
   font-size:25px;
   line-height:1;
   letter-spacing:-.04em;
@@ -174,7 +173,7 @@ body.admin-app{
 
 .admin-app .admin-page-head p{
   margin:8px 0 0;
-  color:rgba(255,247,232,.40);
+  color:#8f8f96;
   font-size:11px;
   line-height:1.5;
 }
@@ -183,8 +182,8 @@ body.admin-app{
   display:grid;
   grid-template-columns:repeat(2,minmax(0,1fr));
   margin:0 0 34px;
-  border-top:1px solid #191919;
-  border-bottom:1px solid #191919;
+  border-top:1px solid #e7e7ea;
+  border-bottom:1px solid #e7e7ea;
 }
 
 .admin-app .ops-summary>div{
@@ -195,15 +194,15 @@ body.admin-app{
 
 .admin-app .ops-summary>div:nth-child(even){
   padding-left:14px;
-  border-left:1px solid #191919;
+  border-left:1px solid #e7e7ea;
 }
 
 .admin-app .ops-summary>div:nth-child(-n+2){
-  border-bottom:1px solid #191919;
+  border-bottom:1px solid #e7e7ea;
 }
 
 .admin-app .ops-summary span{
-  color:rgba(255,247,232,.34);
+  color:#9b9ba1;
   font-size:9px;
   font-weight:800;
   letter-spacing:0;
@@ -213,7 +212,7 @@ body.admin-app{
 .admin-app .ops-summary strong{
   display:block;
   margin-top:9px;
-  color:#fff7e8;
+  color:#111;
   font-size:24px;
   line-height:1;
   font-weight:950;
@@ -231,17 +230,17 @@ body.admin-app{
 
 .admin-dashboard-section .section-head h3{
   margin:0;
-  color:#fff7e8;
+  color:#111;
   font-size:15px;
 }
 
 .admin-dashboard-section .section-head span{
-  color:rgba(255,247,232,.32);
+  color:#a0a0a6;
   font-size:9px;
 }
 
 .admin-current-bosses .store-list{
-  border-top:1px solid #171717;
+  border-top:1px solid #e7e7ea;
 }
 
 .admin-app .gameops-summary{
@@ -252,11 +251,11 @@ body.admin-app{
 .admin-app .gameops-summary>div{
   min-height:72px;
   border-right:0;
-  border-bottom:1px solid #171717;
+  border-bottom:1px solid #e7e7ea;
 }
 
 .admin-app .gameops-summary>div:nth-child(even){
-  border-left:1px solid #171717;
+  border-left:1px solid #e7e7ea;
 }
 
 .admin-app .form-grid,
@@ -328,7 +327,7 @@ body.admin-app{
   position:sticky;
   top:0;
   z-index:2;
-  background:#050505;
+  background:#f1f1f3;
 }
 
 @media(min-width:760px){
@@ -342,7 +341,7 @@ body.admin-app{
     top:0;
     align-self:start;
     height:100dvh;
-    border-right:1px solid #191919;
+    border-right:1px solid #e7e7ea;
     border-bottom:0;
   }
 
@@ -382,7 +381,7 @@ body.admin-app{
     bottom:10px;
     width:2px;
     height:auto;
-    background:#d5232f;
+    background:#d72f38;
   }
 
   .admin-secondary-nav{
@@ -415,7 +414,7 @@ body.admin-app{
     padding:0;
     border:0;
     background:transparent;
-    color:rgba(255,247,232,.36);
+    color:#8f8f96;
     font:inherit;
     font-size:10px;
     text-decoration:none;
@@ -423,7 +422,7 @@ body.admin-app{
   }
 
   .admin-side-link:hover{
-    color:#fff7e8;
+    color:#111;
   }
 
   .admin-app .admin-main{
@@ -442,7 +441,7 @@ body.admin-app{
   }
 
   .admin-app .ops-summary>div+div{
-    border-left:1px solid #191919;
+    border-left:1px solid #e7e7ea;
   }
 
   .admin-app .gameops-summary{
@@ -499,12 +498,10 @@ body.admin-app{
 }
 
 
-/* ============================================================
-   BiteBoss Admin v66.6 — Current Boss mobile hierarchy
-   ============================================================ */
+/* Current boss list */
 
 .admin-current-bosses .store-list{
-  border-top:1px solid #171717;
+  border-top:1px solid #e7e7ea;
 }
 
 .admin-boss-row{
@@ -514,7 +511,7 @@ body.admin-app{
   align-items:center;
   gap:18px;
   padding:15px 0;
-  border-bottom:1px solid #171717;
+  border-bottom:1px solid #e7e7ea;
 }
 
 .admin-boss-copy{
@@ -527,7 +524,7 @@ body.admin-app{
   display:block;
   min-width:0;
   overflow:hidden;
-  color:#fff7e8;
+  color:#111;
   font-size:16px;
   line-height:1.25;
   font-weight:900;
@@ -540,7 +537,7 @@ body.admin-app{
   display:block;
   min-width:0;
   overflow:hidden;
-  color:rgba(255,247,232,.66);
+  color:#66666c;
   font-size:12px;
   line-height:1.25;
   font-weight:800;
@@ -549,14 +546,14 @@ body.admin-app{
 }
 
 .admin-boss-row.is-unclaimed .admin-boss-owner{
-  color:rgba(255,247,232,.38);
+  color:#8f8f96;
 }
 
 .admin-boss-meta{
   display:block;
   min-width:0;
   overflow:hidden;
-  color:rgba(255,247,232,.34);
+  color:#9b9ba1;
   font-size:10px;
   line-height:1.35;
   text-overflow:ellipsis;
@@ -577,7 +574,7 @@ body.admin-app{
 }
 
 .admin-boss-xp strong{
-  color:#fff7e8;
+  color:#111;
   font-size:15px;
   line-height:1;
   font-weight:900;
@@ -585,7 +582,7 @@ body.admin-app{
 }
 
 .admin-boss-xp span{
-  color:rgba(255,247,232,.34);
+  color:#9b9ba1;
   font-size:9px;
   font-weight:800;
 }
@@ -623,4 +620,40 @@ body.admin-app{
     grid-template-columns:minmax(0,1fr) 42px;
     gap:10px;
   }
+}
+
+
+/* Console surfaces */
+.admin-app .admin-side{background:rgba(255,255,255,.96);box-shadow:0 8px 24px rgba(0,0,0,.025)}
+.admin-app .admin-main{color:#111}
+.admin-app .admin-page-head{border-bottom:0;padding-bottom:0;margin-bottom:22px}
+.admin-app .admin-page-head h2{font-size:26px;font-weight:850;letter-spacing:-.045em}
+.admin-app .admin-page-head p{color:#929298;font-size:11px}
+.admin-app .ops-summary{border:0;gap:8px;margin-bottom:28px}
+.admin-app .ops-summary>div{min-height:82px;padding:14px 15px!important;border:0!important;border-radius:16px;background:#fff;box-shadow:0 8px 22px rgba(0,0,0,.02)}
+.admin-app .ops-summary span{color:#96969c}
+.admin-app .ops-summary strong{color:#111;font-size:22px}
+.admin-dashboard-section{margin-top:28px}
+.admin-dashboard-section .section-head{padding:0;margin-bottom:8px}
+.admin-dashboard-section .section-head h3{color:#111;font-size:13px}
+.admin-dashboard-section .section-head span{color:#a0a0a6}
+.admin-current-bosses .store-list{border-top:0}
+.admin-boss-row{min-height:76px;padding:11px 0;border-bottom:0}
+.admin-boss-store,.admin-boss-xp strong{color:#111}
+.admin-boss-owner{color:#66666c}.admin-boss-meta,.admin-boss-xp span{color:#9b9ba1}
+.admin-app label{color:#77777d;font-size:10px;font-weight:700}
+.admin-app .input{background:#fff;border:0;box-shadow:0 0 0 1px rgba(17,17,19,.045)}
+.admin-app .primary-btn{background:#111;color:#fff}
+.admin-app .secondary-btn{background:#fff;color:#111;box-shadow:0 0 0 1px rgba(17,17,19,.045)}
+.admin-app .store-list,.admin-app .timeline{display:grid;gap:6px}
+.admin-app .admin-form,.admin-app .compact-admin-form,.admin-app .store-form{background:#fff;border-radius:20px;padding:18px;box-shadow:0 8px 22px rgba(0,0,0,.02)}
+.admin-app .admin-rule-divider{margin-top:8px;padding-top:14px;border-top:1px solid #ececef;color:#9b9ba1;font-size:8px;font-weight:850;letter-spacing:.12em}
+.admin-app .partner-request-counters{display:grid;gap:8px;margin-bottom:16px}
+.admin-app .partner-request-counters>div,.admin-app .store-metrics article{background:#fff;border-radius:16px;padding:14px}
+.admin-app .admin-maintenance-row{background:#fff;border-radius:16px;padding:16px;margin-bottom:8px}
+.admin-app .admin-editor-panel{background:#f1f1f3}.admin-app .admin-editor-head{background:#f1f1f3}
+@media(min-width:760px){
+  .admin-app .admin-side{background:#fff}
+  .admin-app .admin-main{max-width:1220px;padding:38px 38px 64px}
+  .admin-app .ops-summary{gap:10px}
 }

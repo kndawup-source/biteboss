@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.10";
+  const BITEBOSS_BUILD = "75.14";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -16,6 +16,7 @@
   const config = {
     protect_minutes:60,
     reclaim_cooldown_minutes:1440,
+    capture_cooldown_minutes:60,
     gps_radius_m:50,
     max_location_accuracy_m:100,
     gps_dwell_seconds:120,
@@ -70,6 +71,7 @@
   let profile = null;
   let organization = null;
   let organizationCooldown = null;
+  let captureCooldown = null;
   let organizationInvites = [];
   let organizationMembers = [];
   let playerSession = null;
@@ -173,7 +175,8 @@
     await Promise.all([
       loadConfig(),
       loadMyOrganization(),
-      loadGameActivity()
+      loadGameActivity(),
+      loadCaptureCooldownStatus()
     ]);
 
     renderHomeSplashImage();
@@ -844,6 +847,9 @@
     if(result.error){
       console.warn(result.error);
       toast("매장 정보를 불러오지 못했습니다.");
+      setRetryState("#storeList", "매장 정보를 불러오지 못했습니다.", async () => {
+        await loadStores();
+      });
       return;
     }
 
@@ -1008,12 +1014,76 @@
     nav.querySelector("[data-page-next]")?.addEventListener("click", () => onChange(Math.min(pages, safePage + 1)));
   }
 
+  function setRetryState(target, message, retry){
+    const el = typeof target === "string" ? $(target) : target;
+    if(!el) return;
+    el.innerHTML = `
+      <div class="app-state is-error app-state-retry">
+        <span>${escapeHtml(message || "불러오지 못했습니다.")}</span>
+        ${typeof retry === "function" ? '<button class="app-state-retry-btn" type="button">다시 시도</button>' : ''}
+      </div>
+    `;
+    const button = el.querySelector(".app-state-retry-btn");
+    if(button && typeof retry === "function"){
+      button.addEventListener("click", async () => {
+        if(button.disabled) return;
+        button.disabled = true;
+        button.textContent = "불러오는 중…";
+        try{
+          await retry();
+        }catch(error){
+          console.warn("BiteBoss retry:", error);
+          button.disabled = false;
+          button.textContent = "다시 시도";
+        }
+      }, { once:true });
+    }
+  }
+
+  function captureCooldownActive(){
+    const until = captureCooldown?.cooldown_until || null;
+    return Boolean(captureCooldown?.active && until && new Date(until).getTime() > Date.now());
+  }
+
+  async function loadCaptureCooldownStatus(force=false){
+    if(!playerSession?.authenticated){
+      captureCooldown = null;
+      return null;
+    }
+    if(!force && captureCooldown?.loaded_at && Date.now()-captureCooldown.loaded_at < 15000){
+      return captureCooldown;
+    }
+    try{
+      const {data,error}=await sb.rpc("biteboss_capture_cooldown_status_v7514");
+      if(error){
+        if(!String(error.message||"").includes("biteboss_capture_cooldown_status_v7514")) console.warn("BiteBoss capture cooldown:",error);
+        return captureCooldown;
+      }
+      captureCooldown={...(data||{}),loaded_at:Date.now()};
+      return captureCooldown;
+    }catch(error){
+      console.warn("BiteBoss capture cooldown:",error);
+      return captureCooldown;
+    }
+  }
+
+  function captureCooldownMessage(){
+    if(!captureCooldownActive()) return "";
+    return `다음 매장 점령까지 ${formatRemaining(captureCooldown.cooldown_until)} 남음`;
+  }
+
   function updateChallengeCommand(list = stores){
     const rows = Array.isArray(list) ? list : [];
     const target = $("#challengeNextTarget");
     const meta = $("#challengeNextMeta");
-    const challengeableRows = rows.filter(store => !isMyBossStore(store));
 
+    if(captureCooldownActive()){
+      if(target) target.textContent = "다음 점령 대기 중";
+      if(meta) meta.textContent = `${formatRemaining(captureCooldown.cooldown_until)} 후 다음 매장 점령 가능`;
+      return;
+    }
+
+    const challengeableRows = rows.filter(store => !isMyBossStore(store));
     const next = challengeableRows[0] || null;
     if(target) target.textContent = next?.name ? String(next.name) : "주변 매장 탐색 중";
     if(meta){
@@ -1094,7 +1164,7 @@
 
     if(error){
       console.error("BiteBoss store search:", error);
-      if(box) box.innerHTML = `<div class="app-state is-error">매장 검색에 실패했습니다.</div>`;
+      setRetryState(box, "매장 검색에 실패했습니다.", searchStores);
       return;
     }
 
@@ -1129,7 +1199,7 @@
     const name = String(storeName || "매장").trim();
 
     if(url){
-      return `<img class="${escapeAttr(className)}" src="${escapeAttr(url)}" alt="${escapeAttr(name)} 매장 사진" />`;
+      return `<img class="${escapeAttr(className)}" src="${escapeAttr(url)}" alt="${escapeAttr(name)} 매장 사진" loading="lazy" decoding="async" />`;
     }
 
     const initial = Array.from(name)[0] || "B";
@@ -1140,7 +1210,7 @@
     const url = String(avatarUrl || "").trim();
     const name = String(nickname || "보스").trim();
     if(url){
-      return `<img class="${escapeAttr(className)}" src="${escapeAttr(url)}" alt="${escapeAttr(name)} 프로필" />`;
+      return `<img class="${escapeAttr(className)}" src="${escapeAttr(url)}" alt="${escapeAttr(name)} 프로필" loading="lazy" decoding="async" />`;
     }
     return `<span class="${escapeAttr(className)} boss-avatar-fallback" aria-hidden="true"></span>`;
   }
@@ -1153,11 +1223,11 @@
     const storeInitial = Array.from(storeLabel)[0] || "B";
 
     const storeHalf = storeUrl
-      ? `<img src="${escapeAttr(storeUrl)}" alt="" />`
+      ? `<img src="${escapeAttr(storeUrl)}" alt="" loading="lazy" decoding="async" />`
       : `<span class="occupied-store-half-fallback">${escapeHtml(storeInitial)}</span>`;
 
     const bossHalf = bossUrl
-      ? `<img src="${escapeAttr(bossUrl)}" alt="" />`
+      ? `<img src="${escapeAttr(bossUrl)}" alt="" loading="lazy" decoding="async" />`
       : `<span class="occupied-boss-half-fallback" aria-hidden="true"></span>`;
 
     return `
@@ -1292,7 +1362,9 @@
     }catch(error){
       console.warn("BiteBoss store detail:", error);
       const body = $("#modalBody");
-      if(body) body.innerHTML = `<div class="store-detail-empty">매장 정보를 불러오지 못했습니다.</div>`;
+      setRetryState(body, "매장 정보를 불러오지 못했습니다.", async () => {
+        await openStoreDetail(storeId, options);
+      });
     }
   }
 
@@ -1351,7 +1423,8 @@
       Number(game.power_needed || (bossExists && !isBoss && myPower <= bossDefense ? bossDefense - myPower + 1 : 0))
     );
 
-    const canChallenge = game.challengeable !== false && !protectedNow && !cooldownNow && !isBoss;
+    const globalCaptureCooldownNow = captureCooldownActive();
+    const canChallenge = game.challengeable !== false && !protectedNow && !cooldownNow && !globalCaptureCooldownNow && !isBoss;
 
     const distance = Number.isFinite(Number(store.distance_m)) ? formatDistance(store.distance_m) : "";
     const place = [store.city, store.district].filter(Boolean).join(" ");
@@ -1361,6 +1434,7 @@
     let battleState = "도전 가능";
     if(isBoss) battleState = "점령 중";
     else if(protectedNow) battleState = "보호 중";
+    else if(globalCaptureCooldownNow) battleState = "다음 점령 대기";
     else if(cooldownNow) battleState = "재도전 대기";
     else if(bossExists) battleState = "도전 가능";
     else battleState = "미점령";
@@ -1563,6 +1637,8 @@
       action = "";
     }else if(protectedNow){
       action = `<div class="store-detail-auto"><strong>보호 중</strong><span>${escapeHtml(formatRemaining(protectionUntil))} 후 도전할 수 있습니다.</span></div>`;
+    }else if(globalCaptureCooldownNow){
+      action = `<div class="store-detail-auto"><strong>다음 점령 대기</strong><span>${escapeHtml(formatRemaining(captureCooldown.cooldown_until))} 후 다른 매장을 점령할 수 있습니다.</span></div>`;
     }else if(cooldownNow){
       action = `<div class="store-detail-auto"><strong>재도전 대기</strong><span>${escapeHtml(formatRemaining(cooldownUntil))} 후 다시 도전할 수 있습니다.</span></div>`;
     }else if(isPartner){
@@ -2097,7 +2173,7 @@
     if(error){
       console.warn("BiteBoss activity:", error);
       if(homeBox) homeBox.innerHTML = `<div class="activity-empty">활동 기록을 불러오지 못했습니다.</div>`;
-      if(profileBox) profileBox.innerHTML = `<div class="activity-empty">활동 기록을 불러오지 못했습니다.</div>`;
+      setRetryState(profileBox, "전투 기록을 불러오지 못했습니다.", loadGameActivity);
       return;
     }
 
@@ -2162,7 +2238,7 @@
       ).trim();
       const fallback = Array.from(String(storeName).trim())[0] || "B";
       const thumb = photoUrl
-        ? `<img class="profile-record-thumb" src="${escapeAttr(photoUrl)}" alt="" />`
+        ? `<img class="profile-record-thumb" src="${escapeAttr(photoUrl)}" alt="" loading="lazy" decoding="async" />`
         : `<span class="profile-record-thumb profile-record-thumb-fallback" aria-hidden="true">${escapeHtml(fallback)}</span>`;
 
       return `
@@ -2249,6 +2325,7 @@
     const { data, error } = await sb.rpc("biteboss_my_history", { p_limit:30 });
     if(error){
       console.warn(error);
+      setRetryState(box, "방문 기록을 불러오지 못했습니다.", loadHistory);
       return;
     }
 
@@ -2287,7 +2364,7 @@
       ).trim();
       const fallback = Array.from(storeName)[0] || "B";
       const thumb = photoUrl
-        ? `<img class="profile-record-thumb" src="${escapeAttr(photoUrl)}" alt="" />`
+        ? `<img class="profile-record-thumb" src="${escapeAttr(photoUrl)}" alt="" loading="lazy" decoding="async" />`
         : `<span class="profile-record-thumb profile-record-thumb-fallback" aria-hidden="true">${escapeHtml(fallback)}</span>`;
       const visitTime = formatDate(entry.claimed_at || entry.visited_at || entry.created_at);
       const meta = [place, visitTime].filter(Boolean).join(" · ");
@@ -2547,14 +2624,14 @@
   async function pingTakeoverSession(store,pos){
     if(!store?.id || !pos?.coords || !window.sb) return null;
     try{
-      const {data,error}=await sb.rpc("biteboss_takeover_session_ping_v71",{
+      const {data,error}=await sb.rpc("biteboss_takeover_session_ping_v7514",{
         p_store_id:store.id,
         p_lat:Number(pos.coords.latitude),
         p_lng:Number(pos.coords.longitude),
         p_accuracy_m:Number.isFinite(pos.coords.accuracy)?Number(pos.coords.accuracy):null
       });
       if(error){
-        if(!String(error.message||"").includes("biteboss_takeover_session_ping_v71")) console.warn("BiteBoss takeover session:",error);
+        if(!String(error.message||"").includes("biteboss_takeover_session_ping_v7514")) console.warn("BiteBoss takeover session:",error);
         return null;
       }
       return data||null;
@@ -2690,6 +2767,7 @@
         new Date(protectionUntil).getTime() > Date.now()
       );
 
+      if(captureCooldownActive()) return ownedByMe;
       return ownedByMe || !protectedNow;
     });
 
@@ -2755,6 +2833,12 @@
       // Already-owned stores still send the presence ping so defense/visit records
       // remain intact, but they never create a takeover session or takeover UI.
       const takeoverSession = ownedByMe ? null : await pingTakeoverSession(nearest.store, pos);
+      if(takeoverSession?.reason === "CAPTURE_COOLDOWN"){
+        captureCooldown={active:true,cooldown_until:takeoverSession.cooldown_until,loaded_at:Date.now()};
+        if(takeoverUi?.storeId===String(nearest.store.id)) closeTakeoverUi();
+        updateChallengeCommand(stores);
+        return;
+      }
       if(takeoverSession?.ok){
         syncTakeoverUi(nearest.store, takeoverSession);
         if(takeoverSession.status === "cancelled"){
@@ -2817,7 +2901,7 @@
           ...data,
           store_name:data?.store_name || nearest.store.name || "매장"
         });
-        await Promise.all([loadStores(), loadHome()]);
+        await Promise.all([loadCaptureCooldownStatus(true), loadStores(), loadHome()]);
         return;
       }
 
@@ -3570,6 +3654,9 @@
     const cleanToken = String(token || "").trim();
     if(!cleanToken) return toast("유효한 QR이 아닙니다.");
 
+    await loadCaptureCooldownStatus(true);
+    if(captureCooldownActive()) return toast(captureCooldownMessage());
+
     const pos = await getPositionSafe(true);
     if(!pos) return toast("보스 점령에는 위치 권한이 필요합니다.");
 
@@ -3588,6 +3675,7 @@
     showChallengeOutcome(data);
     lastPosition = pos;
     await Promise.all([
+      loadCaptureCooldownStatus(true),
       loadStores(),
       loadHome(),
       loadRank(),
@@ -3663,6 +3751,7 @@
     }
     if(message.includes("STORE_PROTECTED:")) return `현재 보스 보호시간이 남아 있습니다. ${secondsFromError(message, "STORE_PROTECTED:")}`;
     if(message.includes("ALREADY_BOSS:")) return `이미 이 매장의 보스입니다. ${secondsFromError(message, "ALREADY_BOSS:")}`;
+    if(message.includes("CAPTURE_COOLDOWN:")) return `다음 매장 점령 대기 중입니다. ${secondsFromError(message, "CAPTURE_COOLDOWN:")}`;
     if(message.includes("RECLAIM_COOLDOWN:")) return `이 매장은 재점령 쿨다운 중입니다. ${secondsFromError(message, "RECLAIM_COOLDOWN:")}`;
     if(message.includes("DAILY_LIMIT_REACHED")) return "오늘 이 매장에서 가능한 점령 횟수를 모두 사용했습니다.";
     if(message.includes("ACCOUNT_BLOCKED")) return "현재 이 계정에서는 보스 기능을 사용할 수 없습니다.";
@@ -4403,6 +4492,11 @@
             member.role !== "leader" &&
             member.user_id
           );
+          const canKick = Boolean(
+            organization?.is_leader &&
+            member.role !== "leader" &&
+            member.user_id
+          );
 
           const memberName = String(member.nickname || member.username || "사용자").trim();
           const isCurrentProfile = Boolean(
@@ -4432,14 +4526,25 @@
               </div>
               <div class="organization-member-side">
                 <b>${Number(member.boss_count || 0)} 보스</b>
-                ${canTransfer ? `
-                  <button
-                    class="text-btn organization-transfer-btn"
-                    type="button"
-                    data-transfer-leader="${escapeAttr(member.user_id)}"
-                    data-member-name="${escapeAttr(member.nickname || member.username || "멤버")}">
-                    리더 변경
-                  </button>` : ""}
+                ${(canTransfer || canKick) ? `
+                  <div class="organization-member-actions">
+                    ${canTransfer ? `
+                      <button
+                        class="text-btn organization-transfer-btn"
+                        type="button"
+                        data-transfer-leader="${escapeAttr(member.user_id)}"
+                        data-member-name="${escapeAttr(member.nickname || member.username || "멤버")}">
+                        리더 변경
+                      </button>` : ""}
+                    ${canKick ? `
+                      <button
+                        class="text-btn organization-kick-btn"
+                        type="button"
+                        data-kick-member="${escapeAttr(member.user_id)}"
+                        data-member-name="${escapeAttr(member.nickname || member.username || "멤버")}">
+                        강퇴
+                      </button>` : ""}
+                  </div>` : ""}
               </div>
             </article>
           `;
@@ -4567,14 +4672,93 @@
 
 
   function handleOrganizationMemberAction(event){
-    const button = event.target.closest("[data-transfer-leader]");
-    if(!button) return;
+    const kickButton = event.target.closest("[data-kick-member]");
+    if(kickButton){
+      const userId = String(kickButton.dataset.kickMember || "").trim();
+      const memberName = String(kickButton.dataset.memberName || "멤버").trim();
+      if(userId) openOrganizationKickConfirm(userId, memberName);
+      return;
+    }
 
-    const userId = String(button.dataset.transferLeader || "").trim();
-    const memberName = String(button.dataset.memberName || "Member").trim();
+    const transferButton = event.target.closest("[data-transfer-leader]");
+    if(!transferButton) return;
+
+    const userId = String(transferButton.dataset.transferLeader || "").trim();
+    const memberName = String(transferButton.dataset.memberName || "멤버").trim();
     if(!userId) return;
 
     openLeadershipTransferConfirm(userId, memberName);
+  }
+
+  function openOrganizationKickConfirm(userId, memberName){
+    if(!organization?.is_leader){
+      toast("크루 개설자만 멤버를 강퇴할 수 있습니다.");
+      return;
+    }
+
+    openModal("크루원 강퇴", `
+      <div class="organization-kick-confirm">
+        <span>강퇴할 멤버</span>
+        <strong>${escapeHtml(memberName)}</strong>
+        <p>${escapeHtml(organization?.name || "크루")}에서 이 멤버를 제외합니다.</p>
+        <p class="organization-kick-note">멤버의 개인 보스 기록과 XP는 유지됩니다. 크루 점령 집계에서는 즉시 제외됩니다.</p>
+        <button
+          id="organizationKickConfirm"
+          class="danger-btn"
+          type="button"
+          data-kick-user="${escapeAttr(userId)}">
+          강퇴
+        </button>
+      </div>
+    `);
+
+    $("#organizationKickConfirm")?.addEventListener("click", kickOrganizationMember);
+  }
+
+  async function kickOrganizationMember(event){
+    const button = event.currentTarget;
+    const userId = String(button?.dataset?.kickUser || "").trim();
+    if(!userId) return;
+
+    if(button) button.disabled = true;
+    try{
+      const { data, error } = await sb.rpc("biteboss_kick_organization_member_v7513", {
+        p_target_user_id:userId
+      });
+      if(error) throw error;
+
+      if(!data?.ok){
+        const message = ({
+          MEMBER_LOGIN_REQUIRED:"회원 로그인이 필요합니다.",
+          LEADER_REQUIRED:"크루 개설자만 멤버를 강퇴할 수 있습니다.",
+          TARGET_REQUIRED:"강퇴할 멤버를 선택하세요.",
+          CANNOT_KICK_SELF:"본인은 강퇴할 수 없습니다. 크루 해산 또는 리더 변경을 이용하세요.",
+          TARGET_NOT_MEMBER:"현재 크루 멤버가 아닙니다.",
+          CANNOT_KICK_LEADER:"개설자는 강퇴할 수 없습니다."
+        })[data?.error] || "크루원을 강퇴하지 못했습니다.";
+        toast(message);
+        return;
+      }
+
+      closeModal();
+      await Promise.all([
+        loadMyOrganization(),
+        loadStores(),
+        loadHome(),
+        loadRank()
+      ]);
+      toast(`${data?.member_name || "크루원"}을(를) 크루에서 제외했습니다.`);
+    }catch(error){
+      console.warn("BiteBoss kick organization member:", error);
+      const message = String(error?.message || "");
+      if(message.includes("Could not find the function") || message.includes("PGRST202")){
+        toast("크루원 강퇴 기능이 서버에 아직 적용되지 않았습니다.");
+      }else{
+        toast("크루원을 강퇴하지 못했습니다.");
+      }
+    }finally{
+      if(button) button.disabled = false;
+    }
   }
 
   function openLeadershipTransferConfirm(userId, memberName){
@@ -4701,7 +4885,9 @@
     }catch(error){
       console.warn("BiteBoss player profile:", error);
       const body = $("#modalBody");
-      if(body) body.innerHTML = `<div class="store-detail-empty">플레이어 정보를 불러오지 못했습니다.</div>`;
+      setRetryState(body, "플레이어 정보를 불러오지 못했습니다.", async () => {
+        await openPlayerProfile(userId, avatarHint);
+      });
     }
   }
 

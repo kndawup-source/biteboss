@@ -226,6 +226,29 @@
       btn.addEventListener("click", () => openStoreAdminPage(btn.dataset.openStorePage));
     });
   }
+  function formSubmitButton(form){ return form?.querySelector?.('button[type="submit"]') || null; }
+
+  async function withFormLock(form, task, pendingLabel = "저장 중…"){
+    const button = formSubmitButton(form);
+    if(button?.disabled) return false;
+    const original = button?.textContent || "";
+    if(button){
+      button.disabled = true;
+      button.setAttribute("aria-busy", "true");
+      if(pendingLabel) button.textContent = pendingLabel;
+    }
+    try{
+      await task();
+      return true;
+    }finally{
+      if(button){
+        button.disabled = false;
+        button.removeAttribute("aria-busy");
+        button.textContent = original;
+      }
+    }
+  }
+
   function bindForms(){
     $("#storeInfoForm")?.addEventListener("submit", saveStoreInfo);
     $("#menuForm")?.addEventListener("submit", addMenu);
@@ -333,20 +356,25 @@
 
   async function saveStoreInfo(event){
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const { error } = await storeSb.rpc("biteboss_update_store", {
-      p_store_id:currentStore.id,
-      p_name:String(form.get("name") || "").trim(),
-      p_category:String(form.get("category") || "restaurant"),
-      p_city:String(form.get("city") || "").trim(),
-      p_district:String(form.get("district") || "").trim(),
-      p_address:String(form.get("address") || "").trim(),
-      p_hours:String(form.get("hours") || "").trim(),
-      p_phone:String(form.get("phone") || "").trim(),
-      p_notice:String(form.get("notice") || "").trim()
-    });
-    if(error) return alert(error.message);
-    await refreshStore();
+    const formEl = event.currentTarget;
+    const form = new FormData(formEl);
+    const name = String(form.get("name") || "").trim();
+    if(!name) return alert("매장명을 입력하세요.");
+    await withFormLock(formEl, async () => {
+      const { error } = await storeSb.rpc("biteboss_update_store", {
+        p_store_id:currentStore.id,
+        p_name:name,
+        p_category:String(form.get("category") || "restaurant"),
+        p_city:String(form.get("city") || "").trim(),
+        p_district:String(form.get("district") || "").trim(),
+        p_address:String(form.get("address") || "").trim(),
+        p_hours:String(form.get("hours") || "").trim(),
+        p_phone:String(form.get("phone") || "").trim(),
+        p_notice:String(form.get("notice") || "").trim()
+      });
+      if(error) throw error;
+      await refreshStore();
+    }).catch(error => alert(error?.message || "매장 정보 저장에 실패했습니다."));
   }
 
   async function loadPhotos(){
@@ -356,7 +384,7 @@
     if(!box) return;
     box.innerHTML = (data || []).map(photo => `
       <article class="store-photo-card">
-        <img src="${escapeAttr(photo.image_url)}" alt="" />
+        <img src="${escapeAttr(photo.image_url)}" alt="" loading="lazy" decoding="async" />
         <div><strong>${escapeHtml(photo.caption || (photo.is_cover ? "대표 사진" : "매장 사진"))}</strong><button class="badge bad" data-delete-photo="${escapeAttr(photo.id)}" data-photo-path="${escapeAttr(photo.storage_path || "")}" type="button">삭제</button></div>
       </article>
     `).join("") || `<div class="timeline-item muted">등록된 사진이 없습니다.</div>`;
@@ -437,20 +465,28 @@
 
   async function addMenu(event){
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const isSignature = String(form.get("is_signature")) === "true";
-    if(isSignature) await storeSb.from("biteboss_menu_items").update({ is_signature:false }).eq("store_id", currentStore.id);
-    const result = await storeSb.from("biteboss_menu_items").insert({
-      store_id:currentStore.id,
-      name:String(form.get("name") || "").trim(),
-      price:form.get("price") ? Number(form.get("price")) : null,
-      description:String(form.get("description") || "").trim(),
-      is_signature:isSignature,
-      is_active:true
-    });
-    if(result.error) return alert(result.error.message);
-    event.currentTarget.reset();
-    await loadMenu();
+    const formEl = event.currentTarget;
+    const form = new FormData(formEl);
+    const name = String(form.get("name") || "").trim();
+    if(!name) return alert("메뉴명을 입력하세요.");
+    await withFormLock(formEl, async () => {
+      const isSignature = String(form.get("is_signature")) === "true";
+      if(isSignature){
+        const cleared = await storeSb.from("biteboss_menu_items").update({ is_signature:false }).eq("store_id", currentStore.id);
+        if(cleared.error) throw cleared.error;
+      }
+      const result = await storeSb.from("biteboss_menu_items").insert({
+        store_id:currentStore.id,
+        name,
+        price:form.get("price") ? Number(form.get("price")) : null,
+        description:String(form.get("description") || "").trim(),
+        is_signature:isSignature,
+        is_active:true
+      });
+      if(result.error) throw result.error;
+      formEl.reset();
+      await loadMenu();
+    }).catch(error => alert(error?.message || "메뉴 저장에 실패했습니다."));
   }
 
   async function loadQr(){
@@ -573,21 +609,23 @@
   async function addOffer(event){
     event.preventDefault();
     if(!currentStore) return;
-
-    const form = new FormData(event.currentTarget);
-    const { data, error } = await storeSb.rpc("biteboss_store_upsert_offer", {
-      p_store_id:currentStore.id,
-      p_offer_id:null,
-      p_title:String(form.get("title") || "").trim(),
-      p_description:String(form.get("description") || "").trim(),
-      p_status:String(form.get("status") || "draft"),
-      p_minimum_role:String(form.get("minimum_role") || "visitor")
-    });
-
-    if(error || !data?.ok) return alert(error?.message || data?.error || "혜택 저장 실패");
-
-    event.currentTarget.reset();
-    await loadOffers();
+    const formEl = event.currentTarget;
+    const form = new FormData(formEl);
+    const title = String(form.get("title") || "").trim();
+    if(!title) return alert("혜택 제목을 입력하세요.");
+    await withFormLock(formEl, async () => {
+      const { data, error } = await storeSb.rpc("biteboss_store_upsert_offer", {
+        p_store_id:currentStore.id,
+        p_offer_id:null,
+        p_title:title,
+        p_description:String(form.get("description") || "").trim(),
+        p_status:String(form.get("status") || "draft"),
+        p_minimum_role:String(form.get("minimum_role") || "visitor")
+      });
+      if(error || !data?.ok) throw error || new Error(data?.error || "혜택 저장 실패");
+      formEl.reset();
+      await loadOffers();
+    }).catch(error => alert(error?.message || "혜택 저장에 실패했습니다."));
   }
 
   async function redeemBenefitPass(event){

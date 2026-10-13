@@ -6,19 +6,19 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" />
   <meta name="mobile-web-app-capable" content="yes" />
   <title>BiteBoss Admin</title>
-  <link rel="stylesheet" href="./styles.css?v=72.2" />
-  <link rel="stylesheet" href="./admin.css?v=72.2" />
-  <script src="./app-config.js?v=72.2"></script>
+  <link rel="stylesheet" href="./styles.css?v=75.14" />
+  <link rel="stylesheet" href="./admin.css?v=75.14" />
+  <script src="./app-config.js?v=75.14"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="admin-app">
 <div id="adminAuthGate" class="auth-gate">
   <form id="adminLoginForm" class="auth-panel">
-    <span>BiteBoss</span><h1>Admin</h1>
+    <span>BITEBOSS / ADMIN</span><h1>운영자</h1>
     <p>운영자 ID와 6자리 PIN을 입력하세요.</p>
     <input class="input" name="admin_id" type="text" placeholder="ID" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="40" required />
     <input class="input" name="pin" type="password" placeholder="PIN" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="current-password" required />
-    <button class="primary-btn" type="submit">Login</button>
+    <button class="primary-btn" type="submit">로그인</button>
     <small id="adminLoginStatus"></small>
   </form>
 </div>
@@ -30,7 +30,7 @@
         <span>운영 콘솔</span>
         <strong>BiteBoss</strong>
       </div>
-      <span id="adminRole" class="admin-role">admin</span>
+      <span id="adminRole" class="admin-role">ADMIN</span>
     </div>
 
     <nav class="admin-primary-nav" aria-label="관리자 주요 메뉴">
@@ -118,7 +118,7 @@
 
     <section class="admin-page" id="admin-partner-requests">
       <div class="admin-page-head"><div><span class="eyebrow">매장</span><h2>제휴 신청</h2><p>매장 관리자 인증 신청을 확인합니다.</p></div></div>
-      <div id="partnerRequestCounters" class="partner-request-counters"><div><span>PENDING</span><strong id="partnerCountPending">0</strong></div><div><span>APPROVED</span><strong id="partnerCountApproved">0</strong></div><div><span>REJECTED</span><strong id="partnerCountRejected">0</strong></div></div>
+      <div id="partnerRequestCounters" class="partner-request-counters"><div><span>대기</span><strong id="partnerCountPending">0</strong></div><div><span>승인</span><strong id="partnerCountApproved">0</strong></div><div><span>반려</span><strong id="partnerCountRejected">0</strong></div></div>
       <div class="partner-request-toolbar">
         <select id="partnerRequestFilter" class="input"><option value="pending">확인 대기</option><option value="approved">승인 완료</option><option value="rejected">거절</option><option value="all">전체</option></select>
         <button id="refreshPartnerRequests" class="secondary-btn" type="button">새로고침</button>
@@ -135,6 +135,7 @@
       <div class="admin-page-head"><div><span class="eyebrow">게임</span><h2>게임 규칙</h2><p>점령, GPS, 파워와 크루 규칙을 설정합니다.</p></div></div>
       <form id="rulesForm" class="form-grid admin-form">
         <label>보호시간(분)<input name="protect_minutes" class="input" type="number" min="1" required /></label>
+        <label>점령 간격(분)<input name="capture_cooldown_minutes" class="input" type="number" min="0" required /></label>
         <label>재점령 쿨다운(분)<input name="reclaim_cooldown_minutes" class="input" type="number" min="0" required /></label>
         <label>GPS 허용 반경(m)<input name="gps_radius_m" class="input" type="number" min="1" required /></label>
         <label>최대 GPS 오차(m)<input name="max_location_accuracy_m" class="input" type="number" min="1" required /></label>
@@ -331,6 +332,6 @@
   </section>
 </div>
 
-<script src="./admin.js?v=72.2"></script>
+<script src="./admin.js?v=75.14"></script>
 </body>
 </html>
