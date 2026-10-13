@@ -1,9 +1,9 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "74.5";
+  const BITEBOSS_BUILD = "75.0";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
-if(window.__BITEBOSS_APP_BOOTED__) return;
+  if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
 
   const $ = q => document.querySelector(q);
@@ -49,6 +49,22 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     new_player_protection_claims:5,
     season_days:30
   };
+
+  const RUNTIME = Object.freeze({
+    foregroundRefreshMinMs:30000,
+    autoImportRetryMs:120000,
+    autoImportCacheLimit:12,
+    apiTimeoutMs:7000,
+    initialLocationTimeoutMs:2500,
+    initialLocationMaxAgeMs:60000,
+    foregroundLocationMaxAgeMs:30000,
+    takeoverUiTickMs:250,
+    localOwnershipGraceMs:120000,
+    gamePulseCacheMs:15000,
+    storeSearchDebounceMs:250
+  });
+  const TAKEOVER_IDLE_STATES = new Set(["hold","outside","low_accuracy","cancelled","ready"]);
+
 
   let authUser = null;
   let profile = null;
@@ -166,8 +182,8 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     await refreshNotificationState({ registerIfGranted:true });
 
     const initialPositionPromise = getPositionSafe(false, {
-      timeout:2500,
-      maximumAge:60000
+      timeout:RUNTIME.initialLocationTimeoutMs,
+      maximumAge:RUNTIME.initialLocationMaxAgeMs
     });
 
     await Promise.all([
@@ -251,13 +267,23 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     window.addEventListener("pagehide", cleanupRuntime, { once:false });
   }
 
+  function clearTimeoutRef(value){
+    if(value !== null) clearTimeout(value);
+    return null;
+  }
+
+  function clearIntervalRef(value){
+    if(value !== null) clearInterval(value);
+    return null;
+  }
+
   function cleanupRuntime(){
     stopPresenceTracking();
     stopNearbyLocationWatch();
-    if(storeSearchTimer){ clearTimeout(storeSearchTimer); storeSearchTimer = null; }
-    if(takeoverUiTimer){ clearInterval(takeoverUiTimer); takeoverUiTimer = null; }
-    if(delayedTakeoverCloseTimer){ clearTimeout(delayedTakeoverCloseTimer); delayedTakeoverCloseTimer = null; }
-    if(takeoverCancelResetTimer){ clearTimeout(takeoverCancelResetTimer); takeoverCancelResetTimer = null; }
+    storeSearchTimer = clearTimeoutRef(storeSearchTimer);
+    takeoverUiTimer = clearIntervalRef(takeoverUiTimer);
+    delayedTakeoverCloseTimer = clearTimeoutRef(delayedTakeoverCloseTimer);
+    takeoverCancelResetTimer = clearTimeoutRef(takeoverCancelResetTimer);
   }
 
   async function refreshAfterForeground(){
@@ -269,7 +295,7 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
 
     // Returning from Control Center / camera can trigger visibility repeatedly.
     // Avoid re-fetching the entire app more than once every 30 seconds.
-    if(elapsed < 30000){
+    if(elapsed < RUNTIME.foregroundRefreshMinMs){
       startPresenceTracking();
       return;
     }
@@ -281,8 +307,8 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
       renderHomeCopy();
 
       const positionPromise = getPositionSafe(false, {
-        timeout:2500,
-        maximumAge:30000
+        timeout:RUNTIME.initialLocationTimeoutMs,
+        maximumAge:RUNTIME.foregroundLocationMaxAgeMs
       });
 
       await Promise.all([
@@ -326,13 +352,14 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     $("#scanBtn")?.addEventListener("click", scanPrompt);
     $("#storeSearch")?.addEventListener("input", () => {
       clearTimeout(storeSearchTimer);
-      storeSearchTimer = setTimeout(searchStores, 250);
+      storeSearchTimer = setTimeout(searchStores, RUNTIME.storeSearchDebounceMs);
     });
     $("#homeEditProfile")?.addEventListener("click", openProfileEditor);
     $("#homeAvatarButton")?.addEventListener("click", openProfileEditor);
     $("#profileAvatarButton")?.addEventListener("click", openProfileEditor);
     $("#memberLoginBtn")?.addEventListener("click", openMemberLogin);
     $("#memberRegisterBtn")?.addEventListener("click", openMemberRegister);
+    $("#storesLoginBtn")?.addEventListener("click", openMemberLogin);
     $("#addStoreBtn")?.addEventListener("click", openMemberStoreForm);
     const organizationAction = (selector, handler) => {
       $(selector)?.addEventListener("click", event => {
@@ -392,8 +419,6 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
   }
 
   function syncViewportMetrics(){
-    // HOME now uses the real CSS viewport (100dvh). Keep this variable only for
-    // legacy non-HOME consumers; it no longer defines the HOME canvas.
     const viewportHeight = Math.max(1, Math.round(document.documentElement.clientHeight || window.innerHeight || 1));
     document.documentElement.style.setProperty("--app-viewport-height", `${viewportHeight}px`);
   }
@@ -735,8 +760,6 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
           void refreshStoresForPosition(position);
         },
         error => {
-          // Keep the last known position/list. Permission or temporary GPS errors
-          // must not blank the current nearby store UI.
           if(error?.code !== 1){
             console.warn("BiteBoss location watch:", error);
           }
@@ -858,12 +881,12 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     if(!key) return false;
     const now = Date.now();
     const last = Number(autoImportAttempts.get(key) || 0);
-    if(now - last < 120000) return false;
+    if(now - last < RUNTIME.autoImportRetryMs) return false;
     autoImportAttempts.set(key, now);
 
     // Bound the small in-memory cache for long driving sessions.
-    if(autoImportAttempts.size > 12){
-      const oldest = [...autoImportAttempts.entries()].sort((a,b) => a[1] - b[1]).slice(0, autoImportAttempts.size - 12);
+    if(autoImportAttempts.size > RUNTIME.autoImportCacheLimit){
+      const oldest = [...autoImportAttempts.entries()].sort((a,b) => a[1] - b[1]).slice(0, autoImportAttempts.size - RUNTIME.autoImportCacheLimit);
       oldest.forEach(([oldKey]) => autoImportAttempts.delete(oldKey));
     }
     return true;
@@ -888,7 +911,7 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
       if(!shouldAttemptAutoImport(pos, radius)) return null;
 
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 7000);
+      const timer = setTimeout(() => controller.abort(), RUNTIME.apiTimeoutMs);
 
       try{
         const configuredApiBase = String(cfg.apiBaseUrl || cfg.publicAppUrl || "").trim();
@@ -977,12 +1000,10 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
 
   function updateChallengeCommand(list = stores){
     const rows = Array.isArray(list) ? list : [];
-    const count = $("#challengeNearbyCount");
     const target = $("#challengeNextTarget");
     const meta = $("#challengeNextMeta");
     const gps = $("#challengeGpsState");
     const challengeableRows = rows.filter(store => !isMyBossStore(store));
-    if(count) count.textContent = String(challengeableRows.length);
 
     const next = challengeableRows[0] || null;
     if(target) target.textContent = next?.name ? String(next.name) : "주변 매장 탐색 중";
@@ -1045,13 +1066,6 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
         scanPrompt();
       };
     });
-
-    $$("#storeList [data-store-login]").forEach(btn => {
-      btn.onclick = event => {
-        event.stopPropagation();
-        openMemberLogin();
-      };
-    });
   }
 
   async function searchStores(){
@@ -1090,6 +1104,9 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
 
   function compareNearbyStores(a,b){
     const ar=storeRoleMap.get(String(a.id))||{}, br=storeRoleMap.get(String(b.id))||{};
+    const aOwned=isMyBossStore(a), bOwned=isMyBossStore(b);
+    // Owned stores are reference/history items, not active targets. Keep them at the bottom.
+    if(aOwned!==bOwned) return aOwned ? 1 : -1;
     const now=Date.now();
     const aProtected=Boolean((ar.protected_until||a.protected_until)&&new Date(ar.protected_until||a.protected_until).getTime()>now);
     const bProtected=Boolean((br.protected_until||b.protected_until)&&new Date(br.protected_until||b.protected_until).getTime()>now);
@@ -1172,9 +1189,8 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
 
     let status = "";
     if(ownedByMe){
-      status = protectedNow
-        ? `내 점령지 · 보호 ${formatRemaining(protectionUntil)} 남음`
-        : "내 점령지";
+      // Ownership is expressed by ordering and the split avatar, not repeated copy.
+      status = protectedNow ? `보호 ${formatRemaining(protectionUntil)} 남음` : "";
     }else if(bossExists && protectedNow){
       status = `보호 ${formatRemaining(protectionUntil)} 남음`;
     }else if(presence?.status === "tracking"){
@@ -1183,31 +1199,20 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
       status = `${Math.round(Number(presence.distance_m || 0))}m 더 가까이 가면 자동 시작`;
     }else if(presence?.status === "low_accuracy"){
       status = "GPS 정확도 확인 중";
-    }else if(loginRequired){
-      status = "";
     }else if(isPartner){
       status = "QR로 바로 도전";
-    }else{
-      status = "";
     }
 
     let action = "";
-    if(ownedByMe){
-      action = "";
-    }else if(isPartner){
+    if(!ownedByMe && isPartner){
       action = `<button class="store-list-action is-primary" data-scan-store="${escapeAttr(store.id)}" type="button">QR 도전</button>`;
-    }else if(loginRequired){
-      action = `<button class="store-list-action" data-store-login="${escapeAttr(store.id)}" type="button">로그인</button>`;
-    }else if(presence?.status === "tracking"){
+    }else if(!ownedByMe && presence?.status === "tracking"){
       action = `<span class="store-list-action is-live" aria-live="polite">${formatPresenceSeconds(remainingSeconds)}</span>`;
-    }else{
-      action = "";
     }
 
     const badges = [
       isPartner ? {label:"제휴", cls:"partner"} : null,
       Boolean(store.has_benefit || Number(store.active_offer_count || 0) > 0) ? {label:"혜택", cls:"benefit"} : null,
-      ownedByMe ? {label:"내 점령지", cls:"owned"} : null,
       protectedNow ? {label:"보호 중", cls:"protected"} : null
     ].filter(Boolean);
 
@@ -2332,23 +2337,34 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
   }
 
 
-  function isMyBossStore(store){
-    if(!store?.id) return false;
-    const storeId=String(store.id);
-    const localOwnedAt=Number(locallyOwnedStoreIds.get(storeId) || 0);
-    if(localOwnedAt && Date.now()-localOwnedAt < 120000) return true;
-    if(localOwnedAt) locallyOwnedStoreIds.delete(storeId);
+  function hasRecentLocalOwnership(storeId){
+    const key=String(storeId||"").trim();
+    if(!key) return false;
+    const ownedAt=Number(locallyOwnedStoreIds.get(key) || 0);
+    if(!ownedAt) return false;
+    if(Date.now()-ownedAt <= RUNTIME.localOwnershipGraceMs) return true;
+    locallyOwnedStoreIds.delete(key);
+    return false;
+  }
 
-    const role=storeRoleMap.get(storeId)||{};
-    if(role.is_my_boss_store || role.my_role === "boss") return true;
-
-    const myIds=new Set([
+  function currentUserIdSet(){
+    return new Set([
       playerSession?.player_user_id,
       profile?.user_id,
       authUser?.id
     ].filter(Boolean).map(String));
+  }
+
+  function isMyBossStore(store){
+    const storeId=String(store?.id || "").trim();
+    if(!storeId) return false;
+    if(hasRecentLocalOwnership(storeId)) return true;
+
+    const role=storeRoleMap.get(storeId)||{};
+    if(role.is_my_boss_store || role.my_role === "boss") return true;
+
     const bossUserId=String(store.current_boss_user_id || store.boss_user_id || "");
-    if(bossUserId && myIds.has(bossUserId)) return true;
+    if(bossUserId && currentUserIdSet().has(bossUserId)) return true;
 
     const myNickname=String(profile?.nickname || playerSession?.nickname || "").trim();
     const bossNickname=String(store.current_boss_nickname || "").trim();
@@ -2358,7 +2374,7 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
   function markStoreOwnedLocally(store){
     const storeId=String(store?.id || "").trim();
     if(!storeId) return;
-    locallyOwnedStoreIds.add(storeId);
+    locallyOwnedStoreIds.set(storeId,Date.now());
     const previous=storeRoleMap.get(storeId)||{};
     storeRoleMap.set(storeId,{...previous,store_id:storeId,is_my_boss_store:true,my_role:"boss"});
   }
@@ -2371,7 +2387,7 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
 
   function currentTakeoverVisualRemaining(){
     if(!takeoverUi) return 0;
-    if(["hold","outside","low_accuracy","cancelled","ready"].includes(String(takeoverUi.status||""))){
+    if(TAKEOVER_IDLE_STATES.has(String(takeoverUi.status||""))){
       return Math.max(0,Number(takeoverRemaining||0));
     }
     const elapsed=Math.max(0,(Date.now()-takeoverLastServerAt)/1000);
@@ -2423,11 +2439,11 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
   function startTakeoverUiTicker(){
     if(takeoverUiTimer) return;
     takeoverUiTimer=window.setInterval(()=>{
-      if(!takeoverUi || ["hold","low_accuracy","cancelled","ready"].includes(takeoverUi.status)) return;
+      if(!takeoverUi || TAKEOVER_IDLE_STATES.has(String(takeoverUi.status||""))) return;
       const elapsed=Math.max(0,(Date.now()-takeoverLastServerAt)/1000);
       const visual=Math.max(0,takeoverRemaining-elapsed);
       renderTakeoverCount(visual);
-    },250);
+    },RUNTIME.takeoverUiTickMs);
   }
 
   function renderTakeoverCount(seconds){
@@ -2506,15 +2522,12 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
   }
 
   function closeTakeoverUi(delay=0){
-    if(delayedTakeoverCloseTimer){
-      clearTimeout(delayedTakeoverCloseTimer);
-      delayedTakeoverCloseTimer = null;
-    }
+    delayedTakeoverCloseTimer = clearTimeoutRef(delayedTakeoverCloseTimer);
 
     const run=()=>{
       $("#takeoverScreen")?.classList.add("hidden");
       document.body.classList.remove("takeover-active");
-      if(takeoverUiTimer){ clearInterval(takeoverUiTimer); takeoverUiTimer=null; }
+      takeoverUiTimer = clearIntervalRef(takeoverUiTimer);
       takeoverUi=null; takeoverRemaining=0; takeoverRequired=0; takeoverLastServerAt=0;
       delayedTakeoverCloseTimer = null;
     };
@@ -2529,7 +2542,7 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
   function cancelTakeoverUi(){
     takeoverCancelledLocally=true;
     closeTakeoverUi();
-    if(takeoverCancelResetTimer) clearTimeout(takeoverCancelResetTimer);
+    takeoverCancelResetTimer = clearTimeoutRef(takeoverCancelResetTimer);
     takeoverCancelResetTimer = window.setTimeout(()=>{
       takeoverCancelledLocally=false;
       takeoverCancelResetTimer=null;
@@ -2557,7 +2570,7 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
   async function loadGamePulse(force=false){
     const box=$("#gamePulse");
     if(!box) return;
-    if(!force && Date.now()-gamePulseLoadedAt<15000) return;
+    if(!force && Date.now()-gamePulseLoadedAt<RUNTIME.gamePulseCacheMs) return;
     gamePulseLoadedAt=Date.now();
 
     let data=null;
@@ -2621,10 +2634,7 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
   }
 
   function stopPresenceTracking(){
-    if(presenceTimer){
-      clearInterval(presenceTimer);
-      presenceTimer = null;
-    }
+    presenceTimer = clearIntervalRef(presenceTimer);
   }
 
   async function tickPresenceTracking(){
@@ -2743,9 +2753,7 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
       }
 
       presenceBlockedReason = "";
-      // Keep the visible countdown on the v71 takeover-session clock only.
-      // biteboss_presence_ping has a different dwell model and using its remaining
-      // seconds here was the source of visible countdown jumps/increases.
+      // The visual countdown follows only the takeover-session clock.
       if(!ownedByMe && !takeoverCancelledLocally && takeoverSession?.ok){
         syncTakeoverUi(nearest.store,takeoverSession);
       }
@@ -3050,7 +3058,7 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
       const {data,error}=await sb.rpc("biteboss_season_region_rank_v71",{p_limit:50});
       if(error){
         console.warn("BiteBoss season ranking:",error);
-        box.innerHTML=`<div class="app-state is-error">시즌 순위를 불러오지 못했습니다. v71 SQL 적용 여부를 확인하세요.</div>`;
+        box.innerHTML=`<div class="app-state is-error">시즌 순위를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</div>`;
         return;
       }
       const rows=Array.isArray(data)?data:[];
@@ -5342,6 +5350,8 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     const profilePage = $("#page-profile");
     profilePage?.classList.toggle("is-guest", !loggedIn);
     profilePage?.classList.toggle("is-member", loggedIn);
+    $("#profileGuestInfo")?.classList.toggle("hidden", loggedIn);
+    $("#page-profile .profile-actions")?.classList.toggle("hidden", loggedIn);
 
     const nickname = loggedIn ? (profile?.nickname || "보스") : "게스트";
     const avatar = loggedIn ? (profile?.avatar_url || "") : "";

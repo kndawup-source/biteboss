@@ -59,14 +59,14 @@ test('takeover timer excludes owned stores and uses one monotonic clock source',
 test('owned store takeover suppression persists immediately after a successful claim',()=>{
   const app=read('app.js').toString();
   assert.match(app,/const locallyOwnedStoreIds = new Map\(\)/);
-  assert.match(app,/locallyOwnedStoreIds\.get\(storeId\)/);
+  assert.match(app,/locallyOwnedStoreIds\.get\(key\)/);
   assert.match(app,/markStoreOwnedLocally\(nearest\.store\)/);
   assert.match(app,/const next = challengeableRows\[0\] \|\| null/);
   assert.match(app,/if\(!items\.length\)\{\s*box\.innerHTML="";\s*box\.classList\.add\("hidden"\)/);
   assert.doesNotMatch(app,/READY TO TAKE OVER/);
-  assert.match(app,/status = protectedNow[\s\S]*내 점령지/);
-  assert.match(app,/ownedByMe \? \{label:"내 점령지", cls:"owned"\}/);
-  assert.match(app,/if\(ownedByMe\)\{\s*action = "";/);
+  assert.doesNotMatch(app,/label:"내 점령지"/);
+  assert.doesNotMatch(app,/status = protectedNow[\s\S]*내 점령지/);
+  assert.match(app,/if\(!ownedByMe && isPartner\)/);
 });
 
 test('ranking and profile avatars are forced to circular masks',()=>{
@@ -131,4 +131,17 @@ test("territory rank uses dedicated 3-column layout and crew marker fallback", (
 test("top-level tab navigation resets inherited scroll position", () => {
   const app = read("app.js").toString();
   assert.match(app, /function openTab\(tab\)[\s\S]*window\.scrollTo\(\{ top:0, left:0, behavior:"auto" \}\)/);
+});
+
+
+test("challenge store list keeps owned stores last and avoids per-row login CTAs", () => {
+  const html = read("index.html").toString();
+  const app = read("app.js").toString();
+  const css = read("styles.css").toString();
+  assert.match(app,/const aOwned=isMyBossStore\(a\), bOwned=isMyBossStore\(b\)/);
+  assert.match(app,/if\(aOwned!==bOwned\) return aOwned \? 1 : -1/);
+  assert.doesNotMatch(app,/data-store-login=/);
+  assert.match(html,/id="storesLoginBtn"/);
+  assert.match(css,/\.challenge-login-btn\{/);
+  assert.doesNotMatch(app,/label:"내 점령지"/);
 });

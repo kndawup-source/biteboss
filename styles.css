@@ -92,7 +92,8 @@ body.user-app #page-home{height:100dvh;min-height:0;padding:0;overflow:hidden}
 .takeover-command-stat{min-height:96px;padding:16px 0 12px;display:flex;flex-direction:column;background:transparent;border:0;border-radius:0;min-width:0}
 .takeover-command-stat strong{margin-top:auto;color:#111;font-size:16px;line-height:1;font-weight:860;letter-spacing:-.035em;white-space:nowrap}
 .takeover-command-stat small{margin-top:5px;color:#a0a0a6;font-size:8px;line-height:1.2;white-space:nowrap}
-.challenge-login-note{margin:0 0 11px;color:#8c8c92;font-size:11px}
+.challenge-login-note{margin:0 0 14px;padding:13px 14px;display:flex;align-items:center;justify-content:space-between;gap:14px;border-radius:15px;background:#fff;color:#111;box-shadow:0 8px 22px rgba(0,0,0,.025)}
+.challenge-login-note>div{min-width:0;display:grid;gap:3px}.challenge-login-note strong{font-size:11px;line-height:1.3;font-weight:830}.challenge-login-note span{color:#96969c;font-size:9px;line-height:1.35}.challenge-login-btn{flex:0 0 auto;min-width:64px;height:34px;padding:0 12px;border-radius:11px;background:#111;color:#fff;font-size:10px;font-weight:830}
 .challenge-search{margin:0 0 18px}
 .game-pulse{margin:0 0 16px;padding:0;background:transparent;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none}.game-pulse::-webkit-scrollbar{display:none}
 .game-pulse-info,.game-pulse-item{flex:0 0 auto;min-width:0;padding:11px 13px;border:0;border-radius:14px;background:#fff;text-align:left;display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 8px;align-items:center}.game-pulse-info span,.game-pulse-item span{grid-row:1/3;color:var(--accent);font-size:9px;font-weight:850;letter-spacing:.12em}.game-pulse-info strong,.game-pulse-item strong{font-size:13px;line-height:1.15;font-weight:830;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.game-pulse-info small,.game-pulse-item small{color:#929298;font-size:9px;line-height:1.2}.game-pulse-item{cursor:pointer}
@@ -101,7 +102,6 @@ body.user-app #page-home{height:100dvh;min-height:0;padding:0;overflow:hidden}
 .store-card-main{display:flex;align-items:center;gap:12px;min-width:0}
 .store-card-photo,.store-avatar,.occupied-store-avatar{width:52px;height:52px;flex:0 0 52px;border-radius:50%;object-fit:cover;background:#e3e3e5;overflow:hidden;position:relative}
 .store-card-photo>img,.store-avatar>img,.occupied-store-half>img,.occupied-boss-half>img{width:100%;height:100%;object-fit:cover}
-.store-avatar-fallback,.boss-avatar-fallback,.occupied-store-half-fallback,.occupied-boss-half-fallback{display:grid;place-items:center;width:100%;height:100%;background:#e0e0e2;color:#111;font-size:19px;font-weight:850;line-height:1}
 .occupied-store-avatar{display:grid;grid-template-columns:50% 50%;grid-template-rows:100%;gap:0}
 .occupied-store-half,.occupied-boss-half{position:relative;display:block;width:100%;height:100%;overflow:hidden}
 .occupied-store-half>img,.occupied-boss-half>img{display:block;width:100%;height:100%;object-fit:cover;border-radius:0!important;clip-path:none!important}
@@ -114,6 +114,14 @@ body.user-app #page-home{height:100dvh;min-height:0;padding:0;overflow:hidden}
 .store-status-tag.partner{color:#111}.store-status-tag.benefit{color:var(--accent)}
 .store-list-action{min-height:35px;padding:0 12px;border:0;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;background:#fff;color:#5f5f65;font-size:10px;font-weight:820;white-space:nowrap;text-align:center;box-shadow:none}
 .store-list-action.is-primary,.store-list-action.is-live{background:#111;color:#fff}.store-list-action.is-auto{background:transparent;color:#8d8d93;padding-right:0;box-shadow:none}.store-list-action.is-owned{color:var(--accent)}
+
+/* challenge list hierarchy */
+.challenge-store-list .store-card{padding:13px 0;background:transparent;border:0;border-radius:0;box-shadow:none}
+.challenge-store-list .store-card + .store-card{margin-top:2px}
+.challenge-store-list .store-card-main{min-width:0}
+.challenge-store-list .store-card-copy{min-width:0;padding-right:4px}
+.challenge-store-list .store-status-tags{margin-top:3px}
+.challenge-store-list .store-list-action{box-shadow:none}
 
 /* avatar geometry */
 .store-card-photo,.store-avatar,.occupied-store-avatar,
@@ -131,7 +139,7 @@ body.user-app #page-home{height:100dvh;min-height:0;padding:0;overflow:hidden}
   width:100%;height:100%;object-fit:cover;border-radius:50%;
 }
 .store-avatar-fallback,.boss-avatar-fallback,.occupied-store-half-fallback,.occupied-boss-half-fallback{
-  display:grid;place-items:center;width:100%;height:100%;background:#e0e0e2;color:#111;font-weight:850;line-height:1;
+  display:grid;place-items:center;width:100%;height:100%;background:#e0e0e2;color:#111;font-size:19px;font-weight:850;line-height:1;
 }
 
 /* pagination */

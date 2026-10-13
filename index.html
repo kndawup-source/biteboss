@@ -9,7 +9,7 @@
   <meta property="og:title" content="BiteBoss" />
   <meta property="og:description" content="주변 매장을 발견하고 도전해 보스를 차지하세요." />
   <meta property="og:type" content="website" />
-  <meta name="biteboss-build" content="74.7" />
+  <meta name="biteboss-build" content="75.0" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -18,8 +18,8 @@
   <link rel="preconnect" href="https://imumpyumchvctrpmfngr.supabase.co" crossorigin />
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
   <link rel="preconnect" href="https://unpkg.com" crossorigin />
-  <link rel="manifest" href="./manifest.webmanifest?v=74.7" />
-  <link rel="stylesheet" href="./styles.css?v=74.7" />
+  <link rel="manifest" href="./manifest.webmanifest?v=75.0" />
+  <link rel="stylesheet" href="./styles.css?v=75.0" />
 </head>
 <body class="user-app home-active">
 <div id="app" class="app-shell">
@@ -86,7 +86,10 @@
         </div>
       </section>
 
-      <p id="storesLoginNotice" class="challenge-login-note hidden">로그인하면 현장에서 자동 점령을 시작할 수 있습니다.</p>
+      <aside id="storesLoginNotice" class="challenge-login-note hidden" aria-label="로그인 안내">
+        <div><strong>현장 점령은 로그인 후 시작됩니다.</strong><span>매장 목록은 로그인 없이 둘러볼 수 있어요.</span></div>
+        <button id="storesLoginBtn" class="challenge-login-btn" type="button">로그인</button>
+      </aside>
 
       <div class="search-box challenge-search">
         <input id="storeSearch" class="input" type="search" aria-label="매장, 카테고리 또는 지역 검색" autocomplete="off" placeholder="매장 / 카테고리 / 지역 검색" />
@@ -261,6 +264,6 @@
   </div>
 </div>
 
-<script src="./bootstrap.js?v=74.7"></script>
+<script src="./bootstrap.js?v=75.0"></script>
 </body>
 </html>
