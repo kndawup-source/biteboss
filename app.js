@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.26";
+  const BITEBOSS_BUILD = "75.27";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -475,6 +475,10 @@
     });
     $("#notificationSettingsBtn")?.addEventListener("click", openNotificationSettings);
     $("#takeoverCancelBtn")?.addEventListener("click", cancelTakeoverUi);
+    $("#challengeNextCard")?.addEventListener("click", () => {
+      const storeId = String($("#challengeNextCard")?.dataset.storeId || "").trim();
+      if(storeId) openStoreDetail(storeId);
+    });
     $("#deleteAccountBtn")?.addEventListener("click", openDeleteAccount);
     $("#logoutBtn")?.addEventListener("click", logout);
 
@@ -1131,10 +1135,15 @@
 
   function updateChallengeCommand(list = stores){
     const rows = Array.isArray(list) ? list : [];
+    const card = $("#challengeNextCard");
     const target = $("#challengeNextTarget");
     const meta = $("#challengeNextMeta");
 
     if(captureCooldownActive()){
+      if(card){
+        card.dataset.storeId = "";
+        card.disabled = true;
+      }
       if(target) target.textContent = "다음 점령 대기 중";
       if(meta){
         meta.textContent = `${formatRemaining(captureCooldown.cooldown_until)} 후 다음 매장 점령 가능`;
@@ -1145,6 +1154,10 @@
 
     const challengeableRows = rows.filter(store => !isMyBossStore(store));
     const next = challengeableRows[0] || null;
+    if(card){
+      card.dataset.storeId = next?.id ? String(next.id) : "";
+      card.disabled = !next?.id;
+    }
     if(target) target.textContent = next?.name ? String(next.name) : "주변 매장 탐색 중";
     if(meta){
       const address = next ? String(next.address || [next.city,next.district].filter(Boolean).join(" ") || "").trim() : "";
@@ -2672,7 +2685,7 @@
       takeoverCancelledLocally=false;
       takeoverCancelResetTimer=null;
     },Math.max(5000,Number(config.gps_presence_ping_seconds||10)*1000));
-    toast("점령을 취소했습니다.");
+    showTakeoverCancelledNotice();
   }
 
   async function pingTakeoverSession(store,pos){
@@ -2724,6 +2737,47 @@
     };
   }
 
+  function localStoreForPulse(row){
+    const id = String(row?.store_id || "").trim();
+    const name = String(row?.store_name || "").trim().toLowerCase();
+    return stores.find(store => String(store?.id || "").trim() === id)
+      || (name ? stores.find(store => String(store?.name || "").trim().toLowerCase() === name) : null)
+      || null;
+  }
+
+  function localStoreDistance(store){
+    const directRaw = store?.distance_m;
+    const direct = directRaw == null || directRaw === "" ? NaN : Number(directRaw);
+    if(Number.isFinite(direct)) return direct;
+    const lat = Number(store?.latitude);
+    const lng = Number(store?.longitude);
+    const userLat = Number(lastPosition?.coords?.latitude);
+    const userLng = Number(lastPosition?.coords?.longitude);
+    if([lat,lng,userLat,userLng].every(Number.isFinite)){
+      return haversineMeters(userLat,userLng,lat,lng);
+    }
+    return Number.MAX_SAFE_INTEGER;
+  }
+
+  function nearbyHotRows(rows){
+    const seen = new Set();
+    return rows
+      .map(row => ({ row, store:localStoreForPulse(row) }))
+      .filter(item => item.store)
+      .sort((a,b) => localStoreDistance(a.store) - localStoreDistance(b.store))
+      .filter(item => {
+        const id = String(item.store.id);
+        if(seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      })
+      .map(item => ({
+        ...item.row,
+        store_id:String(item.store.id),
+        store_name:item.store.name || item.row.store_name
+      }));
+  }
+
   async function loadGamePulse(force=false){
     const box=$("#gamePulse");
     if(!box) return;
@@ -2742,6 +2796,7 @@
       .map(s=>({store_id:s.id,store_name:s.name}));
     const fallbackHot=stores
       .filter(s=>s.is_hot||Number(s.challenges_24h||0)>=Number(config.hot_store_challenges_24h||5))
+      .sort((a,b)=>localStoreDistance(a)-localStoreDistance(b))
       .slice(0,3)
       .map(s=>({store_id:s.id,store_name:s.name,challenges_24h:s.challenges_24h||0}));
 
@@ -2749,9 +2804,11 @@
       .map(normalizePulseStore)
       .filter(Boolean)
       .filter(row=>!isMyBossStore(stores.find(store=>String(store.id)===String(row.store_id))||{}));
-    const hot=(Array.isArray(data?.hot)?data.hot:fallbackHot)
+    const serverHot=(Array.isArray(data?.hot)?data.hot:[])
       .map(normalizePulseStore)
       .filter(Boolean);
+    const localHot=fallbackHot.map(normalizePulseStore).filter(Boolean);
+    const hot=nearbyHotRows([...serverHot,...localHot]);
     const newcomer=data?.new_player_protected===true;
 
     // NEXT TARGET already lives in takeover-command.
@@ -6664,6 +6721,7 @@
     const modalType = String(options?.type || "").trim();
 
     modal?.classList.toggle("store-detail-modal", modalType === "store-detail");
+    modal?.classList.toggle("notice-modal", modalType === "notice");
 
     setText("#modalTitle", title);
 
@@ -6679,6 +6737,15 @@
     const modal = $("#modal");
     modal?.classList.add("hidden");
     modal?.classList.remove("store-detail-modal");
+    modal?.classList.remove("notice-modal");
+  }
+
+  function showTakeoverCancelledNotice(){
+    openModal("점령 취소", `
+      <div class="notice-copy">점령을 취소했습니다.</div>
+      <button class="primary-btn notice-confirm" id="takeoverCancelOk" type="button">확인</button>
+    `, {type:"notice"});
+    $("#takeoverCancelOk").onclick = closeModal;
   }
 
   function toast(message){
