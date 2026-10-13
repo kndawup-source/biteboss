@@ -45,3 +45,31 @@ test('v71 game loop ships takeover, retake/hot pulse, history and season UI',()=
   assert.match(app,/biteboss_store_history_v71/);
   assert.match(css,/\.takeover-count/);
 });
+
+
+test('takeover timer excludes owned stores and uses one monotonic clock source',()=>{
+  const app=read('app.js').toString();
+  assert.match(app,/if\(isMyBossStore\(store\)\)/);
+  assert.match(app,/const takeoverSession = ownedByMe \? null : await pingTakeoverSession/);
+  assert.match(app,/takeoverRemaining=Math\.min\(visualNow,incomingRemaining\)/);
+  assert.match(app,/if\(!ownedByMe && !takeoverCancelledLocally && takeoverSession\?\.ok\)/);
+  assert.doesNotMatch(app,/remaining_seconds:Number\(data\?\.remaining_seconds \?\? takeoverSession\?\.remaining_seconds/);
+});
+
+test('owned store takeover suppression persists immediately after a successful claim',()=>{
+  const app=read('app.js').toString();
+  assert.match(app,/const locallyOwnedStoreIds = new Map\(\)/);
+  assert.match(app,/locallyOwnedStoreIds\.get\(storeId\)/);
+  assert.match(app,/markStoreOwnedLocally\(nearest\.store\)/);
+  assert.match(app,/const next = challengeableRows\[0\] \|\| null/);
+  assert.match(app,/const next=stores\.find\(store=>!isMyBossStore\(store\)\)/);
+  assert.match(app,/action = `<span class="store-list-action is-owned">내 점령지<\/span>`/);
+});
+
+test('ranking and profile avatars are forced to circular masks',()=>{
+  const css=read('styles.css').toString();
+  assert.match(css,/\.my-rank-avatar,.rank-player-avatar,.crew-rank-avatar/);
+  assert.match(css,/border-radius:50%!important/);
+  assert.match(css,/clip-path:circle\(50% at 50% 50%\)/);
+  assert.match(css,/\.crew-rank-avatar-link\{[\s\S]*border-radius:50%/);
+});
