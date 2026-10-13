@@ -187,3 +187,14 @@ test("guest profile uses a single entry CTA and hides crew creation until login"
   assert.match(app, /memberAuthSwitchToRegister/);
   assert.match(app, /memberAuthSwitchToLogin/);
 });
+
+test("challenge HOT pulse is full-width, opens normalized store ids, and store initials stay subdued", () => {
+  const app = read("app.js").toString();
+  const css = read("styles.css").toString();
+  assert.match(app, /function normalizePulseStore\(row\)/);
+  assert.match(app, /row\.store_id \?\? row\.id \?\? row\.store\?\.id/);
+  assert.match(app, /openStoreDetail\(storeId\)/);
+  assert.match(css, /\.game-pulse\{[^}]*display:grid;grid-template-columns:minmax\(0,1fr\)/);
+  assert.match(css, /\.game-pulse-info,\.game-pulse-item\{width:100%/);
+  assert.match(css, /\.store-avatar-fallback,\.occupied-store-half-fallback\{font-size:15px;font-weight:700\}/);
+});

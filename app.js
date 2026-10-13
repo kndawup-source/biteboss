@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.5";
+  const BITEBOSS_BUILD = "75.6";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -2562,6 +2562,18 @@
     }catch{return null;}
   }
 
+  function normalizePulseStore(row){
+    if(!row || typeof row !== "object") return null;
+    const storeId = row.store_id ?? row.id ?? row.store?.id ?? null;
+    if(storeId === null || storeId === undefined || String(storeId).trim() === "") return null;
+    return {
+      ...row,
+      store_id:String(storeId),
+      store_name:row.store_name || row.name || row.store?.name || "매장",
+      challenges_24h:Number(row.challenges_24h ?? row.challenge_count ?? row.store?.challenges_24h ?? 0)
+    };
+  }
+
   async function loadGamePulse(force=false){
     const box=$("#gamePulse");
     if(!box) return;
@@ -2584,8 +2596,12 @@
       .map(s=>({store_id:s.id,store_name:s.name,challenges_24h:s.challenges_24h||0}));
 
     const retakes=(Array.isArray(data?.retakes)?data.retakes:fallbackRetakes)
+      .map(normalizePulseStore)
+      .filter(Boolean)
       .filter(row=>!isMyBossStore(stores.find(store=>String(store.id)===String(row.store_id))||{}));
     const hot=(Array.isArray(data?.hot)?data.hot:fallbackHot)
+      .map(normalizePulseStore)
+      .filter(Boolean)
       .filter(row=>!isMyBossStore(stores.find(store=>String(store.id)===String(row.store_id))||{}));
     const newcomer=data?.new_player_protected===true;
 
@@ -2610,7 +2626,11 @@
 
     box.innerHTML=items.join("");
     box.classList.remove("hidden");
-    $$("[data-pulse-store]",box).forEach(btn=>btn.addEventListener("click",()=>openStoreDetail(btn.dataset.pulseStore)));
+    $$("[data-pulse-store]",box).forEach(btn=>btn.addEventListener("click",()=>{
+      const storeId=String(btn.dataset.pulseStore||"").trim();
+      if(!storeId) return;
+      openStoreDetail(storeId);
+    }));
   }
 
 
