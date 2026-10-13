@@ -209,3 +209,19 @@ test("roleCopy regression: store detail defines role label before rendering", ()
   const use = src.indexOf("escapeHtml(roleCopy)");
   assert.ok(def >= 0 && use > def);
 });
+
+test("HOT pulse remains visible for owned stores and legal pages use BiteBoss editorial hierarchy", () => {
+  const app = read("app.js").toString();
+  const privacy = read("privacy-policy.html").toString();
+  const support = read("support.html").toString();
+  const css = read("styles.css").toString();
+  const hotStart = app.indexOf('const hot=(Array.isArray(data?.hot)?data.hot:fallbackHot)');
+  const hotEnd = app.indexOf('const newcomer=', hotStart);
+  const hotBlock = app.slice(hotStart, hotEnd);
+  assert.ok(hotStart >= 0 && hotEnd > hotStart);
+  assert.doesNotMatch(hotBlock, /isMyBossStore/);
+  assert.match(privacy, /BITEBOSS \/ PRIVACY/);
+  assert.match(support, /BITEBOSS \/ SUPPORT/);
+  assert.match(css, /\.legal-page-shell\{/);
+  assert.match(css, /\.support-faq-item\{/);
+});

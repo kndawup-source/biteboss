@@ -2622,8 +2622,7 @@
       .filter(row=>!isMyBossStore(stores.find(store=>String(store.id)===String(row.store_id))||{}));
     const hot=(Array.isArray(data?.hot)?data.hot:fallbackHot)
       .map(normalizePulseStore)
-      .filter(Boolean)
-      .filter(row=>!isMyBossStore(stores.find(store=>String(store.id)===String(row.store_id))||{}));
+      .filter(Boolean);
     const newcomer=data?.new_player_protected===true;
 
     // NEXT TARGET already lives in takeover-command.
