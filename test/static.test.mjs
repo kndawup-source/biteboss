@@ -68,8 +68,20 @@ test('owned store takeover suppression persists immediately after a successful c
 
 test('ranking and profile avatars are forced to circular masks',()=>{
   const css=read('styles.css').toString();
-  assert.match(css,/\.my-rank-avatar,.rank-player-avatar,.crew-rank-avatar/);
-  assert.match(css,/border-radius:50%!important/);
+  for(const selector of ['.my-rank-avatar','.rank-player-avatar','.crew-rank-avatar','.profile-identity .avatar','.crew-profile-avatar']){
+    assert.ok(css.includes(selector), `missing avatar selector ${selector}`);
+  }
   assert.match(css,/clip-path:circle\(50% at 50% 50%\)/);
-  assert.match(css,/\.crew-rank-avatar-link\{[\s\S]*border-radius:50%/);
+  assert.match(css,/border-radius:50%/);
+});
+
+
+test("v74.1 critical layout contracts prevent store/profile overlap", () => {
+  const css = read("styles.css").toString();
+  assert.match(css, /\.store-detail-avatar\{[^}]*width:54px[^}]*height:54px/);
+  assert.match(css, /\.power-matchup-values\{[^}]*grid-template-columns:minmax\(0,1fr\) auto minmax\(0,1fr\)/);
+  assert.match(css, /\.organization-stats>div\{/);
+  assert.match(css, /\.organization-panel-head\{[^}]*grid-template-columns:auto minmax\(0,1fr\)/);
+  assert.match(css, /\.rank-player-avatar[^\{]*\{[^}]*border-radius:50%/);
+  assert.doesNotMatch(css, /v73\.3 avatar geometry/);
 });
