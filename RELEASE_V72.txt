@@ -1,4 +1,4 @@
-BiteBoss v72.0 — Editorial Game UI
+BiteBoss v72.1 — Editorial Game UI
 
 UI scope
 - Rebuilt user-facing visual system around paper/ink editorial hierarchy.
@@ -10,7 +10,7 @@ UI scope
 - Removed the redundant profile Crew count statistic (one active crew membership model).
 - Reworked store detail modal/action styling.
 - Preserved v71 takeover/RETAKE/HOT/partner QR/GPS/server-timer game logic.
-- Cache/build version bumped to 72.0.
+- Cache/build version bumped to 72.1.
 
 Quality
 - npm run quality: PASS

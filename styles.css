@@ -7924,7 +7924,7 @@ body.user-app .crew-profile-detail .organization-detail-section{
 }
 
 /* ============================================================
-   BiteBoss v72.0 — Editorial game system
+   BiteBoss v72.1 — Editorial game system
    Canonical user UI. Paper / ink / signal red. No glass, no gradients,
    no decorative cards. The interface is a scoreboard, not a dashboard.
    ============================================================ */
@@ -8486,4 +8486,392 @@ body.takeover-active{overflow:hidden;touch-action:none}
   body.user-app #page-profile .profile-game-stats{grid-template-columns:repeat(3,1fr)!important}
   body.user-app #page-profile .profile-game-stats .stat-card b{font-size:25px!important}
   .takeover-count{font-size:100px}
+}
+
+
+/* ============================================================
+   BiteBoss v72.1 — soft mono card redesign inspired by user refs
+   ============================================================ */
+body.user-app{
+  --bb-soft-bg:#efefee;
+  --bb-card:#fafaf8;
+  --bb-card-2:#f5f5f2;
+  --bb-soft-line:#deded9;
+  --bb-soft-line-2:#cfcfc9;
+  --bb-soft-text:#111111;
+  --bb-soft-muted:#8d8d86;
+  background:var(--bb-soft-bg)!important;
+  color:var(--bb-soft-text)!important;
+}
+html.home-active, body.user-app.home-active{background:var(--bb-soft-bg)!important}
+body.user-app .app-shell,
+body.user-app .page,
+body.user-app .inner-page,
+body.user-app .home-dashboard,
+body.user-app #page-home,
+body.user-app .boss-home,
+body.user-app .boss-home-hero{
+  background:var(--bb-soft-bg)!important;
+  color:var(--bb-soft-text)!important;
+}
+body.user-app .inner-page,
+body.user-app .home-dashboard{
+  width:min(100%,740px);
+  padding-left:20px;
+  padding-right:20px;
+}
+body.user-app .inner-head,
+body.user-app .rank-head,
+body.user-app .challenge-head,
+body.user-app .profile-head,
+body.user-app .store-head{
+  border-bottom:0!important;
+  margin-bottom:18px!important;
+  padding-bottom:0!important;
+}
+body.user-app .page-kicker,
+body.user-app .challenge-kicker,
+body.user-app .promo-kicker,
+body.user-app .home-section-head span,
+body.user-app .inner-head span,
+body.user-app .rank-head span{
+  color:var(--bb-soft-muted)!important;
+}
+body.user-app .inner-head h2,
+body.user-app .challenge-head h2,
+body.user-app .rank-head h2,
+body.user-app .profile-head h2,
+body.user-app .store-head h2{
+  font-size:42px!important;
+  line-height:.95!important;
+  font-weight:900!important;
+  letter-spacing:-.06em!important;
+  color:#111!important;
+}
+body.user-app .inner-head p,
+body.user-app .challenge-head p,
+body.user-app .rank-head p,
+body.user-app .profile-head p,
+body.user-app .store-head p{
+  color:var(--bb-soft-muted)!important;
+  font-size:14px!important;
+  max-width:34ch;
+}
+
+/* home */
+body.user-app .boss-home-fallback,
+body.user-app .boss-home-shade{display:none!important}
+body.user-app .boss-home-image{
+  position:relative!important;
+  width:100%!important;
+  max-height:36dvh!important;
+  margin:calc(14px + var(--safe-top)) auto 0!important;
+  border-radius:34px!important;
+  object-fit:cover!important;
+  opacity:1!important;
+}
+body.user-app .boss-home-hook{
+  position:relative!important;
+  left:auto!important;right:auto!important;bottom:auto!important;
+  margin:22px 20px 14px!important;
+  color:#111!important;
+  text-shadow:none!important;
+  font-size:40px!important;
+  line-height:.96!important;
+  font-weight:900!important;
+  letter-spacing:-.065em!important;
+}
+body.user-app .boss-home-actions{
+  position:relative!important;
+  left:auto!important;right:auto!important;bottom:auto!important;
+  margin:0 20px 22px!important;
+  grid-template-columns:minmax(0,1fr)!important;
+  gap:12px!important;
+}
+body.user-app .boss-home-action,
+body.user-app .boss-home-action.primary{
+  min-height:64px!important;
+  height:64px!important;
+  border-radius:28px!important;
+  border:1px solid var(--bb-soft-line)!important;
+  background:var(--bb-card)!important;
+  color:#111!important;
+  padding:0 22px!important;
+}
+body.user-app .boss-home-action.primary{
+  background:#0f0f0f!important;
+  color:#fff!important;
+  border-color:#0f0f0f!important;
+}
+body.user-app .boss-home-action-label{
+  font-size:18px!important;
+  font-weight:850!important;
+  letter-spacing:-.03em!important;
+}
+body.user-app .boss-home-runtime{
+  position:relative!important;
+  width:auto!important;height:auto!important;clip:auto!important;clip-path:none!important;
+  overflow:visible!important;white-space:normal!important;
+  margin:0 20px 110px!important;
+  padding:24px!important;
+  border-radius:34px!important;
+  background:var(--bb-card)!important;
+  box-shadow:0 10px 40px rgba(0,0,0,.04)!important;
+  display:grid!important;
+  grid-template-columns:1fr 1fr!important;
+  gap:14px 18px!important;
+}
+body.user-app #homeEditProfile,
+body.user-app #homeAvatarButton,
+body.user-app #homeProfilePhoto,
+body.user-app #homeProfileFallback{grid-column:1}
+body.user-app #homeXp,
+body.user-app #homeAdBanner,
+body.user-app #homeNearbyBosses,
+body.user-app #homeMeterTitle,
+body.user-app #homeMeterValue,
+body.user-app #homeMeterBar,
+body.user-app #homeBossCount,
+body.user-app #homeCheckinCount,
+body.user-app #homeStreakCount,
+body.user-app #homeActivity{
+  color:#111!important;
+}
+body.user-app #homeXp{font-size:13px;font-weight:800;letter-spacing:-.02em}
+body.user-app #homeMeterTitle{font-size:13px;color:var(--bb-soft-muted)!important}
+body.user-app #homeMeterValue{font-size:36px;font-weight:900;letter-spacing:-.05em}
+body.user-app #homeMeterBar{display:block;height:12px;border-radius:999px;background:linear-gradient(90deg,#111 0 46%, #e2e2de 46% 100%)}
+body.user-app #homeBossCount,
+body.user-app #homeCheckinCount,
+body.user-app #homeStreakCount{
+  display:inline-flex;align-items:flex-end;gap:4px;
+  font-size:42px!important;font-weight:900!important;line-height:.9!important;letter-spacing:-.06em!important;
+}
+
+/* surface system */
+body.user-app .page-meter,
+body.user-app .stat-card,
+body.user-app .panel,
+body.user-app .organization-panel,
+body.user-app .profile-panel,
+body.user-app .store-panel,
+body.user-app .crew-panel,
+body.user-app .modal-card,
+body.user-app .takeover-command,
+body.user-app .game-pulse,
+body.user-app .store-detail-head,
+body.user-app .store-detail-status,
+body.user-app .store-detail-section,
+body.user-app .profile-summary,
+body.user-app .profile-identity,
+body.user-app .profile-stat-grid article,
+body.user-app .crew-invite-shell,
+body.user-app .crew-join-preview{
+  background:var(--bb-card)!important;
+  border:1px solid var(--bb-soft-line)!important;
+  border-radius:30px!important;
+  box-shadow:0 10px 34px rgba(0,0,0,.035)!important;
+}
+body.user-app .page-meter,
+body.user-app .panel,
+body.user-app .organization-panel,
+body.user-app .profile-panel,
+body.user-app .store-panel,
+body.user-app .crew-panel,
+body.user-app .game-pulse{padding:22px!important}
+body.user-app .store-detail-head,
+body.user-app .store-detail-status,
+body.user-app .store-detail-section{padding:20px!important;margin-bottom:12px!important;border-bottom:0!important}
+body.user-app .modal{background:rgba(0,0,0,.18)!important;backdrop-filter:blur(8px)}
+body.user-app .modal-card{border-radius:30px 30px 0 0!important;background:#f8f8f6!important}
+
+/* challenge */
+body.user-app .challenge-search{margin-bottom:14px!important}
+body.user-app .challenge-search .input,
+body.user-app .input{
+  height:60px!important;
+  padding:0 20px!important;
+  border:1px solid var(--bb-soft-line)!important;
+  border-radius:24px!important;
+  background:var(--bb-card)!important;
+  color:#111!important;
+}
+body.user-app .input::placeholder{color:#9a9a93!important}
+body.user-app .takeover-command{
+  grid-template-columns:minmax(0,1.7fr) repeat(2,110px)!important;
+  gap:0!important;
+  padding:0!important;
+  overflow:hidden;
+}
+body.user-app .takeover-command-index{display:none!important}
+body.user-app .takeover-command>div:not(.takeover-command-index){
+  min-height:166px!important;
+  padding:22px!important;
+  justify-content:flex-start!important;
+}
+body.user-app .takeover-command>div+div{border-left:1px solid var(--bb-soft-line)!important}
+body.user-app .takeover-command span{font-size:10px!important;letter-spacing:.12em!important;color:#94948d!important}
+body.user-app .takeover-command-primary strong{padding-top:18px!important;font-size:34px!important;line-height:.92!important;color:#111!important;white-space:normal!important}
+body.user-app .takeover-command-primary small,
+body.user-app .takeover-command-stat small{font-size:11px!important;color:#8e8e87!important;line-height:1.35!important}
+body.user-app .takeover-command-stat strong{font-size:34px!important;color:#111!important}
+body.user-app .game-pulse{display:grid;gap:10px}
+
+body.user-app .store-list,
+body.user-app .rank-list,
+body.user-app .timeline,
+body.user-app .visit-log{border-top:0!important;display:grid!important;gap:12px!important}
+body.user-app .store-card,
+body.user-app .rank-card,
+body.user-app .timeline-item,
+body.user-app .visit-card,
+body.user-app .qr-card{
+  padding:18px 18px!important;
+  border:1px solid var(--bb-soft-line)!important;
+  border-radius:28px!important;
+  background:var(--bb-card)!important;
+  box-shadow:0 8px 26px rgba(0,0,0,.03)!important;
+}
+body.user-app .store-card{
+  grid-template-columns:minmax(0,1fr) auto!important;
+  gap:14px!important;
+  align-items:center!important;
+}
+body.user-app .store-card-photo{width:58px!important;height:58px!important;border-radius:18px!important;background:#d9d9d4!important}
+body.user-app .store-card-copy>strong{font-size:20px!important;line-height:1.08!important;font-weight:850!important;color:#111!important}
+body.user-app .store-card .meta,
+body.user-app .store-card-status,
+body.user-app .rank-card .meta,
+body.user-app .timeline-item .meta,
+body.user-app .visit-card .meta{font-size:13px!important;color:#8f8f88!important}
+body.user-app .store-scan-btn,
+body.user-app .primary-btn,
+body.user-app .promo-action,
+body.user-app .crew-primary-action,
+body.user-app .modal-card .primary-btn{
+  min-width:106px!important;
+  height:48px!important;
+  min-height:48px!important;
+  padding:0 18px!important;
+  border-radius:22px!important;
+  border:0!important;
+  background:#111!important;
+  color:#fff!important;
+  font-size:13px!important;
+  font-weight:850!important;
+  letter-spacing:-.02em!important;
+}
+body.user-app .secondary-btn,
+body.user-app .crew-secondary-action,
+body.user-app .boss-home-action:not(.primary),
+body.user-app .store-detail .secondary-btn{
+  min-height:48px!important;
+  border-radius:22px!important;
+  border:1px solid var(--bb-soft-line-2)!important;
+  background:var(--bb-card)!important;
+  color:#111!important;
+  font-weight:800!important;
+}
+body.user-app .text-btn,
+body.user-app .crew-text-action{color:#7f7f78!important}
+body.user-app .badge,
+body.user-app .partner-badge,
+body.user-app .chip,
+body.user-app .store-chip,
+body.user-app .store-detail-partner{
+  min-height:30px!important;
+  padding:0 12px!important;
+  border-radius:999px!important;
+  border:1px solid var(--bb-soft-line)!important;
+  background:#f1f1ee!important;
+  color:#61615c!important;
+  font-size:10px!important;
+  font-weight:850!important;
+  letter-spacing:.04em!important;
+}
+
+/* ranking/profile */
+body.user-app .page-meter-row strong,
+body.user-app .stat-card b,
+body.user-app .profile-stat-grid b,
+body.user-app .rank-card strong,
+body.user-app .rank-row-value,
+body.user-app .profile-identity h3,
+body.user-app .crew-invite-head>strong,
+body.user-app .crew-join-preview>strong{
+  color:#111!important;
+  font-weight:900!important;
+  letter-spacing:-.05em!important;
+}
+body.user-app .profile-identity .avatar,
+body.user-app .home-mini-avatar,
+body.user-app .avatar{
+  border-radius:22px!important;
+  border:0!important;
+  background:#e1e1dc!important;
+}
+body.user-app .profile-identity .avatar{width:80px!important;height:80px!important}
+body.user-app .profile-identity h3{font-size:32px!important;line-height:.95!important}
+body.user-app .profile-identity p,
+body.user-app .profile-summary .meta,
+body.user-app .organization-panel .meta,
+body.user-app .panel .meta{color:#8e8e87!important}
+body.user-app .profile-stat-grid,
+body.user-app .organization-stats,
+body.user-app .crew-actions{gap:12px!important}
+body.user-app .profile-stat-grid article,
+body.user-app .organization-stats article{
+  padding:18px!important;
+}
+body.user-app .profile-stat-grid b,
+body.user-app .organization-stats b{font-size:34px!important;line-height:.9!important}
+body.user-app .profile-stat-grid span,
+body.user-app .organization-stats span{font-size:12px!important;color:#909089!important}
+
+/* bottom nav */
+body.user-app .bottom-nav{
+  left:14px!important;
+  right:14px!important;
+  bottom:10px!important;
+  height:70px!important;
+  padding:0 10px!important;
+  border:1px solid var(--bb-soft-line)!important;
+  border-radius:30px!important;
+  background:rgba(250,250,247,.92)!important;
+  box-shadow:0 16px 40px rgba(0,0,0,.05)!important;
+  backdrop-filter:blur(14px)!important;
+}
+body.user-app .nav-btn{color:#a1a19a!important}
+body.user-app .nav-btn.active{color:#111!important}
+body.user-app .nav-label{font-size:9px!important;font-weight:800!important;letter-spacing:.03em!important;text-transform:none!important}
+
+/* takeover live board */
+body.user-app .takeover-overlay,
+body.user-app .capture-overlay,
+body.user-app .game-overlay,
+body.user-app .countdown-overlay{
+  background:rgba(12,12,12,.93)!important;
+}
+body.user-app .takeover-board,
+body.user-app .countdown-board,
+body.user-app .capture-board{
+  width:min(100% - 28px,560px)!important;
+  padding:28px 24px 26px!important;
+  border-radius:34px!important;
+  background:#111!important;
+  color:#fff!important;
+  box-shadow:0 20px 56px rgba(0,0,0,.28)!important;
+}
+@media (max-width:720px){
+  body.user-app .inner-head h2,
+  body.user-app .challenge-head h2,
+  body.user-app .rank-head h2,
+  body.user-app .profile-head h2,
+  body.user-app .store-head h2{font-size:36px!important}
+  body.user-app .takeover-command{grid-template-columns:minmax(0,1fr)!important}
+  body.user-app .takeover-command>div+div{border-left:0!important;border-top:1px solid var(--bb-soft-line)!important}
+  body.user-app .takeover-command-primary strong{font-size:30px!important}
+  body.user-app .takeover-command-stat{display:grid!important;grid-template-columns:1fr auto!important;align-items:end!important}
+  body.user-app .boss-home-runtime{grid-template-columns:1fr!important}
+  body.user-app .bottom-nav{height:68px!important}
 }
