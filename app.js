@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.2";
+  const BITEBOSS_BUILD = "75.3";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1361,27 +1361,11 @@
     const detailLine = [categoryLabel(store.category), place, distance].filter(Boolean).join(" · ");
 
     let battleState = "도전 가능";
-    if(isBoss) battleState = "";
+    if(isBoss) battleState = "점령 중";
     else if(protectedNow) battleState = "보호 중";
     else if(cooldownNow) battleState = "재도전 대기";
     else if(bossExists) battleState = "도전 가능";
     else battleState = "미점령";
-
-    let bossText = "아직 보스가 없습니다";
-    if(bossExists){
-      const bossIdentity = [bossName || "보스", bossOrganizationName].filter(Boolean).join(" · ");
-      bossText = protectedNow
-        ? `${bossIdentity} · 보호 ${formatRemaining(protectionUntil)} 남음`
-        : `${bossIdentity} · 방어력 ${bossDefense}`;
-    }
-
-    let roleCopy = "방문자";
-    if(isBoss) roleCopy = "보스";
-    else if(isCrew) roleCopy = "크루";
-
-    const bonusCopy = storeBonus >= bonusMax
-      ? `매장 보너스 최대 +${storeBonus}`
-      : `유효 방문 ${visitsToNextBonus}회 후 +${nextBonus}`;
 
     const defenseStateRaw = String(defenseActivity.state || (defenseDecay > 0 ? "weak" : "active"));
     const defenseState = ({
@@ -1559,17 +1543,26 @@
       ? "매장 보너스 최대"
       : `다음 +${nextBonus}까지 유효 방문 ${visitsToNextBonus}회`;
 
-    const compactDefenseHtml = isBoss && bossExists ? `
-      <div class="owner-defense-summary">
-        <span>내 방어 상태</span>
-        <strong>${escapeHtml(defenseState)}</strong>
-        ${defenseTimelineCopy ? `<small>${escapeHtml(defenseTimelineCopy)}</small>` : ""}
-      </div>
+    const ownerStatusHtml = isBoss && bossExists ? `
+      <section class="owner-store-status" aria-label="점령 상태">
+        <div class="owner-store-status-main">
+          <div>
+            <span>방어력</span>
+            <strong>${bossDefense}</strong>
+          </div>
+          <small>${protectedNow
+            ? `보호 ${escapeHtml(formatRemaining(protectionUntil))} 남음`
+            : (nextDefenseAt
+              ? `다음 약화까지 ${escapeHtml(formatRemaining(nextDefenseAt))}`
+              : "점령 유지 중")}</small>
+        </div>
+        <p>${defenseTimelineCopy ? escapeHtml(defenseTimelineCopy) : "다시 방문하면 방어력이 유지됩니다."}</p>
+      </section>
     ` : "";
 
     let action = "";
     if(isBoss){
-      action = `<div class="store-detail-auto is-boss"><strong class="store-detail-boss-owner-copy">현재 이 매장의 보스입니다.</strong><span>다시 방문하면 방어력이 유지됩니다.</span></div>`;
+      action = "";
     }else if(protectedNow){
       action = `<div class="store-detail-auto"><strong>보호 중</strong><span>${escapeHtml(formatRemaining(protectionUntil))} 후 도전할 수 있습니다.</span></div>`;
     }else if(cooldownNow){
@@ -1602,7 +1595,7 @@
             </div>` : ""}
         </header>
 
-        ${bossExists ? `
+        ${bossExists && !isBoss ? `
           <section class="boss-focus" aria-label="보스 정보">
             <div class="boss-focus-head">
               <span></span>
@@ -1618,25 +1611,27 @@
           </section>
         ` : ""}
 
-        <section class="power-matchup" aria-label="도전 전력">
-          <div class="power-matchup-values">
-            <article>
-              <span>내 파워</span>
-              <strong>${myPower}</strong>
-            </article>
-            <i aria-hidden="true">VS</i>
-            <article>
-              <span>보스 방어력</span>
-              <strong>${bossExists ? bossDefense : "—"}</strong>
-            </article>
-          </div>
-          ${powerState ? `
-            <div class="power-matchup-result ${powerStateClass}">
-              <strong>${escapeHtml(powerState)}</strong>
-              ${!isBoss && powerNeeded > 0 ? `<small>방문 보너스와 레벨 보너스를 올리면 다시 도전할 수 있습니다.</small>` : ""}
+        ${!isBoss ? `
+          <section class="power-matchup" aria-label="도전 전력">
+            <div class="power-matchup-values">
+              <article>
+                <span>내 파워</span>
+                <strong>${myPower}</strong>
+              </article>
+              <i aria-hidden="true">VS</i>
+              <article>
+                <span>보스 방어력</span>
+                <strong>${bossExists ? bossDefense : "—"}</strong>
+              </article>
             </div>
-          ` : ""}
-        </section>
+            ${powerState ? `
+              <div class="power-matchup-result ${powerStateClass}">
+                <strong>${escapeHtml(powerState)}</strong>
+                ${powerNeeded > 0 ? `<small>방문 보너스와 레벨 보너스를 올리면 다시 도전할 수 있습니다.</small>` : ""}
+              </div>
+            ` : ""}
+          </section>
+        ` : ownerStatusHtml}
 
         ${action ? `<div class="primary-store-action">${action}</div>` : ""}
 
@@ -1656,8 +1651,6 @@
             <span>최대 +${bonusMax}</span>
           </div>
         </section>
-
-        ${compactDefenseHtml}
 
         ${offersHtml}
 

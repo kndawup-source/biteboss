@@ -163,3 +163,15 @@ test("profile game metrics are actionable buttons", () => {
   assert.match(html, /data-profile-action="boss"/);
   assert.match(html, /data-profile-action="visits"/);
 });
+
+
+test("owned store detail uses owner layout instead of self-vs-self battle UI", () => {
+  const app = read("app.js").toString();
+  const css = read("styles.css").toString();
+  assert.match(app, /bossExists && !isBoss \? `\n          <section class="boss-focus"/);
+  assert.match(app, /!isBoss \? `\n          <section class="power-matchup"/);
+  assert.match(app, /ownerStatusHtml = isBoss && bossExists/);
+  assert.match(app, /<span>방어력<\/span>/);
+  assert.doesNotMatch(app, /<span>내 방어 상태<\/span>/);
+  assert.match(css, /\.owner-store-status\{/);
+});
