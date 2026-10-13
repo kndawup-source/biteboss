@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.25";
+  const BITEBOSS_BUILD = "75.26";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -5084,6 +5084,83 @@
     await openOrganizationDetail(orgId);
   }
 
+
+  function organizationMemberAvatar(member = {}){
+    return String(
+      member.avatar_url ||
+      member.profile_avatar_url ||
+      member.profile_image_url ||
+      member.photo_url ||
+      member.image_url ||
+      ""
+    ).trim();
+  }
+
+  function organizationMemberUserIds(member = {}){
+    return [...new Set([
+      member.user_id,
+      member.player_user_id,
+      member.member_user_id,
+      member.profile_user_id,
+      member.player_id
+    ].map(value => String(value || "").trim()).filter(Boolean))];
+  }
+
+  async function hydrateOrganizationMemberAvatars(members = []){
+    const source = Array.isArray(members) ? members : [];
+    const hydrated = await Promise.all(source.map(async member => {
+      if(organizationMemberAvatar(member)) return member;
+
+      for(const userId of organizationMemberUserIds(member)){
+        try{
+          const { data:profileData, error:profileError } = await sb.rpc("biteboss_player_profile", {
+            p_user_id:userId
+          });
+          if(profileError || !profileData?.ok || !profileData?.player) continue;
+          const avatarUrl = organizationMemberAvatar(profileData.player);
+          if(avatarUrl) return {...member, avatar_url:avatarUrl, user_id:member.user_id || userId};
+        }catch(profileError){
+          console.warn("BiteBoss crew member profile avatar:", profileError);
+        }
+      }
+
+      return member;
+    }));
+
+    const needsRankFallback = hydrated.some(member => !organizationMemberAvatar(member));
+    if(!needsRankFallback) return hydrated;
+
+    try{
+      const { data:rankData, error:rankError } = await sb.rpc("biteboss_game_rankings_v656", {
+        p_scope:"players",
+        p_limit:50
+      });
+      if(rankError || !Array.isArray(rankData)) return hydrated;
+
+      const byUserId = new Map();
+      const byNickname = new Map();
+      rankData.forEach(row => {
+        const avatarUrl = organizationMemberAvatar(row);
+        if(!avatarUrl) return;
+        const userId = String(row.user_id || "").trim();
+        const nickname = String(row.nickname || "").trim();
+        if(userId) byUserId.set(userId, avatarUrl);
+        if(nickname && !byNickname.has(nickname)) byNickname.set(nickname, avatarUrl);
+      });
+
+      return hydrated.map(member => {
+        if(organizationMemberAvatar(member)) return member;
+        const matchedId = organizationMemberUserIds(member).find(userId => byUserId.has(userId));
+        const nickname = String(member.nickname || member.username || "").trim();
+        const avatarUrl = (matchedId && byUserId.get(matchedId)) || byNickname.get(nickname) || "";
+        return avatarUrl ? {...member, avatar_url:avatarUrl} : member;
+      });
+    }catch(rankError){
+      console.warn("BiteBoss crew member ranking avatar fallback:", rankError);
+      return hydrated;
+    }
+  }
+
   async function openOrganizationDetail(orgId){
     openModal("크루 프로필", `<div class="store-detail-loading">크루 정보를 불러오는 중…</div>`);
 
@@ -5095,42 +5172,7 @@
       if(!data?.ok) throw new Error(data?.error || "CREW_LOAD_FAILED");
 
       if(Array.isArray(data.members) && data.members.length){
-        const hydratedMembers = await Promise.all(data.members.map(async member => {
-          const existingAvatar = String(
-            member.avatar_url ||
-            member.profile_avatar_url ||
-            member.profile_image_url ||
-            member.photo_url ||
-            member.image_url ||
-            ""
-          ).trim();
-
-          if(existingAvatar || !member.user_id) return member;
-
-          try{
-            const { data:profileData, error:profileError } = await sb.rpc("biteboss_player_profile", {
-              p_user_id:member.user_id
-            });
-            if(profileError || !profileData?.ok || !profileData?.player) return member;
-
-            const player = profileData.player;
-            const avatarUrl = String(
-              player.avatar_url ||
-              player.profile_avatar_url ||
-              player.profile_image_url ||
-              player.photo_url ||
-              player.image_url ||
-              ""
-            ).trim();
-
-            return avatarUrl ? {...member, avatar_url:avatarUrl} : member;
-          }catch(profileError){
-            console.warn("BiteBoss crew member avatar:", profileError);
-            return member;
-          }
-        }));
-
-        data.members = hydratedMembers;
+        data.members = await hydrateOrganizationMemberAvatars(data.members);
       }
 
       renderOrganizationDetail(data, orgId);
