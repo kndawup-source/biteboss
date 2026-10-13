@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.20";
+  const BITEBOSS_BUILD = "75.21";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1087,7 +1087,10 @@
 
     if(captureCooldownActive()){
       if(target) target.textContent = "다음 점령 대기 중";
-      if(meta) meta.textContent = `${formatRemaining(captureCooldown.cooldown_until)} 후 다음 매장 점령 가능`;
+      if(meta){
+        meta.textContent = `${formatRemaining(captureCooldown.cooldown_until)} 후 다음 매장 점령 가능`;
+        meta.classList.remove("hidden");
+      }
       return;
     }
 
@@ -1095,14 +1098,8 @@
     const next = challengeableRows[0] || null;
     if(target) target.textContent = next?.name ? String(next.name) : "주변 매장 탐색 중";
     if(meta){
-      if(next){
-        const distance = Number(next.distance_m ?? next.distance ?? 0);
-        const mode = takeoverModeFromStore(next);
-        const modeLabel = ({retake:"RETAKE",hot:"HOT",challenge:"CHALLENGE",takeover:"TAKEOVER"})[mode] || "TAKEOVER";
-        meta.textContent = `${modeLabel}${distance > 0 ? ` · ${Math.round(distance)}m` : ""}`;
-      }else{
-        meta.textContent = lastPosition ? "주변 도전 대상을 찾는 중입니다." : "GPS 위치를 확인하고 있습니다.";
-      }
+      meta.textContent = "";
+      meta.classList.add("hidden");
     }
   }
 
