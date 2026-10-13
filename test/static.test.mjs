@@ -175,3 +175,15 @@ test("owned store detail uses owner layout instead of self-vs-self battle UI", (
   assert.doesNotMatch(app, /<span>내 방어 상태<\/span>/);
   assert.match(css, /\.owner-store-status\{/);
 });
+
+
+test("guest profile uses a single entry CTA and hides crew creation until login", () => {
+  const html = read("index.html").toString();
+  const app = read("app.js").toString();
+  assert.match(html, /id="memberLoginBtn"[^>]*>시작하기<\/button>/);
+  assert.doesNotMatch(html, /id="memberRegisterBtn"/);
+  assert.match(app, /create\.classList\.toggle\("hidden", hasOrg \|\| !loggedIn\)/);
+  assert.doesNotMatch(app, /로그인 후 크루 만들기/);
+  assert.match(app, /memberAuthSwitchToRegister/);
+  assert.match(app, /memberAuthSwitchToLogin/);
+});

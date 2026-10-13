@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.3";
+  const BITEBOSS_BUILD = "75.4";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -369,7 +369,6 @@
       });
     });
     $("#memberLoginBtn")?.addEventListener("click", openMemberLogin);
-    $("#memberRegisterBtn")?.addEventListener("click", openMemberRegister);
     $("#storesLoginBtn")?.addEventListener("click", openMemberLogin);
     $("#addStoreBtn")?.addEventListener("click", openMemberStoreForm);
     const organizationAction = (selector, handler) => {
@@ -3670,15 +3669,17 @@
   }
 
   function openMemberLogin(){
-    openModal("Member Login", `
+    openModal("로그인", `
       <div class="form-grid member-auth-form">
         <label class="wide">ID<input id="memberLoginId" class="input" maxlength="32" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="yourid" /></label>
-        <label class="wide">6-digit PIN<input id="memberLoginPin" class="input" type="password" inputmode="numeric" maxlength="6" autocomplete="current-password" placeholder="000000" /></label>
-        <button id="memberLoginSubmit" class="primary-btn wide" type="button">Login</button>
+        <label class="wide">6자리 PIN<input id="memberLoginPin" class="input" type="password" inputmode="numeric" maxlength="6" autocomplete="current-password" placeholder="000000" /></label>
+        <button id="memberLoginSubmit" class="primary-btn wide" type="button">로그인</button>
+        <button id="memberAuthSwitchToRegister" class="auth-switch-btn wide" type="button">계정이 없나요? 계정 만들기</button>
         <p id="memberAuthStatus" class="inline-status wide" aria-live="polite"></p>
       </div>
     `);
     $("#memberLoginSubmit").onclick = loginMember;
+    $("#memberAuthSwitchToRegister").onclick = openMemberRegister;
   }
 
   async function loginMember(){
@@ -3780,16 +3781,18 @@
   }
 
   function openMemberRegister(){
-    openModal("Create ID", `
+    openModal("계정 만들기", `
       <div class="form-grid member-auth-form">
         <label class="wide">ID<input id="memberRegisterId" class="input" maxlength="32" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="yourid" /></label>
-        <label class="wide">Nickname<input id="memberRegisterNick" class="input" maxlength="40" placeholder="Boss name" /></label>
-        <label class="wide">6-digit PIN<input id="memberRegisterPin" class="input" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" placeholder="000000" /></label>
-        <button id="memberRegisterSubmit" class="primary-btn wide" type="button">만들기</button>
+        <label class="wide">닉네임<input id="memberRegisterNick" class="input" maxlength="40" placeholder="보스 이름" /></label>
+        <label class="wide">6자리 PIN<input id="memberRegisterPin" class="input" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" placeholder="000000" /></label>
+        <button id="memberRegisterSubmit" class="primary-btn wide" type="button">계정 만들기</button>
+        <button id="memberAuthSwitchToLogin" class="auth-switch-btn wide" type="button">이미 계정이 있나요? 로그인</button>
         <p id="memberAuthStatus" class="inline-status wide" aria-live="polite"></p>
       </div>
     `);
     $("#memberRegisterSubmit").onclick = registerMember;
+    $("#memberAuthSwitchToLogin").onclick = openMemberLogin;
   }
 
   async function registerMember(){
@@ -4312,14 +4315,12 @@
         !cooldownActive
       );
 
-      create.classList.toggle("hidden", hasOrg);
+      create.classList.toggle("hidden", hasOrg || !loggedIn);
       create.disabled = Boolean(loggedIn && !canCreate);
 
-      if(!loggedIn){
-        create.textContent = "로그인 후 크루 만들기";
-      }else if(cooldownActive && cooldownUntil){
+      if(loggedIn && cooldownActive && cooldownUntil){
         create.textContent = `재가입 대기 ${formatRemaining(cooldownUntil)}`;
-      }else{
+      }else if(loggedIn){
         create.textContent = canCreate ? "크루 만들기" : "보스가 되어 크루 만들기";
       }
     }
@@ -5380,13 +5381,11 @@
     renderProfilePhoto("#profilePhoto", "#profileFallback", avatar);
 
     const login = $("#memberLoginBtn");
-    const register = $("#memberRegisterBtn");
     const addStore = $("#addStoreBtn");
     const notificationSettings = $("#notificationSettingsBtn");
     const deleteAccount = $("#deleteAccountBtn");
     const logout = $("#logoutBtn");
     login?.classList.toggle("hidden", loggedIn);
-    register?.classList.toggle("hidden", loggedIn);
     addStore?.classList.toggle("hidden", !loggedIn);
     notificationSettings?.classList.toggle("hidden", !loggedIn);
     deleteAccount?.classList.toggle("hidden", !loggedIn);
