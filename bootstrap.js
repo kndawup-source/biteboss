@@ -1,6 +1,9 @@
 (() => {
   "use strict";
 
+  const ASSET_VERSION = document.querySelector('meta[name="biteboss-build"]')?.content || "75.23";
+  const localAsset = path => `${path}?v=${encodeURIComponent(ASSET_VERSION)}`;
+
   const isNative = (() => {
     try{
       return Boolean(window.Capacitor?.isNativePlatform?.()) ||
@@ -60,13 +63,12 @@
 
     await loadCss(deps.leafletCss);
 
-    await loadScript("./app-config.js?v=75.21");
+    await loadScript(localAsset("./app-config.js"));
     await loadScript(deps.supabase);
     await loadScript(deps.scanner);
     await loadScript(deps.qrcode);
     await loadScript(deps.leaflet);
-    await loadScript("./supabase.js?v=75.21");
-    await loadScript("./ui-helpers.js?v=75.21");
-    await loadScript("./app.js?v=75.21");
+    await loadScript(localAsset("./supabase.js"));
+    await loadScript(localAsset("./app.js"));
   })().catch(fatal);
 })();

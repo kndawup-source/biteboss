@@ -1,22 +1,23 @@
-const CACHE_NAME = "biteboss-v75.21";
+const BUILD = "75.23";
+const CACHE_NAME = `biteboss-v${BUILD}`;
+const versioned = path => `${path}?v=${BUILD}`;
 const SHELL = [
   "./",
-  "./index.html?v=75.21",
-  "./styles.css?v=75.21",
-  "./bootstrap.js?v=75.21",
-  "./app.js?v=75.21",
-  "./app-config.js?v=75.21",
-  "./supabase.js?v=75.21",
-  "./ui-helpers.js?v=75.21",
-  "./manifest.webmanifest?v=75.21",
-  "./privacy-policy.html?v=75.21",
-  "./support.html?v=75.21",
-  "./admin.html?v=75.21",
-  "./admin.css?v=75.21",
-  "./admin.js?v=75.21",
-  "./store-admin.html?v=75.21",
-  "./store-admin.css?v=75.21",
-  "./store-admin.js?v=75.21"
+  versioned("./index.html"),
+  versioned("./styles.css"),
+  versioned("./bootstrap.js"),
+  versioned("./app.js"),
+  versioned("./app-config.js"),
+  versioned("./supabase.js"),
+  versioned("./manifest.webmanifest"),
+  versioned("./privacy-policy.html"),
+  versioned("./support.html"),
+  versioned("./admin.html"),
+  versioned("./admin.css"),
+  versioned("./admin.js"),
+  versioned("./store-admin.html"),
+  versioned("./store-admin.css"),
+  versioned("./store-admin.js")
 ];
 
 self.addEventListener("install", event => {
@@ -68,7 +69,7 @@ self.addEventListener("fetch", event => {
           return response;
         })
         .catch(() =>
-          caches.match(request).then(hit => hit || caches.match("./index.html?v=75.21") || caches.match("./index.html"))
+          caches.match(request).then(hit => hit || caches.match(versioned("./index.html")) || caches.match("./index.html"))
         )
     );
     return;
