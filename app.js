@@ -10,6 +10,9 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
   const $$ = q => [...document.querySelectorAll(q)];
 
   const cfg = window.BITEBOSS_CONFIG || {};
+  let homeSplashRequestId = 0;
+  const HOME_SPLASH_CACHE_KEY = "biteboss:home-splash-url";
+
   const config = {
     protect_minutes:60,
     reclaim_cooldown_minutes:1440,
@@ -126,6 +129,9 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     setupNativeUrlListener();
     setupPushListeners();
     updateNetworkState();
+
+    // Paint the last successful hero immediately while auth/config load in the background.
+    renderHomeSplashImage({ preferCached:true, allowEmpty:false });
 
     if(!window.sb){
       throw new Error(window.BITEBOSS_BOOT_ERROR || "BiteBoss could not connect to Supabase.");
@@ -488,23 +494,66 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     });
   }
 
-  function renderHomeSplashImage(){
+  function renderHomeSplashImage(options = {}){
     const image = $("#homeSplashImage");
     const promo = $("#homePromo");
     if(!image || !promo) return;
 
-    const url = String(config.home_splash_image_url || "").trim();
-    if(url){
-      image.src = url;
-      image.classList.remove("hidden");
-      promo.classList.add("has-splash");
-      promo.style.removeProperty("--home-hero-image");
-    }else{
+    const preferCached = Boolean(options.preferCached);
+    const allowEmpty = options.allowEmpty !== false;
+    let cachedUrl = "";
+    try{ cachedUrl = String(localStorage.getItem(HOME_SPLASH_CACHE_KEY) || "").trim(); }catch{}
+
+    const configuredUrl = String(config.home_splash_image_url || "").trim();
+    const url = preferCached ? (cachedUrl || configuredUrl) : (configuredUrl || (!allowEmpty ? cachedUrl : ""));
+    const currentUrl = String(image.dataset.loadedUrl || "").trim();
+
+    if(!url){
+      if(!allowEmpty) return;
+      homeSplashRequestId += 1;
       image.removeAttribute("src");
+      delete image.dataset.loadedUrl;
       image.classList.add("hidden");
       promo.classList.remove("has-splash");
-      promo.style.removeProperty("--home-hero-image");
+      try{ localStorage.removeItem(HOME_SPLASH_CACHE_KEY); }catch{}
+      return;
     }
+
+    if(currentUrl === url && !image.classList.contains("hidden")){
+      promo.classList.add("has-splash");
+      return;
+    }
+
+    const requestId = ++homeSplashRequestId;
+    const preload = new Image();
+    preload.decoding = "async";
+    preload.fetchPriority = "high";
+
+    const commit = () => {
+      if(requestId !== homeSplashRequestId) return;
+      image.src = url;
+      image.dataset.loadedUrl = url;
+      image.classList.remove("hidden");
+      promo.classList.add("has-splash");
+      try{ localStorage.setItem(HOME_SPLASH_CACHE_KEY, url); }catch{}
+    };
+
+    preload.onload = () => {
+      if(typeof preload.decode === "function"){
+        preload.decode().catch(() => {}).finally(commit);
+      }else{
+        commit();
+      }
+    };
+    preload.onerror = () => {
+      if(requestId !== homeSplashRequestId) return;
+      // Keep the previous successful hero visible instead of flashing an empty screen.
+      if(!currentUrl){
+        image.classList.add("hidden");
+        promo.classList.remove("has-splash");
+      }
+    };
+    preload.src = url;
   }
 
 
