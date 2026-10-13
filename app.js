@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.6";
+  const BITEBOSS_BUILD = "75.7";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -2562,14 +2562,34 @@
     }catch{return null;}
   }
 
+  function resolvePulseStoreId(row){
+    if(!row || typeof row !== "object") return "";
+    const directCandidates = [row.store_id, row.store?.id, row.storeId]
+      .map(value => String(value ?? "").trim())
+      .filter(Boolean);
+
+    for(const candidate of directCandidates){
+      if(stores.some(store => String(store?.id || "").trim() === candidate)) return candidate;
+    }
+
+    const targetName = String(row.store_name || row.name || row.store?.name || "").trim().toLowerCase();
+    if(targetName){
+      const exact = stores.find(store => String(store?.name || "").trim().toLowerCase() === targetName);
+      if(exact?.id) return String(exact.id);
+    }
+
+    return directCandidates[0] || "";
+  }
+
   function normalizePulseStore(row){
     if(!row || typeof row !== "object") return null;
-    const storeId = row.store_id ?? row.id ?? row.store?.id ?? null;
-    if(storeId === null || storeId === undefined || String(storeId).trim() === "") return null;
+    const storeName = row.store_name || row.name || row.store?.name || "매장";
+    const storeId = resolvePulseStoreId({...row, store_name:storeName});
+    if(!storeId) return null;
     return {
       ...row,
-      store_id:String(storeId),
-      store_name:row.store_name || row.name || row.store?.name || "매장",
+      store_id:storeId,
+      store_name:storeName,
       challenges_24h:Number(row.challenges_24h ?? row.challenge_count ?? row.store?.challenges_24h ?? 0)
     };
   }
@@ -2609,10 +2629,10 @@
     // This surface is reserved for exceptional game signals only, avoiding duplicate hierarchy.
     const items=[];
     if(retakes[0]){
-      items.push(`<button class="game-pulse-item is-retake" type="button" data-pulse-store="${escapeAttr(retakes[0].store_id)}"><span>RETAKE</span><strong>${escapeHtml(retakes[0].store_name||"빼앗긴 매장")}</strong><small>다시 가져오기</small></button>`);
+      items.push(`<button class="game-pulse-item is-retake" type="button" data-pulse-store="${escapeAttr(retakes[0].store_id)}" data-pulse-name="${escapeAttr(retakes[0].store_name||"")}"><span>RETAKE</span><strong>${escapeHtml(retakes[0].store_name||"빼앗긴 매장")}</strong><small>다시 가져오기</small></button>`);
     }
     if(hot[0]){
-      items.push(`<button class="game-pulse-item is-hot" type="button" data-pulse-store="${escapeAttr(hot[0].store_id)}"><span>HOT</span><strong>${escapeHtml(hot[0].store_name||"인기 매장")}</strong><small>${Number(hot[0].challenges_24h||0)}명 도전</small></button>`);
+      items.push(`<button class="game-pulse-item is-hot" type="button" data-pulse-store="${escapeAttr(hot[0].store_id)}" data-pulse-name="${escapeAttr(hot[0].store_name||"")}"><span>HOT</span><strong>${escapeHtml(hot[0].store_name||"인기 매장")}</strong><small>${Number(hot[0].challenges_24h||0)}명 도전</small></button>`);
     }
     if(newcomer && !items.length){
       items.push(`<div class="game-pulse-info"><span>NEW BOSS</span><strong>첫 점령 가이드</strong><small>가까운 미점령 매장부터 시작해 보세요.</small></div>`);
@@ -2627,7 +2647,11 @@
     box.innerHTML=items.join("");
     box.classList.remove("hidden");
     $$("[data-pulse-store]",box).forEach(btn=>btn.addEventListener("click",()=>{
-      const storeId=String(btn.dataset.pulseStore||"").trim();
+      const rawStoreId=String(btn.dataset.pulseStore||"").trim();
+      const storeName=String(btn.dataset.pulseName||"").trim();
+      const matchedStore = stores.find(store => String(store?.id || "").trim() === rawStoreId)
+        || (storeName ? stores.find(store => String(store?.name || "").trim().toLowerCase() === storeName.toLowerCase()) : null);
+      const storeId = String(matchedStore?.id || rawStoreId || "").trim();
       if(!storeId) return;
       openStoreDetail(storeId);
     }));
