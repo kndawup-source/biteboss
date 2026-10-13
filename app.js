@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.23";
+  const BITEBOSS_BUILD = "75.25";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -3297,20 +3297,20 @@
           <article class="rank-card local-crew-rank-card">
             <span class="rank-number">${index+1}</span>
             <span
-              class="crew-rank-avatar-link crew-rank-profile-trigger"
+              class="rank-avatar-slot crew-rank-profile-trigger"
               data-organization-profile="${escapeAttr(row.crew_id || "")}"
               role="button"
               tabindex="0"
               aria-label="${escapeAttr(row.crew_name || "크루")} 크루 프로필 열기">
               ${bossAvatarMarkup(row.avatar_url || "", row.crew_name || "크루", "crew-rank-avatar")}
             </span>
-            <div class="crew-rank-copy">
+            <div class="rank-copy crew-rank-copy">
               <strong
-                class="crew-rank-name-link crew-rank-profile-trigger"
+                class="rank-title crew-rank-name-link crew-rank-profile-trigger"
                 data-organization-profile="${escapeAttr(row.crew_id || "")}"
                 role="button"
                 tabindex="0">${escapeHtml(row.crew_name || "크루")}</strong>
-              <div class="meta">개설자 ${escapeHtml(row.founder_name || "—")} · 멤버 ${Number(row.member_count || 0)}명</div>
+              <div class="rank-meta meta">개설자 ${escapeHtml(row.founder_name || "—")} · 멤버 ${Number(row.member_count || 0)}명</div>
             </div>
             <div class="rank-result">
               <b>${Number(row.territory_count || 0)}</b>
@@ -3339,20 +3339,20 @@
         <article class="rank-card organization-rank-card">
           <span class="rank-number">${index+1}</span>
           <span
-            class="crew-rank-avatar-link"
+            class="rank-avatar-slot crew-rank-profile-trigger"
             data-organization-profile="${escapeAttr(row.id || "")}"
             role="button"
             tabindex="0"
             aria-label="${escapeAttr(row.name || "크루")} 크루 프로필 열기">
             ${bossAvatarMarkup(row.avatar_url || "", row.name || "크루", "crew-rank-avatar")}
           </span>
-          <div class="crew-rank-copy">
+          <div class="rank-copy crew-rank-copy">
             <strong
-              class="crew-rank-name-link crew-rank-profile-trigger"
+              class="rank-title crew-rank-name-link crew-rank-profile-trigger"
               data-organization-profile="${escapeAttr(row.id || "")}"
               role="button"
               tabindex="0">${escapeHtml(row.name || "크루")}</strong>
-            <div class="meta">개설자 ${escapeHtml(row.leader_name || "—")} · 멤버 ${Number(row.member_count || 0)}명</div>
+            <div class="rank-meta meta">개설자 ${escapeHtml(row.leader_name || "—")} · 멤버 ${Number(row.member_count || 0)}명</div>
           </div>
           <div class="rank-result">
             <b>${Number(row.territory_count || 0)}</b>
@@ -3437,10 +3437,10 @@
           data-player-profile="${escapeAttr(row.user_id || "")}"
           data-player-avatar="${escapeAttr(personalAvatar)}">
           <span class="rank-number">${index+1}</span>
-          ${bossAvatarMarkup(personalAvatar, playerName, "rank-player-avatar")}
-          <div class="rank-player-copy">
-            <strong>${escapeHtml(playerName)}</strong>
-            <div class="meta">${escapeHtml(rankMeta)}</div>
+          <span class="rank-avatar-slot">${bossAvatarMarkup(personalAvatar, playerName, "rank-player-avatar")}</span>
+          <div class="rank-copy rank-player-copy">
+            <strong class="rank-title">${escapeHtml(playerName)}</strong>
+            <div class="rank-meta meta">${escapeHtml(rankMeta)}</div>
           </div>
           <div class="rank-result">
             <b>${Number(row.xp || 0).toLocaleString("ko-KR")}</b>
@@ -5094,6 +5094,45 @@
       if(error) throw error;
       if(!data?.ok) throw new Error(data?.error || "CREW_LOAD_FAILED");
 
+      if(Array.isArray(data.members) && data.members.length){
+        const hydratedMembers = await Promise.all(data.members.map(async member => {
+          const existingAvatar = String(
+            member.avatar_url ||
+            member.profile_avatar_url ||
+            member.profile_image_url ||
+            member.photo_url ||
+            member.image_url ||
+            ""
+          ).trim();
+
+          if(existingAvatar || !member.user_id) return member;
+
+          try{
+            const { data:profileData, error:profileError } = await sb.rpc("biteboss_player_profile", {
+              p_user_id:member.user_id
+            });
+            if(profileError || !profileData?.ok || !profileData?.player) return member;
+
+            const player = profileData.player;
+            const avatarUrl = String(
+              player.avatar_url ||
+              player.profile_avatar_url ||
+              player.profile_image_url ||
+              player.photo_url ||
+              player.image_url ||
+              ""
+            ).trim();
+
+            return avatarUrl ? {...member, avatar_url:avatarUrl} : member;
+          }catch(profileError){
+            console.warn("BiteBoss crew member avatar:", profileError);
+            return member;
+          }
+        }));
+
+        data.members = hydratedMembers;
+      }
+
       renderOrganizationDetail(data, orgId);
     }catch(error){
       console.warn("BiteBoss organization detail:", error);
@@ -5131,9 +5170,17 @@
     const memberRowMarkup = member => {
       const memberName = String(member.nickname || member.username || "사용자").trim();
       const roleLabel = member.role === "leader" ? "개설자" : "멤버";
+      const memberAvatar = String(
+        member.avatar_url ||
+        member.profile_avatar_url ||
+        member.profile_image_url ||
+        member.photo_url ||
+        member.image_url ||
+        ""
+      ).trim();
       return `
         <article class="organization-detail-member">
-          ${bossAvatarMarkup(member.avatar_url || "", memberName, "organization-detail-member-avatar")}
+          ${bossAvatarMarkup(memberAvatar, memberName, "organization-detail-member-avatar")}
           <div class="organization-detail-member-copy">
             <strong>${escapeHtml(memberName)}</strong>
             <span>${escapeHtml(roleLabel)}</span>
