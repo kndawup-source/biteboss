@@ -81,6 +81,7 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
   let activeBanner = null;
   const presenceState = new Map();
   const storeRoleMap = new Map();
+  const locallyOwnedStoreIds = new Map();
   let territoryMap = null;
   let territoryMapLayer = null;
   let territoryUserLayer = null;
@@ -727,8 +728,11 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
 
     (Array.isArray(data) ? data : []).forEach(row => {
       if(!row?.store_id) return;
-      storeRoleMap.set(String(row.store_id), row);
+      const storeId=String(row.store_id);
+      storeRoleMap.set(storeId, row);
+      if(row.is_my_boss_store || row.my_role === "boss") locallyOwnedStoreIds.set(storeId,Date.now());
     });
+    reconcileTakeoverOwnership();
   }
 
 
@@ -889,9 +893,10 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     const target = $("#challengeNextTarget");
     const meta = $("#challengeNextMeta");
     const gps = $("#challengeGpsState");
-    if(count) count.textContent = String(rows.length);
+    const challengeableRows = rows.filter(store => !isMyBossStore(store));
+    if(count) count.textContent = String(challengeableRows.length);
 
-    const next = rows[0] || null;
+    const next = challengeableRows[0] || null;
     if(target) target.textContent = next?.name ? String(next.name) : "주변 매장 탐색 중";
     if(meta){
       if(next){
@@ -1049,7 +1054,7 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
 
   function storeCard(store){
     const roleState = storeRoleMap.get(String(store.id)) || {};
-    const isMyBossStore = Boolean(roleState.is_my_boss_store || roleState.my_role === "boss");
+    const ownedByMe = isMyBossStore(store);
     const protectionUntil = roleState.protected_until || store.protected_until || null;
     const protectedNow = Boolean(protectionUntil && new Date(protectionUntil).getTime() > Date.now());
 
@@ -1067,7 +1072,7 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     const loginRequired = presenceBlockedReason === "MEMBER_LOGIN_REQUIRED";
 
     let status = "";
-    if(isMyBossStore){
+    if(ownedByMe){
       status = protectedNow
         ? `보호 ${formatRemaining(protectionUntil)} 남음`
         : "";
@@ -1088,7 +1093,9 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     }
 
     let action = "";
-    if(isPartner){
+    if(ownedByMe){
+      action = `<span class="store-list-action is-owned">내 점령지</span>`;
+    }else if(isPartner){
       action = `<button class="store-list-action is-primary" data-scan-store="${escapeAttr(store.id)}" type="button">QR 도전</button>`;
     }else if(loginRequired){
       action = `<button class="store-list-action" data-store-login="${escapeAttr(store.id)}" type="button">로그인</button>`;
@@ -2194,6 +2201,52 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
   }
 
 
+  function isMyBossStore(store){
+    if(!store?.id) return false;
+    const storeId=String(store.id);
+    const localOwnedAt=Number(locallyOwnedStoreIds.get(storeId) || 0);
+    if(localOwnedAt && Date.now()-localOwnedAt < 120000) return true;
+    if(localOwnedAt) locallyOwnedStoreIds.delete(storeId);
+
+    const role=storeRoleMap.get(storeId)||{};
+    if(role.is_my_boss_store || role.my_role === "boss") return true;
+
+    const myIds=new Set([
+      playerSession?.player_user_id,
+      profile?.user_id,
+      authUser?.id
+    ].filter(Boolean).map(String));
+    const bossUserId=String(store.current_boss_user_id || store.boss_user_id || "");
+    if(bossUserId && myIds.has(bossUserId)) return true;
+
+    const myNickname=String(profile?.nickname || playerSession?.nickname || "").trim();
+    const bossNickname=String(store.current_boss_nickname || "").trim();
+    return Boolean(myNickname && bossNickname && myNickname === bossNickname);
+  }
+
+  function markStoreOwnedLocally(store){
+    const storeId=String(store?.id || "").trim();
+    if(!storeId) return;
+    locallyOwnedStoreIds.add(storeId);
+    const previous=storeRoleMap.get(storeId)||{};
+    storeRoleMap.set(storeId,{...previous,store_id:storeId,is_my_boss_store:true,my_role:"boss"});
+  }
+
+  function reconcileTakeoverOwnership(){
+    if(!takeoverUi?.storeId) return;
+    const activeStore=stores.find(item=>String(item.id)===String(takeoverUi.storeId));
+    if(!activeStore || isMyBossStore(activeStore)) closeTakeoverUi();
+  }
+
+  function currentTakeoverVisualRemaining(){
+    if(!takeoverUi) return 0;
+    if(["hold","outside","low_accuracy","cancelled","ready"].includes(String(takeoverUi.status||""))){
+      return Math.max(0,Number(takeoverRemaining||0));
+    }
+    const elapsed=Math.max(0,(Date.now()-takeoverLastServerAt)/1000);
+    return Math.max(0,Number(takeoverRemaining||0)-elapsed);
+  }
+
   function takeoverModeLabel(mode){
     return ({takeover:"TAKING OVER",challenge:"CHALLENGING",retake:"RETAKING",hot:"HOT TAKEOVER"})[String(mode||"")] || "TAKING OVER";
   }
@@ -2213,6 +2266,10 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
 
   function showTakeoverUi(store,state={}){
     if(!store?.id || takeoverCancelledLocally) return;
+    if(isMyBossStore(store)){
+      if(takeoverUi?.storeId===String(store.id)) closeTakeoverUi();
+      return;
+    }
     const screen=$("#takeoverScreen");
     if(!screen) return;
     const mode=String(state.mode||takeoverModeFromStore(store));
@@ -2285,11 +2342,33 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
 
   function syncTakeoverUi(store,state={}){
     if(!store?.id) return;
+    if(isMyBossStore(store)){
+      if(takeoverUi?.storeId===String(store.id)) closeTakeoverUi();
+      return;
+    }
+
     const status=String(state.status||"tracking");
-    if(!takeoverUi || takeoverUi.storeId!==String(store.id)) showTakeoverUi(store,state);
-    takeoverRemaining=Math.max(0,Number(state.remaining_seconds ?? takeoverRemaining));
-    takeoverRequired=Math.max(5,Number(state.required_seconds||takeoverRequired||20));
+    const storeId=String(store.id);
+    const freshSession=!takeoverUi || takeoverUi.storeId!==storeId ||
+      (["cancelled","ready"].includes(String(takeoverUi.status||"")) && status==="tracking");
+
+    if(freshSession){
+      showTakeoverUi(store,state);
+      return;
+    }
+
+    const visualNow=currentTakeoverVisualRemaining();
+    const incomingRaw=Number(state.remaining_seconds);
+    const incomingRemaining=Number.isFinite(incomingRaw) ? Math.max(0,incomingRaw) : visualNow;
+
+    // The server is authoritative, but a delayed GPS/RPC response must never make
+    // an active countdown move backwards. A genuinely new session is handled above.
+    takeoverRemaining=Math.min(visualNow,incomingRemaining);
     takeoverLastServerAt=Date.now();
+
+    if(!takeoverRequired){
+      takeoverRequired=Math.max(5,Number(state.required_seconds||takeoverFallbackSeconds(state.mode||takeoverUi.mode)));
+    }
     if(state.mode) takeoverUi.mode=String(state.mode);
     $("#takeoverEyebrow").textContent=takeoverModeLabel(takeoverUi.mode);
     updateTakeoverUi(status,state.reason||"");
@@ -2356,15 +2435,17 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     }catch{}
     const fallbackRetakes=stores.filter(s=>Boolean((storeRoleMap.get(String(s.id))||{}).can_retake)).slice(0,3).map(s=>({store_id:s.id,store_name:s.name}));
     const fallbackHot=stores.filter(s=>s.is_hot||Number(s.challenges_24h||0)>=Number(config.hot_store_challenges_24h||5)).slice(0,3).map(s=>({store_id:s.id,store_name:s.name,challenges_24h:s.challenges_24h||0}));
-    const retakes=Array.isArray(data?.retakes)?data.retakes:fallbackRetakes;
-    const hot=Array.isArray(data?.hot)?data.hot:fallbackHot;
+    const retakes=(Array.isArray(data?.retakes)?data.retakes:fallbackRetakes)
+      .filter(row=>!isMyBossStore(stores.find(store=>String(store.id)===String(row.store_id))||{}));
+    const hot=(Array.isArray(data?.hot)?data.hot:fallbackHot)
+      .filter(row=>!isMyBossStore(stores.find(store=>String(store.id)===String(row.store_id))||{}));
     const newcomer=data?.new_player_protected===true;
     const items=[];
     if(retakes[0]) items.push(`<button type="button" data-pulse-store="${escapeAttr(retakes[0].store_id)}"><span>RETAKE</span><strong>${escapeHtml(retakes[0].store_name||"빼앗긴 매장")}</strong><small>다시 가져오기</small></button>`);
     if(hot[0]) items.push(`<button type="button" data-pulse-store="${escapeAttr(hot[0].store_id)}"><span>HOT</span><strong>${escapeHtml(hot[0].store_name||"인기 매장")}</strong><small>${Number(hot[0].challenges_24h||0)}명 도전</small></button>`);
     if(newcomer) items.push(`<div class="game-pulse-info"><span>NEW BOSS</span><strong>첫 점령 가이드</strong><small>초반에는 쉬운 매장을 우선 추천합니다.</small></div>`);
     if(!items.length){
-      const next=stores[0];
+      const next=stores.find(store=>!isMyBossStore(store));
       if(next) items.push(`<button type="button" data-pulse-store="${escapeAttr(next.id)}"><span>NEXT</span><strong>${escapeHtml(next.name||"가장 가까운 매장")}</strong><small>현장에 들어가면 자동으로 카운트가 시작됩니다.</small></button>`);
       items.push(`<div class="game-pulse-info"><span>LIVE</span><strong>${playerSession?.authenticated ? "READY TO TAKE OVER" : "LOGIN TO TAKE OVER"}</strong><small>${playerSession?.authenticated ? "GPS 반경 안에서 점령 세션이 시작됩니다." : "로그인 후 현장 점령을 시작할 수 있습니다."}</small></div>`);
     }
@@ -2403,14 +2484,14 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
       if(!Number.isFinite(Number(store.latitude)) || !Number.isFinite(Number(store.longitude))) return false;
 
       const roleState = storeRoleMap.get(String(store.id)) || {};
-      const isMyBossStore = Boolean(roleState.is_my_boss_store || roleState.my_role === "boss");
+      const ownedByMe = isMyBossStore(store);
       const protectionUntil = roleState.protected_until || store.protected_until || null;
       const protectedNow = Boolean(
         protectionUntil &&
         new Date(protectionUntil).getTime() > Date.now()
       );
 
-      return isMyBossStore || !protectedNow;
+      return ownedByMe || !protectedNow;
     });
 
     if(!candidates.length) return;
@@ -2431,7 +2512,11 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
           required_seconds:Number(config.gps_dwell_seconds || 120),
           remaining_seconds:Number(config.gps_dwell_seconds || 120)
         }));
-        if(takeoverUi){ syncTakeoverUi(stores.find(item=>String(item.id)===takeoverUi.storeId)||{}, {status:"low_accuracy",remaining_seconds:takeoverRemaining,required_seconds:takeoverRequired}); }
+        if(takeoverUi){
+          const activeStore=stores.find(item=>String(item.id)===takeoverUi.storeId)||null;
+          if(!activeStore || isMyBossStore(activeStore)) closeTakeoverUi();
+          else syncTakeoverUi(activeStore,{status:"low_accuracy",remaining_seconds:currentTakeoverVisualRemaining(),required_seconds:takeoverRequired});
+        }
         renderStores();
         return;
       }
@@ -2451,6 +2536,9 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
       if(!nearest) return;
 
       const radius = Math.max(1, Number(config.gps_radius_m || 50));
+      const ownedByMe=isMyBossStore(nearest.store);
+      if(ownedByMe && takeoverUi?.storeId===String(nearest.store.id)) closeTakeoverUi();
+
       if(nearest.distance > radius + Math.max(0, accuracy || 0)){
         presenceState.set(String(nearest.store.id), {
           status:"outside",
@@ -2458,12 +2546,16 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
           required_seconds:Number(config.gps_dwell_seconds || 120),
           remaining_seconds:Number(config.gps_dwell_seconds || 120)
         });
-        if(takeoverUi?.storeId===String(nearest.store.id)) syncTakeoverUi(nearest.store,{status:"hold",reason:"OUTSIDE",remaining_seconds:takeoverRemaining,required_seconds:takeoverRequired});
+        if(!ownedByMe && takeoverUi?.storeId===String(nearest.store.id)){
+          syncTakeoverUi(nearest.store,{status:"hold",reason:"OUTSIDE",remaining_seconds:currentTakeoverVisualRemaining(),required_seconds:takeoverRequired});
+        }
         renderStores();
         return;
       }
 
-      const takeoverSession = await pingTakeoverSession(nearest.store, pos);
+      // Already-owned stores still send the presence ping so defense/visit records
+      // remain intact, but they never create a takeover session or takeover UI.
+      const takeoverSession = ownedByMe ? null : await pingTakeoverSession(nearest.store, pos);
       if(takeoverSession?.ok){
         syncTakeoverUi(nearest.store, takeoverSession);
         if(takeoverSession.status === "cancelled"){
@@ -2471,9 +2563,6 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
           renderStores();
           return;
         }
-      }else if(!takeoverCancelledLocally){
-        const existing=presenceState.get(String(nearest.store.id))||{};
-        showTakeoverUi(nearest.store,{...existing,status:"tracking"});
       }
 
       const { data, error } = await sb.rpc("biteboss_presence_ping", {
@@ -2502,13 +2591,11 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
       }
 
       presenceBlockedReason = "";
-      if(!takeoverCancelledLocally){
-        syncTakeoverUi(nearest.store,{
-          ...(takeoverSession||{}),
-          status:String(data?.status||takeoverSession?.status||"tracking"),
-          remaining_seconds:Number(data?.remaining_seconds ?? takeoverSession?.remaining_seconds ?? 0),
-          required_seconds:Number((data?.required_seconds ?? takeoverSession?.required_seconds ?? config.gps_dwell_seconds) || 120)
-        });
+      // Keep the visible countdown on the v71 takeover-session clock only.
+      // biteboss_presence_ping has a different dwell model and using its remaining
+      // seconds here was the source of visible countdown jumps/increases.
+      if(!ownedByMe && !takeoverCancelledLocally && takeoverSession?.ok){
+        syncTakeoverUi(nearest.store,takeoverSession);
       }
       presenceState.set(String(nearest.store.id), {
         status:String(data?.status || "tracking"),
@@ -2519,6 +2606,8 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
       });
 
       if(["claimed","crew","boss_visit"].includes(String(data?.status || ""))){
+        const outcomeStatus=String(data?.status || "");
+        if(outcomeStatus === "claimed" || outcomeStatus === "boss_visit") markStoreOwnedLocally(nearest.store);
         presenceState.delete(String(nearest.store.id));
         if(takeoverUi?.storeId===String(nearest.store.id)){
           const count=$("#takeoverCount");
@@ -5654,6 +5743,7 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
       organizationInvites = [];
       organizationMembers = [];
       storeRoleMap.clear();
+      locallyOwnedStoreIds.clear();
       presenceBlockedReason = "MEMBER_LOGIN_REQUIRED";
       presenceState.clear();
       stopPresenceTracking();
@@ -5683,6 +5773,7 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     organizationInvites = [];
     organizationMembers = [];
     storeRoleMap.clear();
+    locallyOwnedStoreIds.clear();
     presenceBlockedReason = "MEMBER_LOGIN_REQUIRED";
     presenceState.clear();
     stopPresenceTracking();

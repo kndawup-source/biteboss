@@ -214,3 +214,27 @@ body.biteboss-info-page{min-height:100dvh;background:var(--bg);color:#111}.info-
   .form-grid{grid-template-columns:1fr}
   .takeover-store-name{font-size:27px}.takeover-count{font-size:clamp(68px,25vw,128px)}
 }
+
+/* v73.3 avatar geometry — canonical circular masks */
+.store-card-photo,.store-avatar,.occupied-store-avatar,
+.profile-identity .avatar,.profile-photo-btn,
+.player-profile-avatar,.home-mini-avatar,
+.my-rank-avatar,.rank-player-avatar,.crew-rank-avatar,
+.crew-profile-avatar,.boss-avatar,.boss-avatar-fallback{
+  aspect-ratio:1/1;
+  border-radius:50%!important;
+  clip-path:circle(50% at 50% 50%);
+  overflow:hidden!important;
+}
+.store-card-photo img,.store-avatar img,.occupied-store-avatar img,
+.profile-identity .avatar img,.profile-photo-btn img,
+.player-profile-avatar img,.home-mini-avatar img,
+.my-rank-avatar img,.rank-player-avatar img,.crew-rank-avatar img,
+.crew-profile-avatar img,.boss-avatar img{
+  width:100%;height:100%;object-fit:cover;border-radius:50%!important;
+}
+.crew-rank-avatar-link{
+  width:48px;height:48px;min-width:48px;display:grid;place-items:center;
+  border-radius:50%;overflow:hidden;
+}
+.store-list-action.is-owned{background:transparent;color:#777771;border-color:transparent;padding-left:0;padding-right:0}
