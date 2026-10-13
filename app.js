@@ -416,6 +416,9 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     const isHome = tab === "home";
     setHomeViewportLocked(isHome);
 
+    // Each primary tab is a top-level screen. Never inherit scroll position from the previous screen.
+    window.scrollTo({ top:0, left:0, behavior:"auto" });
+
     $$(".page").forEach(page => page.classList.remove("active"));
     $(`#page-${tab}`)?.classList.add("active");
     $$(".nav-btn").forEach(btn => btn.classList.toggle("active", btn.dataset.tab === tab));
@@ -2865,10 +2868,10 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
 
     if(hasCurrentPosition && territoryUserLayer){
       const userMarker = L.circleMarker([currentLat,currentLng], {
-        radius:8,
+        radius:7,
         weight:3,
         color:"#ffffff",
-        fillColor:"#d5232f",
+        fillColor:"#111111",
         fillOpacity:1
       });
       userMarker.bindTooltip("내 위치", {
@@ -2895,7 +2898,12 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
         new Date(row.protected_until).getTime() > Date.now()
       );
 
-      const mine = Boolean(row.is_my_organization);
+      const rowOrganizationId = String(row.organization_id || row.crew_id || "").trim();
+      const myOrganizationId = String(organization?.id || "").trim();
+      const mine = Boolean(
+        row.is_my_organization ||
+        (rowOrganizationId && myOrganizationId && rowOrganizationId === myOrganizationId)
+      );
       const distanceMeters = hasCurrentPosition
         ? haversineMeters(currentLat,currentLng,lat,lng)
         : null;
@@ -2908,9 +2916,9 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
       const marker = L.circleMarker([lat,lng], {
         radius:mine ? 8 : 6,
         weight:mine ? 3 : 2,
-        color:mine ? "#fff7e8" : "#9a9a9a",
-        fillColor:mine ? "#fff7e8" : "#111111",
-        fillOpacity:mine ? 0.95 : 0.85
+        color:"#ffffff",
+        fillColor:mine ? "#d72f38" : "#c8c8cc",
+        fillOpacity:mine ? 1 : 0.95
       });
 
       marker.bindPopup(`
@@ -2930,9 +2938,14 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     });
 
     if(summaryEl){
-      summaryEl.textContent = hasCurrentPosition
-        ? `${territoryMapRows.length} stores · 현재 위치 기준`
-        : `${territoryMapRows.length} stores · ${orgIds.size} organizations`;
+      const myOrganizationId = String(organization?.id || "").trim();
+      const myTerritoryCount = territoryMapRows.filter(row => {
+        const rowOrganizationId = String(row.organization_id || row.crew_id || "").trim();
+        return Boolean(row.is_my_organization || (myOrganizationId && rowOrganizationId === myOrganizationId));
+      }).length;
+      summaryEl.textContent = myOrganizationId
+        ? `${territoryMapRows.length}개 매장 · 내 크루 ${myTerritoryCount}개`
+        : `${territoryMapRows.length}개 매장 · ${orgIds.size}개 크루`;
     }
 
     requestAnimationFrame(() => {

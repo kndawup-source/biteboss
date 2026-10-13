@@ -117,3 +117,17 @@ test("non-action store states are not rendered as fake disabled buttons", () => 
   assert.doesNotMatch(app,/type="button" disabled>재도전/);
   assert.match(app,/store-detail-auto/);
 });
+
+
+test("territory rank uses dedicated 3-column layout and crew marker fallback", () => {
+  const css = read("styles.css").toString();
+  const app = read("app.js").toString();
+  assert.match(css, /\.territory-rank-card\{grid-template-columns:22px minmax\(0,1fr\) auto/);
+  assert.match(app, /row\.is_my_organization[\s\S]*rowOrganizationId[\s\S]*myOrganizationId/);
+  assert.match(app, /fillColor:mine \? "#d72f38" : "#c8c8cc"/);
+});
+
+test("top-level tab navigation resets inherited scroll position", () => {
+  const app = read("app.js").toString();
+  assert.match(app, /function openTab\(tab\)[\s\S]*window\.scrollTo\(\{ top:0, left:0, behavior:"auto" \}\)/);
+});
