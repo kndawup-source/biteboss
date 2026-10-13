@@ -138,8 +138,9 @@ body.user-app #page-home{height:100dvh;min-height:0;padding:0;overflow:hidden}
   width:100%;height:100%;object-fit:cover;border-radius:50%;
 }
 .store-avatar-fallback,.boss-avatar-fallback,.occupied-store-half-fallback,.occupied-boss-half-fallback{
-  display:grid;place-items:center;width:100%;height:100%;background:#e0e0e2;color:#111;font-size:19px;font-weight:850;line-height:1;
+  display:grid;place-items:center;background:#e0e0e2;color:#111;font-size:19px;font-weight:850;line-height:1;
 }
+.occupied-store-half-fallback,.occupied-boss-half-fallback{width:100%;height:100%}
 
 /* pagination */
 .list-pagination{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;margin:18px 0 2px;padding:4px 0}
@@ -152,7 +153,7 @@ body.user-app #page-home{height:100dvh;min-height:0;padding:0;overflow:hidden}
 .page-meter-row{display:flex;align-items:center;justify-content:space-between;gap:12px}.page-meter-row span{color:#85858b;font-size:9px;font-weight:650}.page-meter-row strong{color:#111;font-size:14px;line-height:1;font-weight:850;letter-spacing:-.025em;white-space:nowrap}
 .page-meter-track{height:6px;margin-top:11px;border-radius:999px;background:#ececef;overflow:hidden}.page-meter-track span{display:block;height:100%;width:0;border-radius:inherit;background:#111}
 .my-rank-summary{display:grid;grid-template-columns:22px 46px minmax(0,1fr) auto;gap:10px;align-items:center;padding:14px 16px;margin:0 0 14px;background:#fff}
-.my-rank-position{color:var(--accent);font-size:17px;font-weight:850}.my-rank-avatar{width:46px;height:46px;border-radius:50%;object-fit:cover;background:#e3e3e5}.my-rank-copy{min-width:0}.my-rank-copy b{display:block;font-size:13px;line-height:1.12;overflow-wrap:anywhere}.my-rank-copy small,.my-rank-label{color:var(--muted);font-size:8px}
+.my-rank-position{color:var(--accent);font-size:17px;font-weight:850}.my-rank-avatar{width:46px;height:46px;min-width:46px;min-height:46px;max-width:46px;max-height:46px;aspect-ratio:1/1;border-radius:50%;object-fit:cover;overflow:hidden;display:grid;place-items:center;background:#e3e3e5;clip-path:circle(50% at 50% 50%)}.my-rank-copy{min-width:0}.my-rank-copy b{display:block;font-size:13px;line-height:1.12;overflow-wrap:anywhere}.my-rank-copy small,.my-rank-label{color:var(--muted);font-size:8px}
 .rank-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:2px;margin:0 0 18px;padding:4px;border-radius:14px;background:#e9e9ec;overflow:hidden}
 .rank-tabs .chip{min-width:0;min-height:31px;padding:0 3px;border:0;border-radius:9px;background:transparent;color:#8f8f95;font-size:9px;font-weight:820;line-height:1.1;text-align:center;white-space:normal}
 .rank-tabs .chip.active{color:#111;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.04)}
@@ -274,7 +275,7 @@ body.biteboss-info-page{min-height:100dvh;background:var(--bg);color:#111}.info-
   .inner-head h2,.challenge-head h2{font-size:26px}.boss-home-hook{font-size:34px}
   .takeover-command-primary{min-height:78px;padding:13px}.takeover-command-primary strong{font-size:17px}.takeover-command-primary small{font-size:9px}
   .store-card{grid-template-columns:minmax(0,1fr);gap:6px;padding:2px 0}.store-card-main{align-items:center}.store-card-photo,.store-avatar,.occupied-store-avatar{width:44px;height:44px;flex-basis:44px}.store-card-name{font-size:12.5px}.store-card-meta{font-size:8.5px}.store-list-action{justify-self:start;max-width:none;min-height:29px;padding:0 8px;font-size:9px}
-  .rank-card,.my-rank-summary{grid-template-columns:18px 38px minmax(0,1fr) auto;gap:8px}.rank-result{min-width:38px}.rank-player-avatar,.crew-rank-avatar{width:38px;height:38px}.rank-card strong,.crew-rank-name-link{font-size:11px}.rank-card .meta{font-size:7.5px}
+  .rank-card,.my-rank-summary{grid-template-columns:18px 38px minmax(0,1fr) auto;gap:8px}.my-rank-avatar{width:38px;height:38px;min-width:38px;min-height:38px;max-width:38px;max-height:38px}.rank-result{min-width:38px}.rank-player-avatar,.crew-rank-avatar{width:38px;height:38px}.rank-card strong,.crew-rank-name-link{font-size:11px}.rank-card .meta{font-size:7.5px}
   .profile-identity{grid-template-columns:50px minmax(0,1fr);gap:10px}.profile-identity .avatar{width:50px;height:50px}.profile-identity h3{font-size:19px}.profile-guest-info{grid-template-columns:1fr}.profile-game-stats{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.stat-card{min-height:56px;padding:9px 22px 8px 9px}.stat-card b{font-size:14px}.stat-card i{right:8px;font-size:15px}
   .organization-panel-head{grid-template-columns:auto minmax(0,1fr);gap:9px}.crew-profile-avatar{width:38px;height:38px;min-width:38px}.organization-panel-head strong{font-size:13px}.organization-stats>div{padding:9px}.organization-stats b{font-size:12px}.organization-member-row{grid-template-columns:34px minmax(0,1fr) auto;padding:8px 9px}.organization-member-avatar{width:34px;height:34px}
   .profile-record-row.has-thumb{grid-template-columns:42px minmax(0,1fr);gap:9px}.profile-record-time{grid-column:2;justify-self:start}.profile-record-thumb{width:42px;height:42px}.activity-row{grid-template-columns:minmax(0,1fr)}.activity-row time{justify-self:start}
