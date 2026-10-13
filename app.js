@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.16";
+  const BITEBOSS_BUILD = "75.17";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1005,7 +1005,7 @@
   }
 
   function renderPagination(selector, page, totalItems, pageSize, onChange){
-    const nav = $(selector);
+    const nav = typeof selector === "string" ? $(selector) : selector;
     if(!nav) return;
     const total = Math.max(0, Number(totalItems || 0));
     const pages = Math.max(1, Math.ceil(total / Math.max(1, pageSize)));
@@ -5034,14 +5034,17 @@
       String(organization.id) === String(requestedOrgId || org.id || "")
     );
     const sortedTerritories = [...allTerritories].sort((a,b) => territoryRecencyValue(b) - territoryRecencyValue(a));
-    const visibleTerritories = isOwnOrganization ? sortedTerritories : sortedTerritories.slice(0,3);
+    const publicTerritories = sortedTerritories.slice(0,3);
+    const CREW_PAGE_SIZE = 8;
+    let territoryPage = 1;
+    let memberPage = 1;
 
     setText("#modalTitle", "크루 프로필");
 
     const body = $("#modalBody");
     if(!body) return;
 
-    const memberHtml = members.map(member => {
+    const memberRowMarkup = member => {
       const memberName = String(member.nickname || member.username || "사용자").trim();
       const roleLabel = member.role === "leader" ? "개설자" : "멤버";
       return `
@@ -5054,9 +5057,9 @@
           <b>BOSS ${Number(member.boss_count || 0)}</b>
         </article>
       `;
-    }).join("") || `<div class="store-detail-empty">멤버가 없습니다.</div>`;
+    };
 
-    const territoryHtml = visibleTerritories.map(row => {
+    const territoryRowMarkup = row => {
       const protectedNow = Boolean(
         row.protected_until &&
         new Date(row.protected_until).getTime() > Date.now()
@@ -5083,12 +5086,7 @@
           ` : `<span class="organization-territory-public-meta">최근 점령</span>`}
         </button>
       `;
-    }).join("") || `<div class="store-detail-empty">아직 점령지가 없습니다.</div>`;
-
-    const territoryTitle = isOwnOrganization ? "점령지" : "최근 점령지";
-    const territoryNote = !isOwnOrganization && Number(org.territory_count || allTerritories.length) > visibleTerritories.length
-      ? `<p class="crew-public-note">다른 크루의 점령지는 최근 3곳만 공개됩니다.</p>`
-      : "";
+    };
 
     body.innerHTML = `
       <div class="organization-detail crew-profile-detail">
@@ -5104,9 +5102,9 @@
           </div>
         </section>
 
-        <section class="player-profile-h2h-grid crew-profile-stats" aria-label="크루 기록">
-          <p><span>멤버</span><strong>${Number(org.member_count || members.length || 0)}</strong></p>
-          <p><span>점령지</span><strong>${Number(org.territory_count || allTerritories.length || 0)}</strong></p>
+        <section class="crew-profile-overview" aria-label="크루 기록">
+          <div><strong>${Number(org.member_count || members.length || 0)}</strong><span>멤버</span></div>
+          <div><strong>${Number(org.territory_count || allTerritories.length || 0)}</strong><span>점령지</span></div>
         </section>
 
         <div class="crew-detail-tabs" role="tablist" aria-label="크루 상세">
@@ -5115,17 +5113,72 @@
         </div>
 
         <section class="organization-detail-section crew-detail-panel" data-crew-detail-panel="territory">
-          <div class="crew-detail-section-head"><h4>${territoryTitle}</h4><span>${isOwnOrganization ? `${visibleTerritories.length}곳` : `최대 3곳`}</span></div>
-          <div class="organization-territory-list">${territoryHtml}</div>
-          ${territoryNote}
+          <div class="crew-detail-section-head">
+            <h4>${isOwnOrganization ? "점령지" : "최근 점령지"}</h4>
+            <span>${isOwnOrganization ? `${sortedTerritories.length}곳` : `${publicTerritories.length}곳`}</span>
+          </div>
+          <div class="organization-territory-list" data-crew-territory-list></div>
+          <nav class="list-pagination crew-detail-pagination hidden" data-crew-territory-pagination aria-label="크루 점령지 페이지"></nav>
+          ${!isOwnOrganization && Number(org.territory_count || allTerritories.length) > publicTerritories.length
+            ? `<p class="crew-public-note">다른 크루의 점령지는 최근 3곳만 공개됩니다.</p>`
+            : ""}
         </section>
 
         <section class="organization-detail-section crew-detail-panel hidden" data-crew-detail-panel="members">
           <div class="crew-detail-section-head"><h4>멤버</h4><span>${members.length}명</span></div>
-          <div class="organization-detail-members">${memberHtml}</div>
+          <div class="organization-detail-members" data-crew-member-list></div>
+          <nav class="list-pagination crew-detail-pagination hidden" data-crew-member-pagination aria-label="크루 멤버 페이지"></nav>
         </section>
       </div>
     `;
+
+    const bindTerritoryRows = () => {
+      $$('[data-org-territory-store]', body).forEach(button => {
+        button.addEventListener("click", () => {
+          const storeId = button.dataset.orgTerritoryStore;
+          closeModal();
+          if(storeId) openStoreDetail(storeId);
+        });
+      });
+    };
+
+    const renderTerritoryPage = () => {
+      const list = $('[data-crew-territory-list]', body);
+      const nav = $('[data-crew-territory-pagination]', body);
+      if(!list || !nav) return;
+      const source = isOwnOrganization ? sortedTerritories : publicTerritories;
+      const slice = isOwnOrganization ? pageSlice(source, territoryPage, CREW_PAGE_SIZE) : {page:1,pages:1,rows:source};
+      territoryPage = slice.page;
+      list.innerHTML = slice.rows.map(territoryRowMarkup).join("") || `<div class="store-detail-empty">아직 점령지가 없습니다.</div>`;
+      bindTerritoryRows();
+      if(isOwnOrganization){
+        renderPagination(nav, territoryPage, source.length, CREW_PAGE_SIZE, nextPage => {
+          territoryPage = nextPage;
+          renderTerritoryPage();
+          $('[data-crew-detail-panel="territory"]', body)?.scrollIntoView({block:"nearest"});
+        });
+      }else{
+        nav.classList.add("hidden");
+        nav.innerHTML = "";
+      }
+    };
+
+    const renderMemberPage = () => {
+      const list = $('[data-crew-member-list]', body);
+      const nav = $('[data-crew-member-pagination]', body);
+      if(!list || !nav) return;
+      const slice = pageSlice(members, memberPage, CREW_PAGE_SIZE);
+      memberPage = slice.page;
+      list.innerHTML = slice.rows.map(memberRowMarkup).join("") || `<div class="store-detail-empty">멤버가 없습니다.</div>`;
+      renderPagination(nav, memberPage, members.length, CREW_PAGE_SIZE, nextPage => {
+        memberPage = nextPage;
+        renderMemberPage();
+        $('[data-crew-detail-panel="members"]', body)?.scrollIntoView({block:"nearest"});
+      });
+    };
+
+    renderTerritoryPage();
+    renderMemberPage();
 
     $$('[data-crew-detail-tab]', body).forEach(tab => {
       tab.addEventListener("click", () => {
@@ -5138,14 +5191,6 @@
         $$('[data-crew-detail-panel]', body).forEach(panel => {
           panel.classList.toggle("hidden", panel.dataset.crewDetailPanel !== target);
         });
-      });
-    });
-
-    $$('[data-org-territory-store]', body).forEach(button => {
-      button.addEventListener("click", () => {
-        const storeId = button.dataset.orgTerritoryStore;
-        closeModal();
-        if(storeId) openStoreDetail(storeId);
       });
     });
   }

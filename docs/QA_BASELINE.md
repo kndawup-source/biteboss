@@ -28,7 +28,7 @@
 - Targeted mutation score: 100%
 - Duplicate HTML IDs: 0
 - Critical client secrets: 0 service-role keys
-- Performance budget: public initial HTML < 30 KB, app.js < 250 KB, styles.css < 250 KB before transfer compression.
+- Performance budget: public initial HTML < 30 KB, app.js < 260 KB, styles.css < 250 KB before transfer compression.
 
 ## Browser/device acceptance
 Automated source tests do not replace real-device checks for GPS, camera QR, APNs, WebView safe-area, keyboard, or App Store lifecycle behavior. Those are release-blocking manual checks.

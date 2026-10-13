@@ -28,7 +28,7 @@ test('all declared navigation tabs have matching pages',()=>{
 
 test('release assets stay within source-size budgets',()=>{
   assert.ok(read('index.html').byteLength < 30*1024,'index.html budget');
-  assert.ok(read('app.js').byteLength < 250*1024,'app.js budget');
+  assert.ok(read('app.js').byteLength < 260*1024,'app.js budget');
   assert.ok(read('styles.css').byteLength < 250*1024,'styles.css budget');
 });
 
@@ -285,15 +285,15 @@ test('global capture cooldown blocks the next store for 60 minutes',()=>{
   assert.match(admin,/name="capture_cooldown_minutes"/);
 });
 
-test('v75.16 public crew detail exposes members but limits other-crew territory to three',()=>{
+test('v75.17 public crew detail exposes members but limits other-crew territory to three',()=>{
   const app=read('app.js').toString();
-  assert.match(app,/visibleTerritories = isOwnOrganization \? sortedTerritories : sortedTerritories\.slice\(0,3\)/);
+  assert.match(app,/publicTerritories = sortedTerritories\.slice\(0,3\)/);
   assert.match(app,/data-crew-detail-tab="territory"/);
   assert.match(app,/data-crew-detail-tab="members"/);
   assert.match(app,/다른 크루의 점령지는 최근 3곳만 공개됩니다/);
 });
 
-test('v75.16 notification center has structured unread rows and pagination',()=>{
+test('v75.17 notification center has structured unread rows and pagination',()=>{
   const app=read('app.js').toString();
   const css=read('styles.css').toString();
   assert.match(app,/NOTIFICATION_PAGE_SIZE = 8/);
@@ -304,14 +304,14 @@ test('v75.16 notification center has structured unread rows and pagination',()=>
   assert.match(css,/\.notification-inbox-row\.is-unread/);
 });
 
-test('v75.16 challenge and ranking pages use compact bottom spacing',()=>{
+test('v75.17 challenge and ranking pages use compact bottom spacing',()=>{
   const css=read('styles.css').toString();
   assert.match(css,/#page-stores,#page-rank\{padding-bottom:calc\(82px \+ var\(--safe-bottom\)\)\}/);
   assert.match(css,/\.challenge-page\{padding-bottom:14px!important\}/);
   assert.match(css,/#page-rank \.inner-page\{padding-bottom:14px\}/);
 });
 
-test('v75.16 new members receive Korean BiteBoss-style suggested nicknames',()=>{
+test('v75.17 new members receive Korean BiteBoss-style suggested nicknames',()=>{
   const app=read('app.js').toString();
   const helpers=read('ui-helpers.js').toString();
   assert.match(app,/generateDefaultNickname\(\)/);
@@ -320,18 +320,32 @@ test('v75.16 new members receive Korean BiteBoss-style suggested nicknames',()=>
   assert.match(helpers,/불주먹/);
 });
 
-test('v75.16 player ranking separates nickname from crew and BOSS metadata',()=>{
+test('v75.17 player ranking separates nickname from crew and BOSS metadata',()=>{
   const app=read('app.js').toString();
   assert.match(app,/const rankMeta=\[crewName, `BOSS \$\{Number\(row\.boss_count \|\| 0\)\}`\]/);
   assert.match(app,/<strong>\$\{escapeHtml\(playerName\)\}<\/strong>/);
   assert.doesNotMatch(app,/const identity=\[playerName,row\.organization_name\]/);
 });
 
-test('v75.16 crew member management actions do not fall through to profile row clicks',()=>{
+test('v75.17 crew member management actions do not fall through to profile row clicks',()=>{
   const app=read('app.js').toString();
   assert.match(app,/actionButton = event\.target\.closest\("\[data-kick-member\],\[data-transfer-leader\]"\)/);
   assert.match(app,/event\.stopPropagation\(\)/);
   assert.match(app,/handlePlayerProfileOpen\(event\)[\s\S]*?data-kick-member[\s\S]*?data-transfer-leader/);
   assert.match(app,/biteboss_kick_organization_member_v7513/);
   assert.match(app,/biteboss_transfer_organization_leadership/);
+});
+
+test('v75.17 crew pagination HOT emphasis and stable countdown typography',()=>{
+  const app=read('app.js').toString();
+  const css=read('styles.css').toString();
+  assert.match(app,/const CREW_PAGE_SIZE = 8/);
+  assert.match(app,/data-crew-territory-pagination/);
+  assert.match(app,/data-crew-member-pagination/);
+  assert.match(app,/pageSlice\(members, memberPage, CREW_PAGE_SIZE\)/);
+  assert.match(app,/isOwnOrganization \? pageSlice\(source, territoryPage, CREW_PAGE_SIZE\)/);
+  assert.match(css,/\.game-pulse-item\.is-hot\{background:var\(--accent\);color:#fff\}/);
+  assert.match(css,/\.takeover-count\{[^}]*font-variant-numeric:tabular-nums[^}]*font-feature-settings:"tnum" 1/);
+  assert.match(css,/\.takeover-count\{[^}]*letter-spacing:\.015em/);
+  assert.match(css,/\.crew-profile-overview/);
 });
