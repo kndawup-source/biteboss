@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "72.1";
+  const BITEBOSS_BUILD = "72.2";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
 if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -503,8 +503,7 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
       image.src = url;
       image.classList.remove("hidden");
       promo.classList.add("has-splash");
-      const safeUrl = url.replace(/["\\\n\r]/g, match => `\\${match}`);
-      promo.style.setProperty("--home-hero-image", `url("${safeUrl}")`);
+      promo.style.removeProperty("--home-hero-image");
     }else{
       image.removeAttribute("src");
       image.classList.add("hidden");
