@@ -85,3 +85,13 @@ test("v74.1 critical layout contracts prevent store/profile overlap", () => {
   assert.match(css, /\.rank-player-avatar[^\{]*\{[^}]*border-radius:50%/);
   assert.doesNotMatch(css, /v73\.3 avatar geometry/);
 });
+
+
+test("home hero and occupied-store avatar layout regressions stay fixed", () => {
+  const css = read("styles.css").toString();
+  const app = read("app.js").toString();
+  assert.match(css, /\.boss-home-hero\.has-splash \.boss-home-fallback\{display:none\}/);
+  assert.match(css, /\.occupied-store-avatar\{display:grid;grid-template-columns:50% 50%/);
+  assert.match(css, /\.occupied-store-half>img,\.occupied-boss-half>img\{[^}]*border-radius:0!important;clip-path:none!important/);
+  assert.match(app, /image\.src = url;/);
+});

@@ -63,10 +63,12 @@ body.user-app #page-home{height:100dvh;min-height:0;padding:0;overflow:hidden}
 .boss-home{width:100%;height:100%}
 .boss-home-hero{position:relative;width:100%;height:100%;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;background:#111}
 .boss-home-image,.boss-home-fallback{position:absolute;inset:0;width:100%;height:100%;border-radius:0;object-fit:cover;object-position:center;background:#d6d6d0}
+.boss-home-hero.has-splash .boss-home-fallback{display:none}
+.boss-home-image{z-index:1}.boss-home-fallback{z-index:0}.boss-home-shade{z-index:2}
 .boss-home-shade{display:block;position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 0%,rgba(0,0,0,.05) 45%,rgba(0,0,0,.42) 76%,rgba(0,0,0,.78) 100%)}
-.boss-home-hook{position:relative;z-index:2;left:auto;right:auto;bottom:auto;max-width:560px;margin:auto 22px 16px;color:#fff;text-shadow:none;pointer-events:none;font-size:clamp(40px,9.2vw,62px);line-height:.91;font-weight:870;letter-spacing:-.075em;text-wrap:balance}
+.boss-home-hook{position:relative;z-index:3;left:auto;right:auto;bottom:auto;max-width:560px;margin:auto 22px 16px;color:#fff;text-shadow:none;pointer-events:none;font-size:clamp(40px,9.2vw,62px);line-height:.91;font-weight:870;letter-spacing:-.075em;text-wrap:balance}
 .boss-home-hook.hidden{display:none!important}
-.boss-home-actions{position:relative;z-index:2;left:auto;right:auto;bottom:auto;display:grid;grid-template-columns:1fr;gap:10px;margin:0 20px calc(98px + var(--safe-bottom));padding:0}
+.boss-home-actions{position:relative;z-index:3;left:auto;right:auto;bottom:auto;display:grid;grid-template-columns:1fr;gap:10px;margin:0 20px calc(98px + var(--safe-bottom));padding:0}
 .boss-home-action{width:100%;height:56px;padding:0 20px;border:0;border-radius:20px;display:flex;align-items:center;background:rgba(255,255,255,.97);color:#111;text-align:left;box-shadow:0 8px 22px rgba(0,0,0,.10)}
 .boss-home-action.primary{background:#111;color:#fff;box-shadow:0 8px 22px rgba(0,0,0,.18)}
 .boss-home-action-label{font-size:17px;line-height:1;font-weight:840;letter-spacing:-.03em}
@@ -99,8 +101,10 @@ body.user-app #page-home{height:100dvh;min-height:0;padding:0;overflow:hidden}
 .store-card-photo,.store-avatar,.occupied-store-avatar{width:52px;height:52px;flex:0 0 52px;border-radius:50%;object-fit:cover;background:#e3e3e5;overflow:hidden;position:relative}
 .store-card-photo>img,.store-avatar>img,.occupied-store-half>img,.occupied-boss-half>img{width:100%;height:100%;object-fit:cover}
 .store-avatar-fallback,.boss-avatar-fallback,.occupied-store-half-fallback,.occupied-boss-half-fallback{display:grid;place-items:center;width:100%;height:100%;background:#e0e0e2;color:#111;font-size:19px;font-weight:850;line-height:1}
-.occupied-store-avatar{display:grid;grid-template-columns:1fr 1fr}
-.occupied-store-half,.occupied-boss-half{position:relative;overflow:hidden}
+.occupied-store-avatar{display:grid;grid-template-columns:50% 50%;grid-template-rows:100%;gap:0}
+.occupied-store-half,.occupied-boss-half{position:relative;display:block;width:100%;height:100%;overflow:hidden}
+.occupied-store-half>img,.occupied-boss-half>img{display:block;width:100%;height:100%;object-fit:cover;border-radius:0!important;clip-path:none!important}
+.occupied-store-half-fallback,.occupied-boss-half-fallback{width:100%;height:100%;border-radius:0!important;clip-path:none!important}
 .store-card-copy{min-width:0}.store-card-name{display:block;margin:0;color:#111;font-size:16px;line-height:1.12;font-weight:830;letter-spacing:-.032em;overflow-wrap:anywhere}
 .store-card-meta{margin-top:4px;color:#8f8f95;font-size:11px;line-height:1.35}
 .store-card-status{margin-top:4px;color:#66666c;font-size:10px;line-height:1.3;font-weight:700}
@@ -118,7 +122,7 @@ body.user-app #page-home{height:100dvh;min-height:0;padding:0;overflow:hidden}
 .boss-avatar,.boss-focus-avatar,.boss-avatar-fallback{
   aspect-ratio:1/1;border-radius:50%;overflow:hidden;clip-path:circle(50% at 50% 50%);background:#e3e3e5;
 }
-.store-card-photo img,.store-avatar img,.occupied-store-avatar img,
+.store-card-photo img,.store-avatar img,
 .store-detail-avatar img,.profile-identity .avatar img,.profile-photo-btn img,
 .player-profile-avatar img,.home-mini-avatar img,.my-rank-avatar img,
 .rank-player-avatar img,.crew-rank-avatar img,.crew-profile-avatar img,

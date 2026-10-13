@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "73.0";
+  const BITEBOSS_BUILD = "74.2";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
 if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -505,8 +505,7 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     try{ cachedUrl = String(localStorage.getItem(HOME_SPLASH_CACHE_KEY) || "").trim(); }catch{}
 
     const configuredUrl = String(config.home_splash_image_url || "").trim();
-    const url = preferCached ? (cachedUrl || configuredUrl) : (configuredUrl || (!allowEmpty ? cachedUrl : ""));
-    const currentUrl = String(image.dataset.loadedUrl || "").trim();
+    const url = preferCached ? (cachedUrl || configuredUrl) : (configuredUrl || cachedUrl);
 
     if(!url){
       if(!allowEmpty) return;
@@ -515,45 +514,40 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
       delete image.dataset.loadedUrl;
       image.classList.add("hidden");
       promo.classList.remove("has-splash");
-      try{ localStorage.removeItem(HOME_SPLASH_CACHE_KEY); }catch{}
       return;
     }
 
+    const currentUrl = String(image.dataset.loadedUrl || image.getAttribute("src") || "").trim();
     if(currentUrl === url && !image.classList.contains("hidden")){
       promo.classList.add("has-splash");
       return;
     }
 
     const requestId = ++homeSplashRequestId;
-    const preload = new Image();
-    preload.decoding = "async";
-    preload.fetchPriority = "high";
-
-    const commit = () => {
+    image.onload = () => {
       if(requestId !== homeSplashRequestId) return;
-      image.src = url;
       image.dataset.loadedUrl = url;
       image.classList.remove("hidden");
       promo.classList.add("has-splash");
       try{ localStorage.setItem(HOME_SPLASH_CACHE_KEY, url); }catch{}
     };
-
-    preload.onload = () => {
-      if(typeof preload.decode === "function"){
-        preload.decode().catch(() => {}).finally(commit);
-      }else{
-        commit();
-      }
-    };
-    preload.onerror = () => {
+    image.onerror = () => {
       if(requestId !== homeSplashRequestId) return;
-      // Keep the previous successful hero visible instead of flashing an empty screen.
-      if(!currentUrl){
-        image.classList.add("hidden");
-        promo.classList.remove("has-splash");
+      // If the configured URL failed, keep a previously cached hero when available.
+      if(configuredUrl && cachedUrl && cachedUrl !== configuredUrl){
+        image.src = cachedUrl;
+        return;
       }
+      image.classList.add("hidden");
+      promo.classList.remove("has-splash");
     };
-    preload.src = url;
+
+    // Assign directly so the browser can begin rendering immediately; do not gate first paint on a separate preload/decode cycle.
+    image.classList.remove("hidden");
+    image.src = url;
+    if(image.complete && image.naturalWidth > 0){
+      image.onload();
+    }
   }
 
 
