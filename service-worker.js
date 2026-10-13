@@ -1,15 +1,15 @@
-const CACHE_NAME = "biteboss-v74.2";
+const CACHE_NAME = "biteboss-v74.3";
 const SHELL = [
   "./",
-  "./index.html?v=74.2",
-  "./styles.css?v=74.2",
-  "./bootstrap.js?v=74.2",
-  "./app.js?v=74.2",
-  "./app-config.js?v=74.2",
-  "./supabase.js?v=74.2",
-  "./manifest.webmanifest?v=74.2",
-  "./privacy-policy.html?v=74.2",
-  "./support.html?v=74.2"
+  "./index.html?v=74.3",
+  "./styles.css?v=74.3",
+  "./bootstrap.js?v=74.3",
+  "./app.js?v=74.3",
+  "./app-config.js?v=74.3",
+  "./supabase.js?v=74.3",
+  "./manifest.webmanifest?v=74.3",
+  "./privacy-policy.html?v=74.3",
+  "./support.html?v=74.3"
 ];
 
 self.addEventListener("install", event => {
@@ -61,7 +61,7 @@ self.addEventListener("fetch", event => {
           return response;
         })
         .catch(() =>
-          caches.match(request).then(hit => hit || caches.match("./index.html?v=74.2") || caches.match("./index.html"))
+          caches.match(request).then(hit => hit || caches.match("./index.html?v=74.3") || caches.match("./index.html"))
         )
     );
     return;

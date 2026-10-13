@@ -43,6 +43,7 @@ body.user-app .inner-page{width:min(100%,var(--page));margin:0 auto;padding:calc
 .inner-head p,.challenge-head p{max-width:440px;margin:12px 0 0;color:var(--muted);font-size:14px;line-height:1.55;letter-spacing:-.018em}
 .section-head,.visit-head,.home-section-head,.store-section-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px}
 .section-head h3,.visit-head h3,.home-section-head h2,.store-section-head h3,.panel>h3{margin:0;font-size:17px;line-height:1.18;font-weight:830;letter-spacing:-.03em}
+.section-head small,.visit-head small,.home-section-head small,.store-section-head small{color:#98989e;font-size:10px;font-weight:720;letter-spacing:-.01em}
 
 /* controls */
 .input{width:100%;height:var(--control);padding:0 16px;border:0;border-radius:18px;background:#fff;outline:0;box-shadow:0 0 0 1px rgba(17,17,19,.04);color:var(--ink);font-size:14px}
@@ -111,7 +112,7 @@ body.user-app #page-home{height:100dvh;min-height:0;padding:0;overflow:hidden}
 .store-card-title-row{display:grid;gap:5px;min-width:0}.store-status-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:0}
 .store-status-tag{min-height:22px;padding:0 8px;border-radius:999px;font-size:8px;font-weight:820;background:#f0f0f2;color:#737379}
 .store-status-tag.partner{color:#111}.store-status-tag.benefit{color:var(--accent)}
-.store-list-action{min-height:35px;padding:0 11px;border:0;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;background:#fff;color:#5f5f65;font-size:10px;font-weight:820;white-space:nowrap;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,.025)}
+.store-list-action{min-height:35px;padding:0 12px;border:0;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;background:#fff;color:#5f5f65;font-size:10px;font-weight:820;white-space:nowrap;text-align:center;box-shadow:none}
 .store-list-action.is-primary,.store-list-action.is-live{background:#111;color:#fff}.store-list-action.is-auto{background:transparent;color:#8d8d93;padding-right:0;box-shadow:none}.store-list-action.is-owned{color:var(--accent)}
 
 /* avatar geometry */
@@ -133,15 +134,21 @@ body.user-app #page-home{height:100dvh;min-height:0;padding:0;overflow:hidden}
   display:grid;place-items:center;width:100%;height:100%;background:#e0e0e2;color:#111;font-weight:850;line-height:1;
 }
 
+/* pagination */
+.list-pagination{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;margin:18px 0 2px;padding:4px 0}
+.pagination-btn{justify-self:start;min-width:58px;height:36px;padding:0 12px;border:0;border-radius:12px;background:#fff;color:#222226;font-size:10px;font-weight:820;cursor:pointer}
+.pagination-btn:last-child{justify-self:end}.pagination-btn:disabled{opacity:.28;cursor:default}
+.pagination-status{display:flex;align-items:baseline;gap:4px;color:#a0a0a6;font-size:9px;font-variant-numeric:tabular-nums}.pagination-status b{color:#111;font-size:12px;font-weight:850}
+
 /* rank */
 .page-meter{padding:17px 18px;margin:0 0 18px;background:#fff}
 .page-meter-row{display:flex;align-items:center;justify-content:space-between;gap:12px}.page-meter-row span{color:#85858b;font-size:11px;font-weight:650}.page-meter-row strong{color:#111;font-size:18px;line-height:1;font-weight:860;letter-spacing:-.04em}
 .page-meter-track{height:8px;margin-top:14px;border-radius:999px;background:#ececef;overflow:hidden}.page-meter-track span{display:block;height:100%;width:0;border-radius:inherit;background:#111}
 .my-rank-summary{display:grid;grid-template-columns:22px 46px minmax(0,1fr) auto;gap:10px;align-items:center;padding:14px 16px;margin:0 0 14px;background:#fff}
 .my-rank-position{color:var(--accent);font-size:20px;font-weight:860}.my-rank-avatar{width:46px;height:46px;border-radius:50%;object-fit:cover;background:#e3e3e5}.my-rank-copy{min-width:0}.my-rank-copy b{display:block;font-size:15px;line-height:1.12;overflow-wrap:anywhere}.my-rank-copy small,.my-rank-label{color:var(--muted);font-size:10px}
-.rank-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;margin:0 0 16px;padding:0;overflow:visible}
-.rank-tabs .chip{min-width:0;min-height:34px;padding:0 3px;border:0;border-radius:12px;background:transparent;color:#99999f;font-size:10px;font-weight:820;line-height:1.15;text-align:center;white-space:normal}
-.rank-tabs .chip.active{color:var(--accent);background:#fff}
+.rank-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:2px;margin:0 0 18px;padding:4px;border-radius:14px;background:#e9e9ec;overflow:hidden}
+.rank-tabs .chip{min-width:0;min-height:34px;padding:0 3px;border:0;border-radius:10px;background:transparent;color:#8f8f95;font-size:10px;font-weight:820;line-height:1.15;text-align:center;white-space:normal}
+.rank-tabs .chip.active{color:#111;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.04)}
 .rank-list{display:grid;gap:10px}
 .rank-card{display:grid;grid-template-columns:22px 46px minmax(0,1fr) auto;gap:10px;align-items:center;padding:7px 0}
 .rank-number{font-size:14px;font-weight:860;color:#b3b3b9}.rank-card:first-child .rank-number{color:var(--accent)}
@@ -186,7 +193,7 @@ body.user-app #page-home{height:100dvh;min-height:0;padding:0;overflow:hidden}
 .profile-record-thumb{width:46px;height:46px;border-radius:50%;object-fit:cover;background:#dedee0;overflow:hidden}.profile-record-thumb-fallback{display:grid;place-items:center;color:#111;font-size:15px;font-weight:850}
 .profile-record-main{min-width:0}.profile-record-title{display:block;color:#111;font-size:13px;line-height:1.2;font-weight:820;overflow-wrap:anywhere}.profile-record-meta{display:block;margin-top:3px;color:#919197;font-size:10px;line-height:1.35;overflow-wrap:anywhere}.profile-record-time{color:#aaaab0;font-size:9px;white-space:nowrap}
 .activity-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:start;text-align:left}.activity-main{min-width:0}.activity-title-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.activity-title-row strong{font-size:13px}.activity-scope{padding:2px 7px;border-radius:999px;background:#fff;color:#88888e;font-size:8px;font-weight:820}.activity-row p{display:grid;gap:2px;margin:4px 0 0;color:#919197;font-size:10px;line-height:1.35}.activity-row p b{color:#111;font-size:12px;overflow-wrap:anywhere}.activity-row time{color:#aaaab0;font-size:9px;white-space:nowrap}
-.profile-settings{display:grid;gap:7px;margin-top:14px}.profile-setting-row{width:100%;min-height:48px;padding:0 14px;border:0;border-radius:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fff;color:#111;font-size:12px;text-align:left}.profile-setting-row>span:last-child{color:#9d9da3}.profile-delete{color:var(--danger)}
+.profile-settings{display:grid;gap:2px;margin-top:18px;padding:6px 14px;border-radius:16px;background:#fff}.profile-setting-row{width:100%;min-height:46px;padding:0;border:0;border-radius:0;display:flex;align-items:center;justify-content:space-between;gap:12px;background:transparent;color:#111;font-size:12px;text-align:left}.profile-setting-row>span:last-child{color:#9d9da3}.profile-delete{color:var(--danger)}
 
 /* modal / details */
 .modal{position:fixed;z-index:1000;inset:0;display:grid;place-items:end center;padding:0;background:rgba(0,0,0,.18);backdrop-filter:blur(10px)}
@@ -248,6 +255,8 @@ body.takeover-active .bottom-nav{display:none}
 body.biteboss-info-page{min-height:100dvh;background:var(--bg);color:#111}.info-shell{width:min(100%,720px);margin:0 auto;padding:calc(28px + var(--safe-top)) 20px 48px}.info-head{margin-bottom:24px}.info-head h1{margin:8px 0 0;font-size:36px;letter-spacing:-.05em}.info-copy{display:grid;gap:14px}.info-copy section{padding:18px;border:0;border-radius:14px;background:var(--card)}.info-copy h2{margin:0 0 8px;font-size:16px}.info-copy p,.info-copy li{color:#6f6f69;font-size:13px;line-height:1.7}
 
 @media(max-width:520px){
+  .list-pagination{margin-top:14px}.pagination-btn{height:34px;min-width:54px;padding:0 10px}
+
   body.user-app .inner-page{padding-left:18px;padding-right:18px}
   .inner-head h2,.challenge-head h2{font-size:34px}.boss-home-hook{font-size:34px}
   .takeover-command{grid-template-columns:minmax(0,1fr) 72px 72px;gap:7px}.takeover-command-primary{min-height:88px;padding:13px}.takeover-command-primary strong{font-size:18px}.takeover-command-primary small{font-size:9px}.takeover-command-stat{min-height:88px;padding:12px 8px}.takeover-command-stat strong{font-size:18px}.takeover-command-stat small{font-size:8px}

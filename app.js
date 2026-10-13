@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "74.2";
+  const BITEBOSS_BUILD = "74.3";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
 if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -65,6 +65,18 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
   let nearbyLastRefreshAt = 0;
   let scanner = null;
   let currentRank = "players";
+  let storePage = 1;
+  const STORE_PAGE_SIZE = 8;
+  let storeViewRows = [];
+  let rankPage = 1;
+  const RANK_PAGE_SIZE = 10;
+  let rankViewItems = [];
+  let profileActivityPage = 1;
+  const PROFILE_ACTIVITY_PAGE_SIZE = 8;
+  let profileActivityRows = [];
+  let visitPage = 1;
+  const VISIT_PAGE_SIZE = 8;
+  let visitRows = [];
   let summary = null;
   let storeSearchTimer = null;
   let storeSearchSeq = 0;
@@ -827,7 +839,7 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     await loadStoreRoles(stores);
     stores.sort(compareNearbyStores);
     void loadGamePulse(false);
-    renderStores();
+    renderStores(stores);
     renderHomeNearbyBosses();
   }
 
@@ -930,6 +942,36 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     }
   }
 
+  function clampPage(page, totalItems, pageSize){
+    const pages = Math.max(1, Math.ceil(Math.max(0, Number(totalItems || 0)) / Math.max(1, Number(pageSize || 1))));
+    return Math.min(pages, Math.max(1, Number(page || 1)));
+  }
+
+  function pageSlice(items, page, pageSize){
+    const rows = Array.isArray(items) ? items : [];
+    const safePage = clampPage(page, rows.length, pageSize);
+    const start = (safePage - 1) * pageSize;
+    return { page:safePage, pages:Math.max(1, Math.ceil(rows.length / pageSize)), rows:rows.slice(start, start + pageSize), start };
+  }
+
+  function renderPagination(selector, page, totalItems, pageSize, onChange){
+    const nav = $(selector);
+    if(!nav) return;
+    const total = Math.max(0, Number(totalItems || 0));
+    const pages = Math.max(1, Math.ceil(total / Math.max(1, pageSize)));
+    const safePage = clampPage(page, total, pageSize);
+    const shouldShow = pages > 1;
+    nav.classList.toggle("hidden", !shouldShow);
+    if(!shouldShow){ nav.innerHTML = ""; return; }
+    nav.innerHTML = `
+      <button type="button" class="pagination-btn" data-page-prev ${safePage <= 1 ? "disabled" : ""} aria-label="이전 페이지">이전</button>
+      <span class="pagination-status" aria-live="polite"><b>${safePage}</b><span>/ ${pages}</span></span>
+      <button type="button" class="pagination-btn" data-page-next ${safePage >= pages ? "disabled" : ""} aria-label="다음 페이지">다음</button>
+    `;
+    nav.querySelector("[data-page-prev]")?.addEventListener("click", () => onChange(Math.max(1, safePage - 1)));
+    nav.querySelector("[data-page-next]")?.addEventListener("click", () => onChange(Math.min(pages, safePage + 1)));
+  }
+
   function updateChallengeCommand(list = stores){
     const rows = Array.isArray(list) ? list : [];
     const count = $("#challengeNearbyCount");
@@ -960,14 +1002,25 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     }
   }
 
-  function renderStores(list = stores){
+  function renderStores(list = stores, options = {}){
     const box = $("#storeList");
     if(!box) return;
 
-    box.innerHTML = list.map(storeCard).join("") ||
+    storeViewRows = Array.isArray(list) ? list : [];
+    if(options.resetPage) storePage = 1;
+    const view = pageSlice(storeViewRows, storePage, STORE_PAGE_SIZE);
+    storePage = view.page;
+
+    box.innerHTML = view.rows.map(storeCard).join("") ||
       `<div class="app-state">검색 결과가 없습니다.</div>`;
 
-    updateChallengeCommand(list);
+    updateChallengeCommand(storeViewRows);
+    renderPagination("#storePagination", storePage, storeViewRows.length, STORE_PAGE_SIZE, nextPage => {
+      storePage = nextPage;
+      renderStores(storeViewRows);
+      $("#page-stores")?.scrollTo?.({ top:0, behavior:"smooth" });
+      window.scrollTo({ top:0, behavior:"smooth" });
+    });
 
     const loginNotice = $("#storesLoginNotice");
     loginNotice?.classList.toggle("hidden", presenceBlockedReason !== "MEMBER_LOGIN_REQUIRED");
@@ -1004,7 +1057,7 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     const seq = ++storeSearchSeq;
 
     if(!keyword){
-      renderStores(stores);
+      renderStores(stores, { resetPage:true });
       return;
     }
 
@@ -1029,7 +1082,7 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     const searchRows = Array.isArray(data) ? data : [];
     await loadStoreRoles(searchRows);
     searchRows.sort(compareNearbyStores);
-    renderStores(searchRows);
+    renderStores(searchRows, { resetPage:true });
   }
 
   function compareNearbyStores(a,b){
@@ -1117,8 +1170,8 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     let status = "";
     if(ownedByMe){
       status = protectedNow
-        ? `보호 ${formatRemaining(protectionUntil)} 남음`
-        : "";
+        ? `내 점령지 · 보호 ${formatRemaining(protectionUntil)} 남음`
+        : "내 점령지";
     }else if(bossExists && protectedNow){
       status = `보호 ${formatRemaining(protectionUntil)} 남음`;
     }else if(presence?.status === "tracking"){
@@ -1137,7 +1190,7 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
 
     let action = "";
     if(ownedByMe){
-      action = `<span class="store-list-action is-owned">내 점령지</span>`;
+      action = "";
     }else if(isPartner){
       action = `<button class="store-list-action is-primary" data-scan-store="${escapeAttr(store.id)}" type="button">QR 도전</button>`;
     }else if(loginRequired){
@@ -1145,12 +1198,13 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     }else if(presence?.status === "tracking"){
       action = `<span class="store-list-action is-live" aria-live="polite">${formatPresenceSeconds(remainingSeconds)}</span>`;
     }else{
-      action = `<span class="store-list-action is-auto">자동 점령</span>`;
+      action = "";
     }
 
     const badges = [
       isPartner ? {label:"제휴", cls:"partner"} : null,
       Boolean(store.has_benefit || Number(store.active_offer_count || 0) > 0) ? {label:"혜택", cls:"benefit"} : null,
+      ownedByMe ? {label:"내 점령지", cls:"owned"} : null,
       protectedNow ? {label:"보호 중", cls:"protected"} : null
     ].filter(Boolean);
 
@@ -1506,9 +1560,9 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     if(isBoss){
       action = `<div class="store-detail-auto is-boss"><strong class="store-detail-boss-owner-copy">현재 이 매장의 보스입니다.</strong><span>다시 방문하면 방어력이 유지됩니다.</span></div>`;
     }else if(protectedNow){
-      action = `<button class="secondary-btn store-detail-primary" type="button" disabled>보호 중</button>`;
+      action = `<div class="store-detail-auto"><strong>보호 중</strong><span>${escapeHtml(formatRemaining(protectionUntil))} 후 도전할 수 있습니다.</span></div>`;
     }else if(cooldownNow){
-      action = `<button class="secondary-btn store-detail-primary" type="button" disabled>재도전 ${escapeHtml(formatRemaining(cooldownUntil))}</button>`;
+      action = `<div class="store-detail-auto"><strong>재도전 대기</strong><span>${escapeHtml(formatRemaining(cooldownUntil))} 후 다시 도전할 수 있습니다.</span></div>`;
     }else if(isPartner){
       action = `<button id="detailScanQr" class="primary-btn store-detail-primary" type="button">QR로 도전</button>`;
     }else{
@@ -1991,6 +2045,39 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     $$("#homeNearbyBosses [data-tab]").forEach(btn => btn.onclick = () => openTab(btn.dataset.tab));
   }
 
+  function attachActivityRowHandlers(scope){
+    const root = scope || document;
+    [...root.querySelectorAll("[data-activity-store]")].forEach(button => {
+      button.onclick = event => {
+        const storeId = button.dataset.activityStore;
+        if(!storeId) return;
+        const fromProfileBattleLog = Boolean(button.closest("#profileActivity"));
+        if(fromProfileBattleLog){
+          event?.preventDefault?.();
+          event?.stopPropagation?.();
+        }
+        openStoreDetail(storeId, {
+          source:fromProfileBattleLog ? "profile_battle" : "activity",
+          showPartnerOwnerCard:!fromProfileBattleLog
+        });
+      };
+    });
+  }
+
+  function renderProfileActivityPage(){
+    const box = $("#profileActivity");
+    if(!box) return;
+    const view = pageSlice(profileActivityRows, profileActivityPage, PROFILE_ACTIVITY_PAGE_SIZE);
+    profileActivityPage = view.page;
+    box.innerHTML = renderActivityRows(view.rows, false);
+    attachActivityRowHandlers(box);
+    renderPagination("#activityPagination", profileActivityPage, profileActivityRows.length, PROFILE_ACTIVITY_PAGE_SIZE, nextPage => {
+      profileActivityPage = nextPage;
+      renderProfileActivityPage();
+      $("#profileBattleSection")?.scrollIntoView({ behavior:"smooth", block:"start" });
+    });
+  }
+
   async function loadGameActivity(){
     const homeBox = $("#homeActivity");
     const profileBox = $("#profileActivity");
@@ -2013,28 +2100,14 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     }
 
     const rows = Array.isArray(data) ? data : [];
+    profileActivityRows = rows;
+    profileActivityPage = 1;
 
-    if(homeBox) homeBox.innerHTML = renderActivityRows(rows.slice(0,5), true);
-    if(profileBox) profileBox.innerHTML = renderActivityRows(rows, false);
-
-    $$("[data-activity-store]").forEach(button => {
-      button.onclick = event => {
-        const storeId = button.dataset.activityStore;
-        if(!storeId) return;
-
-        const fromProfileBattleLog = Boolean(button.closest("#profileActivity"));
-
-        if(fromProfileBattleLog){
-          event?.preventDefault?.();
-          event?.stopPropagation?.();
-        }
-
-        openStoreDetail(storeId, {
-          source:fromProfileBattleLog ? "profile_battle" : "activity",
-          showPartnerOwnerCard:!fromProfileBattleLog
-        });
-      };
-    });
+    if(homeBox){
+      homeBox.innerHTML = renderActivityRows(rows.slice(0,5), true);
+      attachActivityRowHandlers(homeBox);
+    }
+    if(profileBox) renderProfileActivityPage();
   }
 
   function renderActivityRows(rows, compact){
@@ -2180,21 +2253,27 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     renderVisitLog(data || []);
   }
 
-  function renderVisitLog(entries){
+  function renderVisitLog(entries, options = {}){
     const box = $("#myHistory");
     if(!box) return;
 
-    const list = entries.slice(0, 12);
-    setText("#visitPlaceCount", `${list.length}곳`);
+    if(Array.isArray(entries)){
+      visitRows = entries;
+      if(options.resetPage !== false) visitPage = 1;
+    }
+
+    const view = pageSlice(visitRows, visitPage, VISIT_PAGE_SIZE);
+    visitPage = view.page;
+    setText("#visitPlaceCount", `${visitRows.length}곳`);
 
     const summaryText = $("#visitSummaryText");
     if(summaryText){
-      summaryText.textContent = list.length
-        ? `${list[0].store_name}${list.length > 1 ? ` 외 ${list.length - 1}곳` : ""} 방문 기록`
+      summaryText.textContent = visitRows.length
+        ? `${visitRows[0].store_name}${visitRows.length > 1 ? ` 외 ${visitRows.length - 1}곳` : ""} 방문 기록`
         : "매장을 방문하면 기록이 여기에 남습니다.";
     }
 
-    box.innerHTML = list.map(entry => {
+    box.innerHTML = view.rows.map(entry => {
       const storeName = String(entry.store_name || "매장").trim();
       const place = [entry.city, entry.district].filter(Boolean).join(", ") || entry.address || categoryLabel(entry.category) || "";
       const cachedStore = stores.find(item => String(item.id) === String(entry.store_id)) || null;
@@ -2227,7 +2306,13 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
       `;
     }).join("") || `<div class="profile-record-empty">아직 방문 기록이 없습니다.</div>`;
 
-    $$("[data-visit-store]", box).forEach(row => {
+    renderPagination("#visitPagination", visitPage, visitRows.length, VISIT_PAGE_SIZE, nextPage => {
+      visitPage = nextPage;
+      renderVisitLog(null, { resetPage:false });
+      $("#profileVisitSection")?.scrollIntoView({ behavior:"smooth", block:"start" });
+    });
+
+    [...box.querySelectorAll("[data-visit-store]")].forEach(row => {
       const storeId = String(row.dataset.visitStore || "").trim();
       if(!storeId){
         row.disabled = true;
@@ -2879,6 +2964,33 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     return rawId ? `Boss ${rawId.slice(0,4)}` : "Boss";
   }
 
+  function renderRankPage(){
+    const box = $("#rankList");
+    if(!box) return;
+    const view = pageSlice(rankViewItems, rankPage, RANK_PAGE_SIZE);
+    rankPage = view.page;
+    box.innerHTML = view.rows.join("") || `<div class="app-state">표시할 순위가 없습니다.</div>`;
+    renderPagination("#rankPagination", rankPage, rankViewItems.length, RANK_PAGE_SIZE, nextPage => {
+      rankPage = nextPage;
+      renderRankPage();
+      window.scrollTo({ top:0, behavior:"smooth" });
+    });
+  }
+
+  function setRankItems(items, emptyText){
+    rankViewItems = Array.isArray(items) ? items : [];
+    rankPage = 1;
+    if(!rankViewItems.length){
+      const box = $("#rankList");
+      if(box) box.innerHTML = `<div class="app-state">${escapeHtml(emptyText || "표시할 순위가 없습니다.")}</div>`;
+      const nav = $("#rankPagination");
+      nav?.classList.add("hidden");
+      if(nav) nav.innerHTML = "";
+      return;
+    }
+    renderRankPage();
+  }
+
   async function loadRank(){
     const box = $("#rankList");
     const myBox = $("#myRankSummary");
@@ -2886,6 +2998,11 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
 
     syncTerritoryMapVisibility();
     myBox?.classList.add("hidden");
+    rankViewItems = [];
+    rankPage = 1;
+    const rankPagination = $("#rankPagination");
+    rankPagination?.classList.add("hidden");
+    if(rankPagination) rankPagination.innerHTML = "";
 
     if(config.feature_ranking === false){
       box.innerHTML = `<div class="app-state">순위 기능이 현재 비활성화되어 있습니다.</div>`;
@@ -2903,7 +3020,7 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
         return;
       }
       const rows=Array.isArray(data)?data:[];
-      box.innerHTML=rows.map((row,index)=>`<article class="rank-card territory-rank-card"><span class="rank-number">${index+1}</span><div><strong>${escapeHtml([row.city,row.district].filter(Boolean).join(" ")||"지역")}</strong><div class="meta">${escapeHtml(row.crew_name||"크루")} · 최근 ${Number(config.season_days||30)}일</div></div><div class="rank-result"><b>${Number(row.store_count||0)}</b><span>점령</span></div></article>`).join("")||`<div class="app-state">이번 시즌 점령 기록이 아직 없습니다.</div>`;
+      setRankItems(rows.map((row,index)=>`<article class="rank-card territory-rank-card"><span class="rank-number">${index+1}</span><div><strong>${escapeHtml([row.city,row.district].filter(Boolean).join(" ")||"지역")}</strong><div class="meta">${escapeHtml(row.crew_name||"크루")} · 최근 ${Number(config.season_days||30)}일</div></div><div class="rank-result"><b>${Number(row.store_count||0)}</b><span>점령</span></div></article>`), "이번 시즌 점령 기록이 아직 없습니다.");
       return;
     }
 
@@ -2928,7 +3045,7 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
       }
 
       const rows = Array.isArray(data) ? data : [];
-      box.innerHTML = rows.map((row,index)=>`
+      setRankItems(rows.map((row,index)=>`
           <article class="rank-card local-crew-rank-card">
             <span class="rank-number">${index+1}</span>
             <span
@@ -2952,7 +3069,7 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
               <span>점령지</span>
             </div>
           </article>
-        `).join("") || `<div class="app-state">주변에 점령지를 가진 크루가 아직 없습니다.</div>`;
+        `), "주변에 점령지를 가진 크루가 아직 없습니다.");
       return;
     }
 
@@ -2970,7 +3087,7 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
     const rows = Array.isArray(data) ? data : [];
 
     if(currentRank === "organizations"){
-      box.innerHTML = rows.map((row,index)=>`
+      setRankItems(rows.map((row,index)=>`
         <article class="rank-card organization-rank-card">
           <span class="rank-number">${index+1}</span>
           <span
@@ -2994,14 +3111,14 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
             <span>점령지</span>
           </div>
         </article>
-      `).join("") || `<div class="app-state">아직 크루 순위가 없습니다.</div>`;
+      `), "아직 크루 순위가 없습니다.");
       return;
     }
 
     if(currentRank === "territory"){
       syncTerritoryMapVisibility();
       loadTerritoryMap();
-      box.innerHTML = rows.map((row,index)=>{
+      setRankItems(rows.map((row,index)=>{
         const area=[row.city,row.district].filter(Boolean).join(" ");
         return `
           <article class="rank-card territory-rank-card">
@@ -3015,7 +3132,7 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
               <span>매장</span>
             </div>
           </article>`;
-      }).join("") || `<div class="app-state">아직 점령지 순위가 없습니다.</div>`;
+      }), "아직 점령지 순위가 없습니다.");
       return;
     }
 
@@ -3054,7 +3171,7 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
       myBox.classList.remove("hidden");
     }
 
-    box.innerHTML = rows.map((row,index)=>{
+    setRankItems(rows.map((row,index)=>{
       const rowIsMe = String(row.user_id || "") === myId;
       const playerName=rankingPlayerName(row);
       const identity=[playerName,row.organization_name].filter(Boolean).join(" · ");
@@ -3077,7 +3194,7 @@ if(window.__BITEBOSS_APP_BOOTED__) return;
             <span>XP</span>
           </div>
         </article>`;
-    }).join("") || `<div class="app-state">아직 사용자 순위가 없습니다.</div>`;
+    }), "아직 사용자 순위가 없습니다.");
   }
 
   async function loadAlerts(){

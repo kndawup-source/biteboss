@@ -63,7 +63,9 @@ test('owned store takeover suppression persists immediately after a successful c
   assert.match(app,/markStoreOwnedLocally\(nearest\.store\)/);
   assert.match(app,/const next = challengeableRows\[0\] \|\| null/);
   assert.match(app,/const next=stores\.find\(store=>!isMyBossStore\(store\)\)/);
-  assert.match(app,/action = `<span class="store-list-action is-owned">내 점령지<\/span>`/);
+  assert.match(app,/status = protectedNow[\s\S]*내 점령지/);
+  assert.match(app,/ownedByMe \? \{label:"내 점령지", cls:"owned"\}/);
+  assert.match(app,/if\(ownedByMe\)\{\s*action = "";/);
 });
 
 test('ranking and profile avatars are forced to circular masks',()=>{
@@ -94,4 +96,24 @@ test("home hero and occupied-store avatar layout regressions stay fixed", () => 
   assert.match(css, /\.occupied-store-avatar\{display:grid;grid-template-columns:50% 50%/);
   assert.match(css, /\.occupied-store-half>img,\.occupied-boss-half>img\{[^}]*border-radius:0!important;clip-path:none!important/);
   assert.match(app, /image\.src = url;/);
+});
+
+
+test("high-volume public lists use real pagination controls", () => {
+  const html = read("index.html").toString();
+  const app = read("app.js").toString();
+  for(const id of ["storePagination","rankPagination","activityPagination","visitPagination"]){
+    assert.match(html, new RegExp(`id="${id}"`));
+  }
+  assert.match(app,/const STORE_PAGE_SIZE = 8/);
+  assert.match(app,/const RANK_PAGE_SIZE = 10/);
+  assert.match(app,/function renderPagination\(/);
+  assert.match(app,/function renderProfileActivityPage\(/);
+});
+
+test("non-action store states are not rendered as fake disabled buttons", () => {
+  const app = read("app.js").toString();
+  assert.doesNotMatch(app,/type="button" disabled>보호 중/);
+  assert.doesNotMatch(app,/type="button" disabled>재도전/);
+  assert.match(app,/store-detail-auto/);
 });
