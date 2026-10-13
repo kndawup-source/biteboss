@@ -9,7 +9,7 @@
   <meta property="og:title" content="BiteBoss" />
   <meta property="og:description" content="주변 매장을 발견하고 도전해 보스를 차지하세요." />
   <meta property="og:type" content="website" />
-  <meta name="biteboss-build" content="75.0" />
+  <meta name="biteboss-build" content="75.1" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -18,8 +18,8 @@
   <link rel="preconnect" href="https://imumpyumchvctrpmfngr.supabase.co" crossorigin />
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
   <link rel="preconnect" href="https://unpkg.com" crossorigin />
-  <link rel="manifest" href="./manifest.webmanifest?v=75.0" />
-  <link rel="stylesheet" href="./styles.css?v=75.0" />
+  <link rel="manifest" href="./manifest.webmanifest?v=75.1" />
+  <link rel="stylesheet" href="./styles.css?v=75.1" />
 </head>
 <body class="user-app home-active">
 <div id="app" class="app-shell">
@@ -72,17 +72,11 @@
         <p>현장에 들어가면 카운트가 시작됩니다. 빼앗긴 곳은 되찾고, 뜨거운 곳은 먼저 차지하세요.</p>
       </header>
 
-      <section class="takeover-command" aria-label="점령 상태">
-        <div class="takeover-command-index" aria-hidden="true">01</div>
+      <section class="takeover-command" aria-label="다음 도전 대상">
         <div class="takeover-command-primary">
           <span>NEXT TARGET</span>
           <strong id="challengeNextTarget">주변 매장 탐색 중</strong>
-          <small id="challengeNextMeta">GPS 위치를 확인하고 있습니다.</small>
-        </div>
-        <div class="takeover-command-stat">
-          <span>GPS</span>
-          <strong id="challengeGpsState">READY</strong>
-          <small>현장 점령 상태</small>
+          <small id="challengeNextMeta">주변 도전 대상을 찾는 중입니다.</small>
         </div>
       </section>
 
@@ -161,10 +155,10 @@
         <div><span>둘러보기</span><strong>주변 매장 · 순위</strong></div>
         <div><span>로그인하면</span><strong>점령 · 크루 · 기록 저장</strong></div>
       </section>
-      <section id="profileGameStats" class="grid two profile-game-stats" aria-label="내 기록">
-        <article class="stat-card"><b id="myLevel">Lv 1</b><span>레벨</span></article>
-        <article class="stat-card"><b id="myBossCount">0</b><span>보스</span></article>
-        <article class="stat-card"><b id="myCheckinCount">0</b><span>유효 방문</span></article>
+      <section id="profileGameStats" class="profile-game-stats" aria-label="내 기록">
+        <button class="stat-card stat-action" type="button" data-profile-action="level" aria-label="레벨 및 순위 보기"><b id="myLevel">Lv 1</b><span>레벨</span><i aria-hidden="true">›</i></button>
+        <button class="stat-card stat-action" type="button" data-profile-action="boss" aria-label="내 점령 기록 보기"><b id="myBossCount">0</b><span>보스</span><i aria-hidden="true">›</i></button>
+        <button class="stat-card stat-action" type="button" data-profile-action="visits" aria-label="유효 방문 기록 보기"><b id="myCheckinCount">0</b><span>유효 방문</span><i aria-hidden="true">›</i></button>
       </section>
 
       <section id="organizationPanelOpen" class="organization-panel crew-panel" aria-label="크루">
@@ -264,6 +258,6 @@
   </div>
 </div>
 
-<script src="./bootstrap.js?v=75.0"></script>
+<script src="./bootstrap.js?v=75.1"></script>
 </body>
 </html>

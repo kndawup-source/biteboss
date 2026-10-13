@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.0";
+  const BITEBOSS_BUILD = "75.1";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -357,6 +357,17 @@
     $("#homeEditProfile")?.addEventListener("click", openProfileEditor);
     $("#homeAvatarButton")?.addEventListener("click", openProfileEditor);
     $("#profileAvatarButton")?.addEventListener("click", openProfileEditor);
+    $$("[data-profile-action]").forEach(button => {
+      button.addEventListener("click", () => {
+        const action = button.dataset.profileAction;
+        if(action === "level"){
+          openTab("rank");
+          return;
+        }
+        const target = action === "boss" ? $("#profileBattleSection") : $("#profileVisitSection");
+        target?.scrollIntoView?.({ behavior:"smooth", block:"start" });
+      });
+    });
     $("#memberLoginBtn")?.addEventListener("click", openMemberLogin);
     $("#memberRegisterBtn")?.addEventListener("click", openMemberRegister);
     $("#storesLoginBtn")?.addEventListener("click", openMemberLogin);
@@ -1002,7 +1013,6 @@
     const rows = Array.isArray(list) ? list : [];
     const target = $("#challengeNextTarget");
     const meta = $("#challengeNextMeta");
-    const gps = $("#challengeGpsState");
     const challengeableRows = rows.filter(store => !isMyBossStore(store));
 
     const next = challengeableRows[0] || null;
@@ -1016,13 +1026,6 @@
       }else{
         meta.textContent = lastPosition ? "주변 도전 대상을 찾는 중입니다." : "GPS 위치를 확인하고 있습니다.";
       }
-    }
-    if(gps){
-      const accuracy = Number(lastPosition?.coords?.accuracy || 0);
-      if(presenceBlockedReason === "MEMBER_LOGIN_REQUIRED") gps.textContent = "LOGIN";
-      else if(!lastPosition) gps.textContent = "SEARCH";
-      else if(accuracy && accuracy > Number(config.gps_max_accuracy_m || 80)) gps.textContent = "HOLD";
-      else gps.textContent = "READY";
     }
   }
 
@@ -2594,7 +2597,7 @@
       .filter(row=>!isMyBossStore(stores.find(store=>String(store.id)===String(row.store_id))||{}));
     const newcomer=data?.new_player_protected===true;
 
-    // NEXT TARGET / GPS readiness already lives in takeover-command.
+    // NEXT TARGET already lives in takeover-command.
     // This surface is reserved for exceptional game signals only, avoiding duplicate hierarchy.
     const items=[];
     if(retakes[0]){
@@ -4662,7 +4665,8 @@
   function renderPlayerProfile(data){
     const player = data.player || {};
     const h2h = data.head_to_head || {};
-    const recent = Array.isArray(data.recent_activity) ? data.recent_activity : [];
+    const recentAll = Array.isArray(data.recent_activity) ? data.recent_activity : [];
+    const recent = recentAll.slice(0, 3);
 
     // Modal shell is generic; the nickname is the hero title.
     setText("#modalTitle", "사용자 프로필");
@@ -4724,7 +4728,7 @@
         <section class="player-profile-history">
           <div class="player-profile-section-head">
             <span>최근 기록</span>
-            <strong>${recent.length}건</strong>
+            <strong>${recent.length ? `최근 ${recent.length}건` : "0건"}</strong>
           </div>
           <div class="player-profile-history-list">${recentHtml}</div>
         </section>

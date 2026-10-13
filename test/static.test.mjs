@@ -145,3 +145,21 @@ test("challenge store list keeps owned stores last and avoids per-row login CTAs
   assert.match(css,/\.challenge-login-btn\{/);
   assert.doesNotMatch(app,/label:"내 점령지"/);
 });
+
+test("challenge header has no redundant GPS status card", () => {
+  const html = read("index.html").toString();
+  assert.equal(html.includes('id="challengeGpsState"'), false);
+  assert.equal(html.includes('class="takeover-command-stat"'), false);
+});
+
+test("public player profile limits recent activity to three rows", () => {
+  const app = read("app.js").toString();
+  assert.match(app, /const recent = recentAll\.slice\(0, 3\)/);
+});
+
+test("profile game metrics are actionable buttons", () => {
+  const html = read("index.html").toString();
+  assert.match(html, /data-profile-action="level"/);
+  assert.match(html, /data-profile-action="boss"/);
+  assert.match(html, /data-profile-action="visits"/);
+});
