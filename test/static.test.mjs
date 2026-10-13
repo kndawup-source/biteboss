@@ -284,3 +284,54 @@ test('global capture cooldown blocks the next store for 60 minutes',()=>{
   assert.match(app,/if\(captureCooldownActive\(\)\) return ownedByMe/);
   assert.match(admin,/name="capture_cooldown_minutes"/);
 });
+
+test('v75.16 public crew detail exposes members but limits other-crew territory to three',()=>{
+  const app=read('app.js').toString();
+  assert.match(app,/visibleTerritories = isOwnOrganization \? sortedTerritories : sortedTerritories\.slice\(0,3\)/);
+  assert.match(app,/data-crew-detail-tab="territory"/);
+  assert.match(app,/data-crew-detail-tab="members"/);
+  assert.match(app,/다른 크루의 점령지는 최근 3곳만 공개됩니다/);
+});
+
+test('v75.16 notification center has structured unread rows and pagination',()=>{
+  const app=read('app.js').toString();
+  const css=read('styles.css').toString();
+  assert.match(app,/NOTIFICATION_PAGE_SIZE = 8/);
+  assert.match(app,/notification-inbox-row \$\{unread \? "is-unread"/);
+  assert.match(app,/notificationIconMarkup\(item\.kind\)/);
+  assert.match(app,/id="notificationPagination"/);
+  assert.match(css,/\.notification-kind-icon/);
+  assert.match(css,/\.notification-inbox-row\.is-unread/);
+});
+
+test('v75.16 challenge and ranking pages use compact bottom spacing',()=>{
+  const css=read('styles.css').toString();
+  assert.match(css,/#page-stores,#page-rank\{padding-bottom:calc\(82px \+ var\(--safe-bottom\)\)\}/);
+  assert.match(css,/\.challenge-page\{padding-bottom:14px!important\}/);
+  assert.match(css,/#page-rank \.inner-page\{padding-bottom:14px\}/);
+});
+
+test('v75.16 new members receive Korean BiteBoss-style suggested nicknames',()=>{
+  const app=read('app.js').toString();
+  const helpers=read('ui-helpers.js').toString();
+  assert.match(app,/generateDefaultNickname\(\)/);
+  assert.match(app,/p_nickname:nickname \|\| generateDefaultNickname\(username\)/);
+  assert.match(helpers,/명동/);
+  assert.match(helpers,/불주먹/);
+});
+
+test('v75.16 player ranking separates nickname from crew and BOSS metadata',()=>{
+  const app=read('app.js').toString();
+  assert.match(app,/const rankMeta=\[crewName, `BOSS \$\{Number\(row\.boss_count \|\| 0\)\}`\]/);
+  assert.match(app,/<strong>\$\{escapeHtml\(playerName\)\}<\/strong>/);
+  assert.doesNotMatch(app,/const identity=\[playerName,row\.organization_name\]/);
+});
+
+test('v75.16 crew member management actions do not fall through to profile row clicks',()=>{
+  const app=read('app.js').toString();
+  assert.match(app,/actionButton = event\.target\.closest\("\[data-kick-member\],\[data-transfer-leader\]"\)/);
+  assert.match(app,/event\.stopPropagation\(\)/);
+  assert.match(app,/handlePlayerProfileOpen\(event\)[\s\S]*?data-kick-member[\s\S]*?data-transfer-leader/);
+  assert.match(app,/biteboss_kick_organization_member_v7513/);
+  assert.match(app,/biteboss_transfer_organization_leadership/);
+});

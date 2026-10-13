@@ -3,7 +3,7 @@ import path from 'node:path';
 
 const root = process.cwd();
 const read = rel => fs.readFileSync(path.join(root, rel), 'utf8');
-const build = '75.14';
+const build = '75.16';
 const failures = [];
 
 const checks = [
@@ -44,4 +44,4 @@ if (failures.length) {
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
-console.log('BiteBoss v75.14 release audit passed.');
+console.log('BiteBoss v75.16 release audit passed.');

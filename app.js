@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.14";
+  const BITEBOSS_BUILD = "75.16";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -10,6 +10,13 @@
   const $$ = q => [...document.querySelectorAll(q)];
 
   const cfg = window.BITEBOSS_CONFIG || {};
+  const {
+    generateDefaultNickname,
+    notificationKindLabel,
+    notificationIsUnread,
+    notificationIconMarkup,
+    notificationFallbackTitle
+  } = window.BITEBOSS_UI_HELPERS || {};
   let homeSplashRequestId = 0;
   const HOME_SPLASH_CACHE_KEY = "biteboss:home-splash-url";
 
@@ -127,6 +134,8 @@
   let pushPermissionState = "unknown";
   let pushPreferences = null;
   let pushUnreadCount = 0;
+  let notificationPage = 1;
+  const NOTIFICATION_PAGE_SIZE = 8;
   const adSessionKey = getAdSessionKey();
 
   init().catch(fatalError);
@@ -411,7 +420,7 @@
 
     $("#organizationPanelOpen")?.addEventListener("click", event => {
       if(event.target.closest("button,a,input,select,textarea,label")) return;
-      if(event.target.closest("[data-player-profile],[data-transfer-leader]")) return;
+      if(event.target.closest("[data-player-profile],[data-transfer-leader],[data-kick-member]")) return;
       if(!organization?.id) return;
       openCurrentOrganizationDetail();
     });
@@ -595,7 +604,6 @@
       promo.classList.remove("has-splash");
     };
 
-    // Assign directly so the browser can begin rendering immediately; do not gate first paint on a separate preload/decode cycle.
     image.classList.remove("hidden");
     image.src = url;
     if(image.complete && image.naturalWidth > 0){
@@ -3123,8 +3131,8 @@
     const nickname = String(row?.nickname || "").trim();
     if(nickname && nickname !== "사용자") return nickname;
 
-    const rawId = String(row?.user_id || "").replace(/-/g,"").toUpperCase();
-    return rawId ? `Boss ${rawId.slice(0,4)}` : "Boss";
+    const seed = String(row?.user_id || row?.username || "").trim();
+    return generateDefaultNickname(seed || "biteboss-player");
   }
 
   function renderRankPage(){
@@ -3312,12 +3320,14 @@
     if(myBox && myIndex>=0){
       const me=rows[myIndex];
       const myAvatar=String(profile?.avatar_url || me.avatar_url || "").trim();
+      const myCrewName=String(me.organization_name || organization?.name || "").trim();
+      const myRankMeta=[myCrewName, `BOSS ${Number(me.boss_count || 0)}`].filter(Boolean).join(" · ");
       myBox.innerHTML=`
         <strong class="my-rank-position">${myIndex+1}</strong>
         ${bossAvatarMarkup(myAvatar, rankingPlayerName(me) || "나", "my-rank-avatar")}
         <div class="my-rank-copy">
           <b>${escapeHtml(rankingPlayerName(me) || profile?.nickname || playerSession?.nickname || "나")}</b>
-          <small>Lv ${Number(me.level || 1)} · 보스 ${Number(me.boss_count || 0)} · 크루 ${Number(me.crew_count || 0)} · ${Number(me.xp || 0).toLocaleString("ko-KR")} XP</small>
+          <small>${escapeHtml(myRankMeta)} · Lv ${Number(me.level || 1)}</small>
         </div>
         <span class="my-rank-label">내 순위</span>`;
       myBox.classList.remove("hidden");
@@ -3337,7 +3347,8 @@
     setRankItems(rows.map((row,index)=>{
       const rowIsMe = String(row.user_id || "") === myId;
       const playerName=rankingPlayerName(row);
-      const identity=[playerName,row.organization_name].filter(Boolean).join(" · ");
+      const crewName=String(row.organization_name || "").trim();
+      const rankMeta=[crewName, `BOSS ${Number(row.boss_count || 0)}`].filter(Boolean).join(" · ");
       const personalAvatar = rowIsMe
         ? String(profile?.avatar_url || row.avatar_url || "").trim()
         : String(row.avatar_url || "").trim();
@@ -3349,8 +3360,8 @@
           <span class="rank-number">${index+1}</span>
           ${bossAvatarMarkup(personalAvatar, playerName, "rank-player-avatar")}
           <div class="rank-player-copy">
-            <strong>${escapeHtml(identity)}</strong>
-            <div class="meta">Lv ${Number(row.level || 1)} · 보스 ${Number(row.boss_count || 0)} · 크루 ${Number(row.crew_count || 0)}</div>
+            <strong>${escapeHtml(playerName)}</strong>
+            <div class="meta">${escapeHtml(rankMeta)}</div>
           </div>
           <div class="rank-result">
             <b>${Number(row.xp || 0).toLocaleString("ko-KR")}</b>
@@ -3912,10 +3923,12 @@
   }
 
   function openMemberRegister(){
+    const suggestedNickname = generateDefaultNickname();
     openModal("계정 만들기", `
       <div class="form-grid member-auth-form">
         <label class="wide">ID<input id="memberRegisterId" class="input" maxlength="32" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="yourid" /></label>
-        <label class="wide">닉네임<input id="memberRegisterNick" class="input" maxlength="40" placeholder="보스 이름" /></label>
+        <label class="wide">닉네임<input id="memberRegisterNick" class="input" maxlength="40" value="${escapeAttr(suggestedNickname)}" placeholder="${escapeAttr(suggestedNickname)}" /></label>
+        <p class="member-nickname-hint wide">BiteBoss가 만든 기본 별명입니다. 지금 바꾸거나 프로필에서 나중에 변경할 수 있습니다.</p>
         <label class="wide">6자리 PIN<input id="memberRegisterPin" class="input" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" placeholder="000000" /></label>
         <button id="memberRegisterSubmit" class="primary-btn wide" type="button">계정 만들기</button>
         <button id="memberAuthSwitchToLogin" class="auth-switch-btn wide" type="button">이미 계정이 있나요? 로그인</button>
@@ -3937,7 +3950,7 @@
     if(button) button.disabled = true;
     setStatus(status, "계정을 만드는 중…");
     try{
-      const { data, error } = await sb.rpc("biteboss_member_register", { p_username:username, p_pin:pin, p_nickname:nickname || username });
+      const { data, error } = await sb.rpc("biteboss_member_register", { p_username:username, p_pin:pin, p_nickname:nickname || generateDefaultNickname(username) });
       if(error) throw error;
       if(!data?.ok) throw new Error(data?.error || "REGISTER_FAILED");
       playerSession = data;
@@ -4669,27 +4682,28 @@
     }
   }
 
-
-
   function handleOrganizationMemberAction(event){
-    const kickButton = event.target.closest("[data-kick-member]");
-    if(kickButton){
-      const userId = String(kickButton.dataset.kickMember || "").trim();
-      const memberName = String(kickButton.dataset.memberName || "멤버").trim();
+    const actionButton = event.target.closest("[data-kick-member],[data-transfer-leader]");
+    if(!actionButton)return;
+    event.preventDefault();
+    event.stopPropagation();
+
+    const kickButton = actionButton.matches("[data-kick-member]") ? actionButton : null;
+    if(kickButton){const userId=String(kickButton.dataset.kickMember||"").trim();
+      const memberName=String(kickButton.dataset.memberName||"멤버").trim();
       if(userId) openOrganizationKickConfirm(userId, memberName);
       return;
     }
 
-    const transferButton = event.target.closest("[data-transfer-leader]");
+    const transferButton = actionButton.matches("[data-transfer-leader]") ? actionButton : null;
     if(!transferButton) return;
 
-    const userId = String(transferButton.dataset.transferLeader || "").trim();
+    const userId=String(transferButton.dataset.transferLeader||"").trim();
     const memberName = String(transferButton.dataset.memberName || "멤버").trim();
     if(!userId) return;
 
     openLeadershipTransferConfirm(userId, memberName);
   }
-
   function openOrganizationKickConfirm(userId, memberName){
     if(!organization?.is_leader){
       toast("크루 개설자만 멤버를 강퇴할 수 있습니다.");
@@ -4714,7 +4728,6 @@
 
     $("#organizationKickConfirm")?.addEventListener("click", kickOrganizationMember);
   }
-
   async function kickOrganizationMember(event){
     const button = event.currentTarget;
     const userId = String(button?.dataset?.kickUser || "").trim();
@@ -4760,7 +4773,6 @@
       if(button) button.disabled = false;
     }
   }
-
   function openLeadershipTransferConfirm(userId, memberName){
     if(!organization?.is_leader){
       toast("현재 개설자만 리더를 변경할 수 있습니다.");
@@ -4790,7 +4802,6 @@
 
     $("#organizationTransferConfirm")?.addEventListener("click", transferOrganizationLeadership);
   }
-
   async function transferOrganizationLeadership(event){
     const button = event.currentTarget;
     const userId = String(button?.dataset?.newLeader || "").trim();
@@ -4830,6 +4841,7 @@
 
 
   function handlePlayerProfileOpen(event){
+    if(event.target.closest("button,a,input,select,textarea,label,[data-kick-member],[data-transfer-leader]")) return;
     const target = event.target.closest("[data-player-profile]");
     if(!target) return;
 
@@ -4989,7 +5001,7 @@
   }
 
   async function openOrganizationDetail(orgId){
-    openModal("크루 프로필", `<div class="store-detail-loading">Crew 정보를 불러오는 중…</div>`);
+    openModal("크루 프로필", `<div class="store-detail-loading">크루 정보를 불러오는 중…</div>`);
 
     try{
       const { data, error } = await sb.rpc("biteboss_organization_detail", {
@@ -4998,40 +5010,61 @@
       if(error) throw error;
       if(!data?.ok) throw new Error(data?.error || "CREW_LOAD_FAILED");
 
-      renderOrganizationDetail(data);
+      renderOrganizationDetail(data, orgId);
     }catch(error){
       console.warn("BiteBoss organization detail:", error);
       const body = $("#modalBody");
-      if(body) body.innerHTML = `<div class="store-detail-empty">Crew 정보를 불러오지 못했습니다.</div>`;
+      if(body) body.innerHTML = `<div class="store-detail-empty is-error-state"><strong>크루 정보를 불러오지 못했습니다.</strong><button id="organizationDetailRetry" class="secondary-btn" type="button">다시 시도</button></div>`;
+      $("#organizationDetailRetry")?.addEventListener("click", () => openOrganizationDetail(orgId));
     }
   }
 
-  function renderOrganizationDetail(data){
+  function territoryRecencyValue(row = {}){
+    const value = row.started_at || row.captured_at || row.claimed_at || row.updated_at || row.created_at || "";
+    const timestamp = value ? new Date(value).getTime() : 0;
+    return Number.isFinite(timestamp) ? timestamp : 0;
+  }
+
+  function renderOrganizationDetail(data, requestedOrgId = ""){
     const org = data.organization || {};
     const members = Array.isArray(data.members) ? data.members : [];
-    const territories = Array.isArray(data.territories) ? data.territories : [];
+    const allTerritories = Array.isArray(data.territories) ? data.territories : [];
+    const isOwnOrganization = Boolean(
+      organization?.id &&
+      String(organization.id) === String(requestedOrgId || org.id || "")
+    );
+    const sortedTerritories = [...allTerritories].sort((a,b) => territoryRecencyValue(b) - territoryRecencyValue(a));
+    const visibleTerritories = isOwnOrganization ? sortedTerritories : sortedTerritories.slice(0,3);
 
     setText("#modalTitle", "크루 프로필");
 
     const body = $("#modalBody");
     if(!body) return;
 
-    const memberHtml = members.map(member => `
-      <article class="organization-detail-member">
-        <div>
-          <strong>${escapeHtml(member.nickname || "사용자")}</strong>
-          <span>${member.role === "leader" ? "개설자" : "멤버"}</span>
-        </div>
-        <b>${Number(member.boss_count || 0)} 보스</b>
-      </article>
-    `).join("") || `<div class="store-detail-empty">멤버가 없습니다.</div>`;
+    const memberHtml = members.map(member => {
+      const memberName = String(member.nickname || member.username || "사용자").trim();
+      const roleLabel = member.role === "leader" ? "개설자" : "멤버";
+      return `
+        <article class="organization-detail-member">
+          ${bossAvatarMarkup(member.avatar_url || "", memberName, "organization-detail-member-avatar")}
+          <div class="organization-detail-member-copy">
+            <strong>${escapeHtml(memberName)}</strong>
+            <span>${escapeHtml(roleLabel)}</span>
+          </div>
+          <b>BOSS ${Number(member.boss_count || 0)}</b>
+        </article>
+      `;
+    }).join("") || `<div class="store-detail-empty">멤버가 없습니다.</div>`;
 
-    const territoryHtml = territories.map(row => {
+    const territoryHtml = visibleTerritories.map(row => {
       const protectedNow = Boolean(
         row.protected_until &&
         new Date(row.protected_until).getTime() > Date.now()
       );
       const place = [row.city,row.district].filter(Boolean).join(" ");
+      const privateStatus = protectedNow
+        ? `보호 ${formatRemaining(row.protected_until)} 남음`
+        : `방어력 ${Number(row.boss_defense || 0)}`;
 
       return `
         <button
@@ -5042,20 +5075,27 @@
             <strong>${escapeHtml(row.store_name || "매장")}</strong>
             <span>${escapeHtml([place,row.category].filter(Boolean).join(" · "))}</span>
           </div>
-          <div>
-            <b>${escapeHtml(row.boss_nickname || "보스")}</b>
-            <span>${protectedNow ? `보호 ${escapeHtml(formatRemaining(row.protected_until))} 남음` : `방어력 ${Number(row.boss_defense || 0)}`}</span>
-          </div>
+          ${isOwnOrganization ? `
+            <div>
+              <b>${escapeHtml(row.boss_nickname || "보스")}</b>
+              <span>${escapeHtml(privateStatus)}</span>
+            </div>
+          ` : `<span class="organization-territory-public-meta">최근 점령</span>`}
         </button>
       `;
     }).join("") || `<div class="store-detail-empty">아직 점령지가 없습니다.</div>`;
+
+    const territoryTitle = isOwnOrganization ? "점령지" : "최근 점령지";
+    const territoryNote = !isOwnOrganization && Number(org.territory_count || allTerritories.length) > visibleTerritories.length
+      ? `<p class="crew-public-note">다른 크루의 점령지는 최근 3곳만 공개됩니다.</p>`
+      : "";
 
     body.innerHTML = `
       <div class="organization-detail crew-profile-detail">
         <section class="player-profile-hero crew-profile-hero">
           <div class="player-profile-avatar crew-profile-avatar">
             ${String(org.avatar_url || "").trim()
-              ? `<img src="${escapeAttr(org.avatar_url)}" alt="${escapeAttr(org.name || "크루")} 프로필" />`
+              ? `<img src="${escapeAttr(org.avatar_url)}" alt="${escapeAttr(org.name || "크루")} 프로필" loading="lazy" decoding="async" />`
               : `<span aria-hidden="true">${escapeHtml(Array.from(String(org.name || "C"))[0] || "C")}</span>`}
           </div>
           <div class="player-profile-hero-copy crew-profile-hero-copy">
@@ -5065,23 +5105,43 @@
         </section>
 
         <section class="player-profile-h2h-grid crew-profile-stats" aria-label="크루 기록">
-          <p><span>멤버</span><strong>${Number(org.member_count || 0)}</strong></p>
-          <p><span>점령지</span><strong>${Number(org.territory_count || 0)}</strong></p>
+          <p><span>멤버</span><strong>${Number(org.member_count || members.length || 0)}</strong></p>
+          <p><span>점령지</span><strong>${Number(org.territory_count || allTerritories.length || 0)}</strong></p>
         </section>
 
-        <section class="organization-detail-section">
-          <h4>점령지</h4>
+        <div class="crew-detail-tabs" role="tablist" aria-label="크루 상세">
+          <button class="crew-detail-tab active" type="button" role="tab" aria-selected="true" data-crew-detail-tab="territory">점령지</button>
+          <button class="crew-detail-tab" type="button" role="tab" aria-selected="false" data-crew-detail-tab="members">멤버</button>
+        </div>
+
+        <section class="organization-detail-section crew-detail-panel" data-crew-detail-panel="territory">
+          <div class="crew-detail-section-head"><h4>${territoryTitle}</h4><span>${isOwnOrganization ? `${visibleTerritories.length}곳` : `최대 3곳`}</span></div>
           <div class="organization-territory-list">${territoryHtml}</div>
+          ${territoryNote}
         </section>
 
-        <section class="organization-detail-section">
-          <h4>멤버</h4>
+        <section class="organization-detail-section crew-detail-panel hidden" data-crew-detail-panel="members">
+          <div class="crew-detail-section-head"><h4>멤버</h4><span>${members.length}명</span></div>
           <div class="organization-detail-members">${memberHtml}</div>
         </section>
       </div>
     `;
 
-    $$("[data-org-territory-store]", body).forEach(button => {
+    $$('[data-crew-detail-tab]', body).forEach(tab => {
+      tab.addEventListener("click", () => {
+        const target = tab.dataset.crewDetailTab;
+        $$('[data-crew-detail-tab]', body).forEach(item => {
+          const active = item === tab;
+          item.classList.toggle("active", active);
+          item.setAttribute("aria-selected", active ? "true" : "false");
+        });
+        $$('[data-crew-detail-panel]', body).forEach(panel => {
+          panel.classList.toggle("hidden", panel.dataset.crewDetailPanel !== target);
+        });
+      });
+    });
+
+    $$('[data-org-territory-store]', body).forEach(button => {
       button.addEventListener("click", () => {
         const storeId = button.dataset.orgTerritoryStore;
         closeModal();
@@ -5672,20 +5732,6 @@
     return window.Capacitor?.Plugins?.PushNotifications || null;
   }
 
-  function notificationKindLabel(kind){
-    return ({
-      boss_lost:"보스",
-      boss_won:"보스",
-      boss_protection:"보스",
-      crew_invite:"크루",
-      crew_joined:"크루",
-      crew_member_joined:"크루",
-      crew_member_left:"크루",
-      store_offer:"매장",
-      system:"시스템"
-    })[String(kind || "")] || "BiteBoss";
-  }
-
   async function setupPushListeners(){
     if(pushListenersBound || !isNativeApp()) return;
     const push = pushPlugin();
@@ -5914,17 +5960,17 @@
       return;
     }
     if(!isNativeApp()){
-      row.textContent = pushUnreadCount ? `${pushUnreadCount} new` : "iOS app";
+      row.textContent = pushUnreadCount ? `새 알림 ${pushUnreadCount}` : "앱에서 설정";
       return;
     }
     const enabled = pushPreferences?.push_enabled === true && pushPermissionState === "granted";
     row.textContent = pushUnreadCount
-      ? `${pushUnreadCount} new`
+      ? `새 알림 ${pushUnreadCount}`
       : enabled
-        ? "On"
+        ? "켜짐"
         : pushPermissionState === "denied"
-          ? "Off"
-          : "Setup";
+          ? "꺼짐"
+          : "설정";
   }
 
   async function openNotificationSettings(){
@@ -5932,10 +5978,13 @@
       openMemberLogin();
       return;
     }
+    notificationPage = 1;
     await refreshNotificationState();
-    await markNotificationsRead();
     await loadNotificationInbox();
     renderNotificationSettingsModal();
+    // Keep the just-opened screen visually faithful to what was unread,
+    // then clear the badge for the next visit.
+    markNotificationsRead();
   }
 
   async function markNotificationsRead(){
@@ -5951,9 +6000,12 @@
 
   async function loadNotificationInbox(){
     try{
-      const { data, error } = await sb.rpc("biteboss_my_notifications_v627", { p_limit:20 });
+      const { data, error } = await sb.rpc("biteboss_my_notifications_v627", { p_limit:50 });
       if(error) throw error;
-      window.__BITEBOSS_NOTIFICATION_INBOX__ = Array.isArray(data) ? data : [];
+      window.__BITEBOSS_NOTIFICATION_INBOX__ = (Array.isArray(data) ? data : []).map(item => ({
+        ...item,
+        __was_unread:notificationIsUnread(item)
+      }));
     }catch(error){
       console.warn("BiteBoss notification inbox:", error);
       window.__BITEBOSS_NOTIFICATION_INBOX__ = [];
@@ -5977,46 +6029,76 @@
     const inbox = Array.isArray(window.__BITEBOSS_NOTIFICATION_INBOX__) ? window.__BITEBOSS_NOTIFICATION_INBOX__ : [];
     const native = isNativeApp();
     const pushEnabled = pushPreferences?.push_enabled === true && pushPermissionState === "granted";
+    const totalPages = Math.max(1, Math.ceil(inbox.length / NOTIFICATION_PAGE_SIZE));
+    notificationPage = Math.min(Math.max(1, notificationPage), totalPages);
+    const pageStart = (notificationPage - 1) * NOTIFICATION_PAGE_SIZE;
+    const pageItems = inbox.slice(pageStart, pageStart + NOTIFICATION_PAGE_SIZE);
 
     openModal("알림", `
       <div class="notification-settings">
-        <div class="notification-master">
-          <div>
+        <section class="notification-master">
+          <div class="notification-master-copy">
             <span>푸시 알림</span>
             <strong>${pushEnabled ? "알림 켜짐" : "알림 꺼짐"}</strong>
-            <p>${native ? "중요한 Boss와 Crew 변화를 iPhone으로 알려줍니다." : "푸시 알림은 iOS 앱에서 사용할 수 있습니다."}</p>
+            <p>${native ? "점령, 방어, 크루 변화를 중요한 순간에 알려줍니다." : "알림 내역은 여기서 확인할 수 있고, 푸시는 iOS 앱에서 사용할 수 있습니다."}</p>
           </div>
-          ${native ? `<button id="notificationMasterBtn" class="${pushEnabled ? "secondary-btn" : "primary-btn"}" type="button">${pushEnabled ? "끄기" : "알림 켜기"}</button>` : ""}
-        </div>
+          ${native ? `<button id="notificationMasterBtn" class="notification-master-action ${pushEnabled ? "is-on" : ""}" type="button">${pushEnabled ? "끄기" : "알림 켜기"}</button>` : ""}
+        </section>
 
-        <div class="notification-pref-list ${pushEnabled ? "" : "is-disabled"}">
-          ${notificationToggleRow("boss_events", "보스 · 점령지", "Boss를 빼앗기거나 보호시간이 곧 끝날 때")}
-          ${notificationToggleRow("crew_events", "Crew", "초대, 가입, 새 멤버와 Territory 변화")}
-          ${notificationToggleRow("store_offers", "매장 혜택", "매장 혜택과 이벤트 · 기본 OFF")}
-          ${notificationToggleRow("system_events", "시스템", "계정과 서비스에 필요한 중요 안내")}
-        </div>
+        <section class="notification-preferences" aria-label="알림 종류 설정">
+          <div class="notification-section-head"><span>알림 종류</span><small>${pushEnabled ? "필요한 알림만 선택하세요." : "푸시를 켜면 설정할 수 있습니다."}</small></div>
+          <div class="notification-pref-list ${pushEnabled ? "" : "is-disabled"}">
+            ${notificationToggleRow("boss_events", "점령 · 방어", "점령 성공, 빼앗김, 보호시간 변화")}
+            ${notificationToggleRow("crew_events", "크루", "초대, 가입, 멤버 및 리더 변화")}
+            ${notificationToggleRow("store_offers", "매장 혜택", "제휴 매장의 혜택과 이벤트")}
+            ${notificationToggleRow("system_events", "시스템", "계정과 서비스에 필요한 중요 안내")}
+          </div>
+        </section>
 
         <section class="notification-inbox">
-          <div class="notification-inbox-head"><span>최근 알림</span><strong>${inbox.length}</strong></div>
-          <div class="notification-inbox-list">
-            ${inbox.map(item => `
-              <button class="notification-inbox-row" type="button"
-                data-notification-kind="${escapeAttr(item.kind || "")}"
-                data-notification-store="${escapeAttr(item.data?.store_id || "")}">
-                <span>${escapeHtml(notificationKindLabel(item.kind))}</span>
-                <strong>${escapeHtml(item.title || "BiteBoss")}</strong>
-                <p>${escapeHtml(item.body || "")}</p>
-                <small>${escapeHtml(formatDate(item.created_at))}</small>
-              </button>
-            `).join("") || `<p class="notification-empty">아직 알림이 없습니다.</p>`}
+          <div class="notification-inbox-head">
+            <div><span>최근 알림</span><small>${inbox.length ? `총 ${inbox.length}개` : "새 소식이 없습니다."}</small></div>
           </div>
+          <div class="notification-inbox-list">
+            ${pageItems.map(item => {
+              const unread = item.__was_unread === true;
+              return `
+                <button class="notification-inbox-row ${unread ? "is-unread" : ""}" type="button"
+                  data-notification-kind="${escapeAttr(item.kind || "")}"
+                  data-notification-store="${escapeAttr(item.data?.store_id || "")}">
+                  ${notificationIconMarkup(item.kind)}
+                  <span class="notification-inbox-copy">
+                    <span class="notification-inbox-meta"><b>${escapeHtml(notificationKindLabel(item.kind))}</b>${unread ? '<i>새 알림</i>' : ""}</span>
+                    <strong>${escapeHtml(item.title || notificationFallbackTitle(item))}</strong>
+                    ${item.body ? `<p>${escapeHtml(item.body)}</p>` : ""}
+                    <small>${escapeHtml(formatDate(item.created_at))}</small>
+                  </span>
+                  <span class="notification-row-arrow" aria-hidden="true">›</span>
+                </button>
+              `;
+            }).join("") || `
+              <div class="notification-empty-state">
+                <span class="notification-empty-icon" aria-hidden="true">✓</span>
+                <strong>아직 알림이 없습니다.</strong>
+                <p>점령, 방어, 크루 변화가 생기면 이곳에 표시됩니다.</p>
+              </div>`}
+          </div>
+          <nav id="notificationPagination" class="list-pagination ${inbox.length > NOTIFICATION_PAGE_SIZE ? "" : "hidden"}" aria-label="알림 페이지"></nav>
         </section>
       </div>
     `);
 
+    if(inbox.length > NOTIFICATION_PAGE_SIZE){
+      renderPagination("#notificationPagination", notificationPage, inbox.length, NOTIFICATION_PAGE_SIZE, nextPage => {
+        notificationPage = nextPage;
+        renderNotificationSettingsModal();
+        $("#modalBody")?.scrollTo({top:0,behavior:"smooth"});
+      });
+    }
+
     $("#notificationMasterBtn")?.addEventListener("click", () => pushEnabled ? disablePushNotifications() : enablePushNotifications());
 
-    $$("[data-notification-pref]").forEach(button => {
+    $$('[data-notification-pref]').forEach(button => {
       button.addEventListener("click", async () => {
         if(!pushEnabled){
           toast("먼저 푸시 알림을 켜주세요.");
@@ -6035,6 +6117,7 @@
         next[key] = !next[key];
 
         try{
+          button.disabled = true;
           const { data, error } = await sb.rpc("biteboss_update_notification_preferences_v627", {
             p_push_enabled:next.push_enabled,
             p_boss_events:next.boss_events,
@@ -6049,6 +6132,7 @@
         }catch(error){
           console.warn("BiteBoss notification pref update:", error);
           toast("알림 설정을 변경하지 못했습니다.");
+          button.disabled = false;
         }
       });
     });
@@ -6064,6 +6148,7 @@
       });
     });
   }
+
 
   async function unregisterCurrentPushDevice(){
     const token = pushDeviceToken || (() => {
