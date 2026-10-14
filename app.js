@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.55";
+  const BITEBOSS_BUILD = "75.56";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -3584,7 +3584,7 @@
         return;
       }
       const rows=Array.isArray(data)?data:[];
-      setRankItems(rows.map((row,index)=>`<article class="rank-card territory-rank-card season-rank-card"><span class="rank-number">${index+1}</span><div class="season-rank-line"><strong>${escapeHtml(compactSeasonRegionName(row.city,row.district))}</strong><span>${escapeHtml(row.crew_name||"크루")}</span></div><div class="rank-result"><b>${Number(row.store_count||0)}</b><span>점령</span></div></article>`), "이번 시즌 점령 기록이 아직 없습니다.");
+      setRankItems(rows.map((row,index)=>`<article class="rank-card territory-rank-card season-rank-card"><span class="rank-number">${index+1}</span><div><strong>${escapeHtml(compactSeasonRegionName(row.city,row.district))}</strong><div class="meta">${escapeHtml(row.crew_name||"크루")}</div></div><div class="rank-result"><b>${Number(row.store_count||0)}</b><span>점령</span></div></article>`), "이번 시즌 점령 기록이 아직 없습니다.");
       return;
     }
 
@@ -3696,7 +3696,7 @@
               <span>매장</span>
             </div>
           </article>`;
-      }), "아직 점령지 순위가 없습니다.");
+      }), "아직 현재 점령 순위가 없습니다.");
       return;
     }
 

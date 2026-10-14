@@ -163,17 +163,9 @@ body.user-app #page-home{position:fixed;inset:0;height:auto;min-height:0;padding
 .territory-rank-card{grid-template-columns:22px minmax(0,1fr) auto;gap:12px}
 .territory-rank-card>div{min-width:0}
 .territory-rank-card strong{display:block;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;word-break:keep-all;overflow-wrap:normal}
-.season-rank-card{grid-template-columns:20px minmax(0,1fr) auto;gap:6px}
-.season-rank-card>div:nth-child(2){min-width:0}
-.season-rank-line{display:flex;align-items:baseline;gap:5px;min-width:0;white-space:nowrap;overflow:visible}
-.season-rank-line strong,.season-rank-line span{flex:0 0 auto;min-width:0;white-space:nowrap;overflow:visible;text-overflow:clip}
-.season-rank-line strong{font-size:clamp(8.5px,2.55vw,10.5px);letter-spacing:-.045em}
-.season-rank-line span{color:#94949a;font-size:clamp(7.5px,2.2vw,9px);font-weight:760;letter-spacing:-.025em}
-.season-rank-line span:before{content:"·";margin-right:5px;color:#b0b0b5}
-.season-rank-card .rank-result{min-width:0;white-space:nowrap}
-.season-rank-card .rank-result b{font-size:13px}
+/* Season ranking intentionally shares the exact typography and 3-column layout of current territory ranking. */
+.season-rank-card{grid-template-columns:22px minmax(0,1fr) auto;gap:12px}
 
-@media (max-width:380px){.season-rank-card{grid-template-columns:18px minmax(0,1fr) auto;gap:5px}.season-rank-line{gap:4px}.season-rank-line strong{font-size:8.5px}.season-rank-line span{font-size:7.5px}.season-rank-line span:before{margin-right:4px}.season-rank-card .rank-result b{font-size:12px}}
 .rank-number{font-size:12px;font-weight:850;color:#b3b3b9}.rank-card:first-child .rank-number{color:var(--accent)}
 .rank-avatar-slot{width:42px;height:42px;min-width:42px;max-width:42px;aspect-ratio:1/1;display:grid;place-items:center;border-radius:50%;overflow:hidden;background:#dedee0;clip-path:circle(50% at 50% 50%)}
 .rank-avatar-slot>.rank-player-avatar,.rank-avatar-slot>.crew-rank-avatar{width:100%;height:100%;min-width:100%;max-width:100%;border-radius:50%;object-fit:cover;background:#dedee0}
