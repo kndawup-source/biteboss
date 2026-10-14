@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "76.5";
+  const BITEBOSS_BUILD = "76.6";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -5815,6 +5815,14 @@
 
   async function fetchPlayerProfileData(userId){
     const params = { p_user_id:userId };
+
+    const corrected = await sb.rpc("biteboss_player_profile_v766", params);
+    if(!corrected.error) return corrected;
+
+    const correctedMessage = String(corrected.error?.message || "");
+    const correctedMissing = correctedMessage.includes("Could not find the function") || correctedMessage.includes("PGRST202");
+    if(!correctedMissing) return corrected;
+
     const primary = await sb.rpc("biteboss_player_profile_v7568", params);
     if(!primary.error) return primary;
 
