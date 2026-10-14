@@ -342,7 +342,7 @@ body.biteboss-info-page{min-height:100dvh;background:var(--bg);color:#111}.info-
 .store-comments-head h4 span{margin-left:4px;color:#8d8d93;font-size:12px;font-weight:800}
 .store-comment-form{margin-bottom:5px;padding-bottom:8px;border-bottom:1px solid var(--line,#e8e8eb)}
 .store-comment-input-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
-.store-comment-input{width:100%;min-width:0;height:40px;border:0;border-radius:14px;background:#f3f3f5;color:#111;padding:0 13px;outline:0;font:inherit;font-size:16px}
+.store-comment-input{width:100%;min-width:0;height:40px;border:0;border-radius:14px;background:#f3f3f5;color:#111;padding:0 13px;outline:0;font:inherit;font-size:16px}.store-comment-input::placeholder{color:#94949a;font-size:13px;font-weight:500;opacity:1}
 .store-comment-input:focus{background:#ededf0}
 .store-comment-submit,.store-comment-login{min-height:40px;border:0;border-radius:14px;background:#111;color:#fff;padding:0 16px;font:inherit;font-size:12px;font-weight:850}
 .store-comment-login{width:100%;margin:0 0 7px}

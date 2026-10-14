@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.95";
+  const BITEBOSS_BUILD = "75.97";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -2164,9 +2164,6 @@
         </details>
 
         <section class="store-comments" data-store-comments="${escapeAttr(store.id)}" aria-label="매장 한마디">
-          <div class="store-comments-head">
-            <h4>한마디 <span data-store-comment-count>0</span></h4>
-          </div>
           ${playerSession?.authenticated ? `
             <form class="store-comment-form" data-store-comment-form="${escapeAttr(store.id)}">
               <div class="store-comment-input-row">
