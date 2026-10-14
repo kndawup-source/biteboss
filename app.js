@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.65";
+  const BITEBOSS_BUILD = "75.66";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -212,9 +212,13 @@
   const autoImportAttempts = new Map();
   let presenceBusy = false;
   let presenceBlockedReason = "";
+  let presenceBoundaryTargetId = "";
+  let presenceLastInRadiusAt = 0;
+  const PRESENCE_BOUNDARY_GRACE_MS = 15 * 1000;
   let takeoverUi = null;
   let takeoverUiTimer = null;
   let storeReclaimTimer = null;
+  let storeListReclaimTimer = null;
   let activeStoreDetailId = "";
   const storeReclaimCache = new Map();
   const storeReclaimInflight = new Map();
@@ -371,6 +375,8 @@
     const resume = () => {
       if(document.hidden) return;
       startNearbyLocationWatch();
+      // Resume GPS capture immediately. The full foreground refresh can finish in parallel.
+      startPresenceTracking();
       refreshAfterForeground().catch(error => {
         console.warn("BiteBoss foreground refresh:", error);
       });
@@ -404,6 +410,7 @@
     storeSearchTimer = clearTimeoutRef(storeSearchTimer);
     takeoverUiTimer = clearIntervalRef(takeoverUiTimer);
     storeReclaimTimer = clearIntervalRef(storeReclaimTimer);
+    storeListReclaimTimer = clearIntervalRef(storeListReclaimTimer);
     delayedTakeoverCloseTimer = clearTimeoutRef(delayedTakeoverCloseTimer);
     takeoverCancelResetTimer = clearTimeoutRef(takeoverCancelResetTimer);
   }
@@ -1284,6 +1291,7 @@
         scanPrompt();
       };
     });
+    startStoreListReclaimCountdowns();
   }
 
   async function searchStores(){
@@ -1404,16 +1412,21 @@
     const remainingSeconds = Math.max(0, Number(presence?.remaining_seconds ?? requiredSeconds));
     const loginRequired = presenceBlockedReason === "MEMBER_LOGIN_REQUIRED";
 
+    const cachedReclaim = ownedByMe ? getCachedStoreReclaimState(store.id)?.data : null;
+    const reclaimAt = cachedReclaim?.is_boss ? String(cachedReclaim.available_at || "").trim() : "";
+
     let status = "";
     if(ownedByMe){
-      if(presence?.status === "tracking" && String(presence?.mode || "") === "reclaim"){
+      if(["tracking","grace"].includes(String(presence?.status || "")) && String(presence?.mode || "") === "reclaim"){
         status = `자동 재점령 확인 중 · ${formatPresenceSeconds(remainingSeconds)} 남음`;
       }else if(presence?.status === "outside"){
         status = `${Math.round(Number(presence.distance_m || 0))}m · ${Math.max(1, Number(config.gps_radius_m || 50))}m 안에서 재점령 확인`;
       }else if(presence?.status === "low_accuracy"){
         status = "재점령 GPS 정확도 확인 중";
+      }else if(reclaimAt){
+        status = `재점령 ${formatOwnStoreReclaim(reclaimAt)}`;
       }else{
-        // Protected state is folded into the metadata line so store cards stay two lines.
+        // Protected state is folded into the metadata line so store cards stay compact.
         status = "";
       }
     }else if(bossExists && protectedNow){
@@ -1453,7 +1466,7 @@
               ${badges.length ? `<div class="store-status-tags">${badges.map(tag => `<span class="store-status-tag ${tag.cls}">${tag.label}</span>`).join("")}</div>` : ""}
             </div>
             ${details ? `<div class="store-card-meta">${escapeHtml(details)}</div>` : ""}
-            ${status ? `<div class="store-card-status ${protectedNow ? "is-protected" : ""}">${escapeHtml(status)}</div>` : ""}
+            ${status ? `<div class="store-card-status ${protectedNow ? "is-protected" : ""}" ${ownedByMe && reclaimAt && !presence?.status ? `data-store-reclaim-at="${escapeAttr(reclaimAt)}"` : ""}>${escapeHtml(status)}</div>` : ""}
           </div>
         </div>
         ${action}
@@ -1463,11 +1476,13 @@
 
   async function openStoreDetail(storeId, options = {}){
     const cached = stores.find(store => String(store.id) === String(storeId));
-    openModal(
-      "",
-      `<div class="app-state">매장 정보를 불러오는 중…</div>`,
-      { type:"store-detail" }
-    );
+    if(options?.preserveModal !== true){
+      openModal(
+        "",
+        `<div class="app-state">매장 정보를 불러오는 중…</div>`,
+        { type:"store-detail" }
+      );
+    }
 
     try{
       const [detailResult, statusResult, orgResult, offerResult, partnerRequestResult, growthResult, arenaResult, historyResult] = await Promise.all([
@@ -1642,7 +1657,7 @@
     const radius = Math.max(1, Number(config.gps_radius_m || 50));
     const remaining = Math.max(0, Number(state?.remaining_seconds ?? config.gps_dwell_seconds ?? 120));
 
-    if(status === "tracking" && String(state?.mode || "") === "reclaim"){
+    if((status === "tracking" || status === "grace") && String(state?.mode || "") === "reclaim"){
       if(label) label.textContent = "재점령 확인";
       value.textContent = formatPresenceSeconds(remaining);
       delete value.dataset.reclaimAt;
@@ -3382,8 +3397,19 @@
       const ownedByMe=nearest.ownedByMe;
       if(ownedByMe && takeoverUi?.storeId===String(nearest.store.id)) closeTakeoverUi();
 
-      if(nearest.distance > radius){
-        presenceState.set(String(nearest.store.id), {
+      const nearestId = String(nearest.store.id);
+      const withinRadius = nearest.distance <= radius;
+      if(withinRadius){
+        presenceBoundaryTargetId = nearestId;
+        presenceLastInRadiusAt = Date.now();
+      }
+      const boundaryGraceActive = ownedByMe &&
+        !withinRadius &&
+        presenceBoundaryTargetId === nearestId &&
+        (Date.now() - presenceLastInRadiusAt) <= PRESENCE_BOUNDARY_GRACE_MS;
+
+      if(!withinRadius && !boundaryGraceActive){
+        presenceState.set(nearestId, {
           status:"outside",
           distance_m:nearest.distance,
           required_seconds:Number(config.gps_dwell_seconds || 120),
@@ -3396,7 +3422,7 @@
             required_seconds:Number(config.gps_dwell_seconds || 120),
             remaining_seconds:Number(config.gps_dwell_seconds || 120)
           });
-        }else if(takeoverUi?.storeId===String(nearest.store.id)){
+        }else if(takeoverUi?.storeId===nearestId){
           syncTakeoverUi(nearest.store,{status:"hold",reason:"OUTSIDE",remaining_seconds:currentTakeoverVisualRemaining(),required_seconds:takeoverRequired});
         }
         renderStores();
@@ -3434,6 +3460,8 @@
 
       if(error){
         console.warn("BiteBoss presence:", error);
+        // Keep the last authoritative dwell clock on transient network failures.
+        // The server session grace window handles the missed ping when connectivity returns.
         return;
       }
 
@@ -3491,6 +3519,10 @@
           applyOptimisticReclaimCompletion(nearest.store.id, data?.reclaimed_at);
         }
         presenceState.delete(String(nearest.store.id));
+        if(presenceBoundaryTargetId === String(nearest.store.id)){
+          presenceBoundaryTargetId = "";
+          presenceLastInRadiusAt = 0;
+        }
         if(takeoverUi?.storeId===String(nearest.store.id)){
           const count=$("#takeoverCount");
           if(count) count.textContent=String(data?.status||"")==="crew" ? "HOLD" : "BOSS";
@@ -3503,6 +3535,8 @@
           store_name:data?.store_name || nearest.store.name || "매장"
         });
         await Promise.all([loadCaptureCooldownStatus(true), loadStores(), loadHome()]);
+        if(String(activeStoreDetailId || "") === String(nearest.store.id))
+          await openStoreDetail(nearest.store.id, { preserveModal:true, showStoreManagerCard:false });
         return;
       }
 
@@ -3510,6 +3544,25 @@
     }finally{
       presenceBusy = false;
     }
+  }
+
+  function updateStoreListReclaimCountdowns(){
+    let active = false;
+    $$("#storeList [data-store-reclaim-at]").forEach(node => {
+      const availableAt = String(node.dataset.storeReclaimAt || "").trim();
+      if(!availableAt) return;
+      const remaining = getOwnStoreReclaimRemainingSeconds(availableAt);
+      node.textContent = `재점령 ${formatOwnStoreReclaim(availableAt)}`;
+      if(remaining !== null && remaining > 0) active = true;
+    });
+    if(!active) storeListReclaimTimer = clearIntervalRef(storeListReclaimTimer);
+    return active;
+  }
+
+  function startStoreListReclaimCountdowns(){
+    storeListReclaimTimer = clearIntervalRef(storeListReclaimTimer);
+    if(updateStoreListReclaimCountdowns())
+      storeListReclaimTimer = window.setInterval(updateStoreListReclaimCountdowns, 1000);
   }
 
   function formatPresenceSeconds(value){
