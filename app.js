@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.62";
+  const BITEBOSS_BUILD = "75.63";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -7215,31 +7215,56 @@
     })[category] || category || "매장";
   }
 
+  function getOwnStoreReclaimRemainingSeconds(value){
+    const availableAtMs = new Date(value).getTime();
+    if(!Number.isFinite(availableAtMs)) return null;
+    return Math.max(0, Math.ceil((availableAtMs - Date.now()) / 1000));
+  }
+
   function formatOwnStoreReclaim(value){
-    const diff = new Date(value).getTime() - Date.now();
-    if(!Number.isFinite(diff) || diff <= 0) return "지금 가능";
-    const totalMinutes = Math.ceil(diff / 60000);
-    if(totalMinutes <= 1) return "곧 가능";
-    if(totalMinutes < 60) return `${totalMinutes}분`;
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-    return `${hours}시간 ${minutes}분`;
+    const totalSeconds = getOwnStoreReclaimRemainingSeconds(value);
+    if(totalSeconds === null) return "확인 불가";
+    if(totalSeconds <= 0) return "재점령 가능";
+
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    const two = number => String(number).padStart(2, "0");
+
+    return hours > 0
+      ? `${two(hours)}:${two(minutes)}:${two(seconds)}`
+      : `${two(minutes)}:${two(seconds)}`;
   }
 
   function updateOwnerReclaimCountdown(){
     const target = $("#ownerReclaimCountdown");
-    if(!target) return;
+    if(!target) return false;
     const availableAt = String(target.dataset.reclaimAt || "").trim();
-    if(!availableAt) return;
+    if(!availableAt) return false;
+
+    const remainingSeconds = getOwnStoreReclaimRemainingSeconds(availableAt);
     target.textContent = formatOwnStoreReclaim(availableAt);
+
+    if(remainingSeconds === null) return false;
+    if(remainingSeconds <= 0){
+      const card = target.closest(".owner-store-reclaim");
+      const label = card?.querySelector("span");
+      const note = card?.querySelector("small");
+      if(label) label.textContent = "재점령";
+      if(note) note.textContent = "매장에 다시 방문하면 자동 재점령됩니다.";
+      storeReclaimTimer = clearIntervalRef(storeReclaimTimer);
+      return false;
+    }
+    return true;
   }
 
   function startOwnerReclaimCountdown(){
     storeReclaimTimer = clearIntervalRef(storeReclaimTimer);
     const target = $("#ownerReclaimCountdown");
     if(!target) return;
-    updateOwnerReclaimCountdown();
-    storeReclaimTimer = setInterval(updateOwnerReclaimCountdown, 30000);
+    if(updateOwnerReclaimCountdown()){
+      storeReclaimTimer = setInterval(updateOwnerReclaimCountdown, 1000);
+    }
   }
 
   function formatRemaining(value){
