@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "76.2";
+  const BITEBOSS_BUILD = "76.5";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -2115,9 +2115,13 @@
         ${offersHtml}
 
         <details class="store-more">
-          <summary>
-            <span>상세 정보 보기</span>
-            <b aria-hidden="true">+</b>
+          <summary class="store-more-toggle">
+            <span class="store-more-label store-more-label-open">상세 정보 보기</span>
+            <span class="store-more-label store-more-label-close">상세 정보 닫기</span>
+            <b aria-hidden="true">
+              <span class="store-more-icon-open">+</span>
+              <span class="store-more-icon-close">−</span>
+            </b>
           </summary>
           <div class="store-more-body">
             ${bossExists ? `
