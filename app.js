@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.27";
+  const BITEBOSS_BUILD = "75.28";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -96,10 +96,13 @@
     crew_qr_invite_hours:72,
     crew_qr_max_uses:30,
     crew_max_members:30,
-    takeover_empty_seconds:20,
-    takeover_challenge_seconds:30,
-    takeover_retake_seconds:20,
-    takeover_hot_seconds:45,
+    // Legacy takeover-session duration keys are kept for backend compatibility.
+    // The visible capture countdown is driven by biteboss_presence_ping only,
+    // so users never see a timer finish before the server can actually award the store.
+    takeover_empty_seconds:120,
+    takeover_challenge_seconds:120,
+    takeover_retake_seconds:120,
+    takeover_hot_seconds:120,
     takeover_grace_seconds:3,
     takeover_cancel_outside_seconds:12,
     hot_store_challenges_24h:5,
@@ -2544,9 +2547,10 @@
     return boss && boss!=="No Boss" && boss!=="미점령" ? "challenge" : "takeover";
   }
 
-  function takeoverFallbackSeconds(mode){
-    const key=({takeover:"takeover_empty_seconds",challenge:"takeover_challenge_seconds",retake:"takeover_retake_seconds",hot:"takeover_hot_seconds"})[mode]||"takeover_empty_seconds";
-    return Math.max(5,Math.min(120,Number(config[key]||20)));
+  function takeoverFallbackSeconds(){
+    // One authoritative capture clock: presence/dwell time.
+    // takeover-session RPC is used for eligibility/cooldown/mode only.
+    return Math.max(30,Number(config.gps_dwell_seconds||120));
   }
 
   function showTakeoverUi(store,state={}){
@@ -2651,8 +2655,11 @@
     takeoverRemaining=Math.min(visualNow,incomingRemaining);
     takeoverLastServerAt=Date.now();
 
-    if(!takeoverRequired){
-      takeoverRequired=Math.max(5,Number(state.required_seconds||takeoverFallbackSeconds(state.mode||takeoverUi.mode)));
+    const incomingRequired=Number(state.required_seconds);
+    if(Number.isFinite(incomingRequired) && incomingRequired>0){
+      takeoverRequired=Math.max(30,incomingRequired);
+    }else if(!takeoverRequired){
+      takeoverRequired=takeoverFallbackSeconds();
     }
     if(state.mode) takeoverUi.mode=String(state.mode);
     $("#takeoverEyebrow").textContent=takeoverModeLabel(takeoverUi.mode);
@@ -2950,13 +2957,17 @@
         updateChallengeCommand(stores);
         return;
       }
-      if(takeoverSession?.ok){
-        syncTakeoverUi(nearest.store, takeoverSession);
-        if(takeoverSession.status === "cancelled"){
-          presenceState.set(String(nearest.store.id), takeoverSession);
-          renderStores();
-          return;
+      if(takeoverSession?.ok && takeoverSession.status === "cancelled"){
+        presenceState.set(String(nearest.store.id), takeoverSession);
+        if(takeoverUi?.storeId===String(nearest.store.id)){
+          syncTakeoverUi(nearest.store,{
+            ...takeoverSession,
+            required_seconds:takeoverRequired || takeoverFallbackSeconds(),
+            remaining_seconds:currentTakeoverVisualRemaining()
+          });
         }
+        renderStores();
+        return;
       }
 
       const { data, error } = await sb.rpc("biteboss_presence_ping", {
@@ -2985,17 +2996,21 @@
       }
 
       presenceBlockedReason = "";
-      // The visual countdown follows only the takeover-session clock.
-      if(!ownedByMe && !takeoverCancelledLocally && takeoverSession?.ok){
-        syncTakeoverUi(nearest.store,takeoverSession);
-      }
-      presenceState.set(String(nearest.store.id), {
+      const presenceClock = {
         status:String(data?.status || "tracking"),
+        mode:String(takeoverSession?.mode || takeoverModeFromStore(nearest.store)),
         required_seconds:Number(data?.required_seconds || config.gps_dwell_seconds || 120),
-        remaining_seconds:Number(data?.remaining_seconds || 0),
+        remaining_seconds:Number(data?.remaining_seconds ?? data?.required_seconds ?? config.gps_dwell_seconds ?? 120),
         elapsed_seconds:Number(data?.elapsed_seconds || 0),
         distance_m:Number(data?.distance_m || nearest.distance)
-      });
+      };
+
+      // Single authoritative clock: the countdown the user sees is the same
+      // server presence/dwell clock that can actually complete the capture.
+      if(!ownedByMe && !takeoverCancelledLocally && !["claimed","crew","boss_visit"].includes(presenceClock.status)){
+        syncTakeoverUi(nearest.store,presenceClock);
+      }
+      presenceState.set(String(nearest.store.id), presenceClock);
 
       if(["claimed","crew","boss_visit"].includes(String(data?.status || ""))){
         const outcomeStatus=String(data?.status || "");
