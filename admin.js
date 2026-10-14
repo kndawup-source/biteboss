@@ -15,7 +15,7 @@
           detectSessionInUrl:false,
           storageKey:"biteboss-admin-auth"
         },
-        global:{ headers:{ "x-client-info":"biteboss-admin-web/75.95" } }
+        global:{ headers:{ "x-client-info":"biteboss-admin-web/75.96" } }
       })
     : null;
 
@@ -31,6 +31,7 @@
   let analyticsRange = "7d";
   let analyticsCompareMode = "previous";
   let adminCommentPage = 1;
+  let adminCommentFilter = "all";
   let adminStorePage = 1;
   let partnerRequestPage = 1;
   let adminUserPage = 1;
@@ -210,6 +211,12 @@
     $("#partnerRequestFilter")?.addEventListener("change", () => { partnerRequestPage = 1; loadPartnerRequests(); });
     $("#refreshPartnerRequests")?.addEventListener("click", loadPartnerRequests);
     $("#refreshAdminComments")?.addEventListener("click", () => loadAdminComments(adminCommentPage));
+    $$("[data-comment-filter]").forEach(button => button.addEventListener("click", () => {
+      adminCommentFilter = String(button.dataset.commentFilter || "all");
+      adminCommentPage = 1;
+      $$("[data-comment-filter]").forEach(item => item.classList.toggle("active", item === button));
+      loadAdminComments(1);
+    }));
     $$('[data-analytics-range]').forEach(btn => btn.addEventListener("click", () => selectAnalyticsRange(btn.dataset.analyticsRange)));
     $("#analyticsCompareMode")?.addEventListener("change", event => { analyticsCompareMode = String(event.currentTarget.value || "previous"); loadAnalytics(); });
     $("#analyticsApplyCustom")?.addEventListener("click", () => { analyticsRange = "custom"; syncAnalyticsPresetUi(); loadAnalytics(); });
@@ -466,13 +473,85 @@
     const list=$("#adminCommentList"), nav=$("#adminCommentPagination");
     if(!list) return;
     list.innerHTML='<div class="admin-empty">불러오는 중…</div>';
-    const {data,error}=await adminSb.rpc("biteboss_admin_store_comments_overview_v7582",{p_page:Math.max(1,Number(page||1)),p_page_size:10});
-    if(error || !data?.ok){ list.innerHTML='<div class="admin-empty">한마디를 불러오지 못했습니다.</div>'; return; }
+
+    const {data,error}=await adminSb.rpc("biteboss_admin_store_comments_overview_v7596",{
+      p_page:Math.max(1,Number(page||1)),
+      p_page_size:10,
+      p_filter:adminCommentFilter
+    });
+
+    if(error || !data?.ok){
+      console.warn("BiteBoss admin comments:", error || data);
+      list.innerHTML='<div class="admin-empty">한마디를 불러오지 못했습니다.</div>';
+      nav?.classList.add("hidden");
+      return;
+    }
+
     adminCommentPage=Math.max(1,Number(data.page||1));
-    const total=Math.max(0,Number(data.total||0)); setText("#adminCommentCount",`${total}개`);
+    const total=Math.max(0,Number(data.total||0));
+    setText("#adminCommentCount",`${total}개`);
     const items=Array.isArray(data.items)?data.items:[];
-    list.innerHTML=items.length?items.map(item=>`<article class="admin-store-row" data-admin-comment="${escapeAttr(item.id)}"><div><strong>${escapeHtml(item.store_name||"매장")} · ${escapeHtml(item.nickname||"사용자")}</strong><p>${escapeHtml(item.body||"")}</p><small>${escapeHtml(formatDate(item.created_at))}${item.is_pinned?" · 고정":""}${item.is_hidden?" · 숨김":""}${Number(item.report_count||0)?` · 신고 ${Number(item.report_count||0)}건`:""}</small></div><div class="admin-store-actions"><button class="text-btn" data-admin-comment-action="${item.is_pinned?"unpin":"pin"}" type="button">${item.is_pinned?"고정 해제":"고정"}</button><button class="text-btn" data-admin-comment-action="${item.is_hidden?"unhide":"hide"}" type="button">${item.is_hidden?"숨김 해제":"숨김"}</button><button class="text-btn danger" data-admin-comment-action="delete" type="button">삭제</button></div></article>`).join(""):'<div class="admin-empty">등록된 한마디가 없습니다.</div>';
-    list.querySelectorAll('[data-admin-comment-action]').forEach(button=>button.addEventListener('click',async()=>{const row=button.closest('[data-admin-comment]'); const id=row?.dataset.adminComment; const action=button.dataset.adminCommentAction; if(!id)return; if(action==='delete'&&!confirm('영구 삭제할까요?'))return; const r=await adminSb.rpc('biteboss_store_comment_moderate_v7582',{p_comment_id:id,p_action:action}); if(r.error||!r.data?.ok){alert(r.data?.error==='PIN_LIMIT'?'고정은 매장당 최대 3개입니다.':'처리하지 못했습니다.');return;} await loadAdminComments(adminCommentPage);}));
+
+    list.innerHTML=items.length?items.map(item=>{
+      const reports=Array.isArray(item.reports)?item.reports:[];
+      const reportCount=Math.max(0,Number(item.report_count||0));
+      const stateBits=[
+        item.is_pinned?"고정":"",
+        item.is_hidden?"숨김":""
+      ].filter(Boolean);
+
+      return `<article class="admin-comment-row ${reportCount?"has-report":""}" data-admin-comment="${escapeAttr(item.id)}">
+        <div class="admin-comment-main">
+          <div class="admin-comment-head">
+            <div class="admin-comment-identity">
+              <strong>${escapeHtml(item.store_name||"매장")}</strong>
+              <span>${escapeHtml(item.nickname||"사용자")}</span>
+            </div>
+            <time>${escapeHtml(formatDate(item.created_at))}</time>
+          </div>
+          <p class="admin-comment-body">${escapeHtml(item.body||"")}</p>
+          <div class="admin-comment-meta">
+            ${stateBits.length?`<span>${escapeHtml(stateBits.join(" · "))}</span>`:""}
+            ${reportCount?`<button type="button" class="admin-report-count" data-report-detail-toggle>${reportCount}건 신고</button>`:""}
+          </div>
+          ${reportCount?`<div class="admin-report-detail hidden" data-report-detail>
+            <div class="admin-report-detail-head"><strong>신고 내역</strong><span>${reportCount}건</span></div>
+            ${reports.length?reports.map(report=>`<div class="admin-report-item">
+              <div><strong>${escapeHtml(report.reporter_nickname||"사용자")}</strong><time>${escapeHtml(formatDate(report.created_at))}</time></div>
+              <p>${escapeHtml(report.reason||"사유 없음")}</p>
+            </div>`).join(""):`<div class="admin-report-empty">신고 상세 정보가 없습니다.</div>`}
+          </div>`:""}
+        </div>
+        <div class="admin-comment-actions">
+          <button class="text-btn" data-admin-comment-action="${item.is_pinned?"unpin":"pin"}" type="button">${item.is_pinned?"고정 해제":"고정"}</button>
+          <button class="text-btn" data-admin-comment-action="${item.is_hidden?"unhide":"hide"}" type="button">${item.is_hidden?"숨김 해제":"숨김"}</button>
+          <button class="text-btn danger" data-admin-comment-action="delete" type="button">삭제</button>
+        </div>
+      </article>`;
+    }).join(""):'<div class="admin-empty">해당 조건의 한마디가 없습니다.</div>';
+
+    list.querySelectorAll("[data-report-detail-toggle]").forEach(button=>button.addEventListener("click",()=>{
+      const row=button.closest("[data-admin-comment]");
+      const detail=row?.querySelector("[data-report-detail]");
+      if(!detail) return;
+      const open=detail.classList.toggle("hidden")===false;
+      button.setAttribute("aria-expanded",String(open));
+    }));
+
+    list.querySelectorAll('[data-admin-comment-action]').forEach(button=>button.addEventListener('click',async()=>{
+      const row=button.closest('[data-admin-comment]');
+      const id=row?.dataset.adminComment;
+      const action=button.dataset.adminCommentAction;
+      if(!id)return;
+      if(action==='delete'&&!confirm('영구 삭제할까요?'))return;
+      const r=await adminSb.rpc('biteboss_store_comment_moderate_v7582',{p_comment_id:id,p_action:action});
+      if(r.error||!r.data?.ok){
+        alert(r.data?.error==='PIN_LIMIT'?'고정은 매장당 최대 3개입니다.':'처리하지 못했습니다.');
+        return;
+      }
+      await loadAdminComments(adminCommentPage);
+    }));
+
     renderPagination(nav,adminCommentPage,total,10,next=>loadAdminComments(next));
   }
 
