@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.94";
+  const BITEBOSS_BUILD = "75.95";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -2170,7 +2170,7 @@
           ${playerSession?.authenticated ? `
             <form class="store-comment-form" data-store-comment-form="${escapeAttr(store.id)}">
               <div class="store-comment-input-row">
-                <input class="store-comment-input" name="body" type="text" maxlength="120" autocomplete="off" placeholder="이 매장에 한마디" aria-label="한마디 입력" />
+                <input class="store-comment-input" name="body" type="text" maxlength="120" autocomplete="off" placeholder="한마디 남겨보세요" aria-label="한마디 입력" />
                 <button class="store-comment-submit" type="submit">등록</button>
               </div>
               <div class="store-comment-form-meta">
