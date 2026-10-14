@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.28";
+  const BITEBOSS_BUILD = "75.29";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -169,6 +169,8 @@
   let takeoverRemaining = 0;
   let takeoverRequired = 0;
   let takeoverCancelledLocally = false;
+  let modalScrollY = 0;
+  let modalReturnFocus = null;
   let gamePulseLoadedAt = 0;
   let activeBanner = null;
   const presenceState = new Map();
@@ -3871,15 +3873,24 @@
       name:storeName
     };
 
-    openModal("보스가 되었습니다", `
+    openModal("점령 완료", `
       <div class="boss-victory">
-        <span>점령 성공</span>
-        <strong>${escapeHtml(storeName)}</strong>
-        <p>${myPower ? `파워 ${myPower}${bossPower ? ` · 이전 방어력 ${bossPower}` : ""}` : "이 매장을 점령했습니다."}</p>
-        <button id="shareVictoryBtn" class="primary-btn" type="button">공유 · 나한테서 뺏어봐</button>
-        <button id="openVictoryStoreBtn" class="secondary-btn" type="button">매장 보기</button>
+        <div class="boss-victory-copy">
+          <span>새로운 BOSS</span>
+          <strong>${escapeHtml(storeName)}</strong>
+          <p>이 매장의 새로운 BOSS가 되었습니다.${myPower ? ` 파워 ${myPower}${bossPower ? ` · 이전 방어력 ${bossPower}` : ""}` : ""}</p>
+        </div>
+        <div class="boss-victory-actions">
+          <button id="victoryOkBtn" class="primary-btn" type="button">확인</button>
+          <div class="boss-victory-secondary-actions">
+            <button id="shareVictoryBtn" class="secondary-btn" type="button">공유하기</button>
+            <button id="openVictoryStoreBtn" class="secondary-btn" type="button">매장 보기</button>
+          </div>
+        </div>
       </div>
-    `);
+    `, { type:"victory" });
+
+    $("#victoryOkBtn")?.addEventListener("click", closeModal);
 
     $("#shareVictoryBtn")?.addEventListener("click", () => shareBossCard({
       store,
@@ -5020,7 +5031,7 @@
   }
 
   async function openPlayerProfile(userId, avatarHint = ""){
-    openModal("사용자", `<div class="app-state">사용자 정보를 불러오는 중…</div>`);
+    openModal("사용자 프로필", `<div class="app-state">사용자 정보를 불러오는 중…</div>`, { type:"player-profile" });
 
     try{
       const { data, error } = await sb.rpc("biteboss_player_profile", {
@@ -6729,21 +6740,45 @@
     $("#offlineBanner")?.classList.toggle("hidden", navigator.onLine !== false);
   }
 
+  function lockModalScroll(){
+    if(document.body.classList.contains("modal-open")) return;
+    modalScrollY = window.scrollY || window.pageYOffset || 0;
+    document.body.style.top = `-${modalScrollY}px`;
+    document.body.classList.add("modal-open");
+  }
+
+  function unlockModalScroll(){
+    if(!document.body.classList.contains("modal-open")) return;
+    document.body.classList.remove("modal-open");
+    document.body.style.top = "";
+    window.scrollTo(0, modalScrollY);
+  }
+
   function openModal(title, body, options = {}){
     stopScanner();
 
     const modal = $("#modal");
     const modalType = String(options?.type || "").trim();
+    if(!modal) return;
 
-    modal?.classList.toggle("store-detail-modal", modalType === "store-detail");
-    modal?.classList.toggle("notice-modal", modalType === "notice");
+    modalReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    modal.classList.remove("store-detail-modal", "player-profile-modal", "notice-modal", "victory-modal");
+    modal.classList.toggle("store-detail-modal", modalType === "store-detail");
+    modal.classList.toggle("player-profile-modal", modalType === "player-profile");
+    modal.classList.toggle("notice-modal", modalType === "notice");
+    modal.classList.toggle("victory-modal", modalType === "victory");
 
     setText("#modalTitle", title);
 
     const bodyEl = $("#modalBody");
-    if(bodyEl) bodyEl.innerHTML = body;
+    if(bodyEl){
+      bodyEl.innerHTML = body;
+      bodyEl.scrollTop = 0;
+    }
 
-    modal?.classList.remove("hidden");
+    lockModalScroll();
+    modal.classList.remove("hidden");
+    window.requestAnimationFrame(() => $("#modalClose")?.focus({preventScroll:true}));
   }
 
   function closeModal(){
@@ -6751,8 +6786,11 @@
 
     const modal = $("#modal");
     modal?.classList.add("hidden");
-    modal?.classList.remove("store-detail-modal");
-    modal?.classList.remove("notice-modal");
+    modal?.classList.remove("store-detail-modal", "player-profile-modal", "notice-modal", "victory-modal");
+    unlockModalScroll();
+    const returnFocus = modalReturnFocus;
+    modalReturnFocus = null;
+    window.requestAnimationFrame(() => returnFocus?.focus?.({preventScroll:true}));
   }
 
   function showTakeoverCancelledNotice(){
