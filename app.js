@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.70";
+  const BITEBOSS_BUILD = "75.72";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1324,8 +1324,43 @@
 
     const searchRows = Array.isArray(data) ? data : [];
     await loadStoreRoles(searchRows);
-    searchRows.sort(compareNearbyStores);
+    searchRows.sort((a,b) => compareStoreSearchResults(a,b,keyword));
     renderStores(searchRows, { resetPage:true });
+  }
+
+  function normalizeStoreSearchText(value = ""){
+    return String(value || "")
+      .normalize("NFKC")
+      .toLocaleLowerCase("ko-KR")
+      .replace(/\s+/g," ")
+      .trim();
+  }
+
+  function storeSearchRelevance(row = {}, keyword = ""){
+    const query = normalizeStoreSearchText(keyword);
+    if(!query) return 4;
+
+    const name = normalizeStoreSearchText(row.name || row.store_name || "");
+    if(name === query) return 0;
+    if(name.startsWith(query)) return 1;
+
+    const tokens = name.split(/[\s·._()\-\/]+/).filter(Boolean);
+    if(tokens.some(token => token.startsWith(query))) return 2;
+    if(name.includes(query)) return 3;
+    return 4;
+  }
+
+  function compareStoreSearchResults(a,b,keyword){
+    const relevanceDelta = storeSearchRelevance(a,keyword) - storeSearchRelevance(b,keyword);
+    if(relevanceDelta) return relevanceDelta;
+
+    const aDistance = Number(a.distance_m ?? a.distance ?? Number.POSITIVE_INFINITY);
+    const bDistance = Number(b.distance_m ?? b.distance ?? Number.POSITIVE_INFINITY);
+    if(Number.isFinite(aDistance) || Number.isFinite(bDistance)){
+      if(aDistance !== bDistance) return aDistance - bDistance;
+    }
+
+    return compareNearbyStores(a,b);
   }
 
   function compareNearbyStores(a,b){
