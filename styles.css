@@ -228,7 +228,7 @@ body.user-app #page-home{position:fixed;inset:0;height:auto;min-height:0;padding
 .modal{position:fixed;z-index:1000;inset:0;display:grid;place-items:end center;padding:0;background:rgba(0,0,0,.2);backdrop-filter:blur(10px);overscroll-behavior:contain}
 html.modal-open,body.modal-open{overflow:hidden;overscroll-behavior:none}body.modal-open{position:fixed;left:0;right:0;width:100%}
 .modal-card{position:relative;width:min(100%,680px);overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;background:#f8f8f8;color:#111;touch-action:pan-y}
-.modal-card>h3,.modal-head h3{margin:0 52px 18px 0;font-size:22px;line-height:1.05;font-weight:860;letter-spacing:-.045em}.modal-card>h3:empty{display:none}.x-btn{position:absolute;z-index:2;top:14px;right:14px;width:44px;height:44px;border-radius:15px;background:#efeff0;font-size:25px}
+.modal-card>h3,.modal-head h3{margin:0 48px 18px 0;font-size:22px;line-height:1.05;font-weight:860;letter-spacing:-.045em}.modal-card>h3:empty{display:none}.x-btn{position:absolute;z-index:2;top:14px;right:14px;width:40px;height:40px;border-radius:14px;background:#efeff0;font-size:22px;line-height:1}
 .modal-detail-sheet .modal-card{height:92dvh;max-height:92dvh;padding:62px 20px calc(24px + var(--safe-bottom));border-radius:26px 26px 0 0}
 .modal-compact .modal-card{max-height:72dvh;padding:24px 20px calc(22px + var(--safe-bottom));border-radius:24px 24px 0 0}
 .modal-compact .modal-card>h3{margin:0 52px 14px 0;font-size:20px;line-height:1.1}.modal-compact .profile-edit-form,.modal-compact .crew-profile-editor{padding-top:2px}.modal-compact:has(.profile-edit-form) .modal-card,.modal-compact:has(.crew-profile-editor) .modal-card{max-height:84dvh;padding-top:28px}
