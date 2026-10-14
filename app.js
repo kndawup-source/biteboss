@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.78";
+  const BITEBOSS_BUILD = "75.80";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1445,7 +1445,7 @@
       // Keep protected store cards at the same two-line height as ordinary stores.
       status = "";
     }else if(presence?.status === "tracking"){
-      status = `자동 점령 진행 중 · ${formatPresenceSeconds(remainingSeconds)} 남음`;
+      status = "자동 점령 진행 중";
     }else if(presence?.status === "outside"){
       status = `${Math.round(Number(presence.distance_m || 0))}m 더 가까이 가면 자동 시작`;
     }else if(presence?.status === "low_accuracy"){
