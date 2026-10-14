@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.53";
+  const BITEBOSS_BUILD = "75.54";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1895,10 +1895,6 @@
 
         ${Number.isFinite(Number(store.latitude)) && Number.isFinite(Number(store.longitude)) ? `
           <section class="store-detail-map-section" aria-label="매장 위치">
-            <div class="store-detail-map-head">
-              <span>위치</span>
-              <small>${escapeHtml([place, distance].filter(Boolean).join(" · "))}</small>
-            </div>
             <div id="storeDetailMap" class="store-detail-map" aria-label="${escapeAttr(store.name || "매장")} 지도"></div>
           </section>
         ` : ""}
