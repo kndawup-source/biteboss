@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.33";
+  const BITEBOSS_BUILD = "75.34";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1893,9 +1893,30 @@
   }
 
 
+  function hasStoreManagerAccount(store = {}, request = {}){
+    const truthyFlags = [
+      store.has_store_admin, store.store_admin_exists, store.manager_exists, store.has_manager,
+      store.admin_account_exists, store.store_admin_active, request.store_admin_exists,
+      request.manager_exists, request.account_exists, request.activated, request.is_activated
+    ];
+    if(truthyFlags.some(value => value === true || String(value).toLowerCase() === "true")) return true;
+
+    const ids = [
+      store.store_admin_id, store.store_admin_user_id, store.manager_user_id, store.manager_id,
+      store.admin_user_id, store.store_admin_username, request.store_admin_id,
+      request.store_admin_user_id, request.manager_user_id, request.manager_id,
+      request.store_admin_username
+    ];
+    if(ids.some(value => String(value || "").trim())) return true;
+
+    const activatedAt = request.activated_at || request.account_activated_at || request.store_admin_activated_at || store.store_admin_activated_at;
+    return Boolean(String(activatedAt || "").trim());
+  }
+
   function renderPartnerRequestCard(store, request, isPartner){
     const status = String(request?.status || "");
     const activationCode = String(request?.activation_code || "").trim();
+    if(hasStoreManagerAccount(store, request)) return "";
 
     if(status === "approved" && activationCode){
       return `
