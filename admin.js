@@ -15,7 +15,7 @@
           detectSessionInUrl:false,
           storageKey:"biteboss-admin-auth"
         },
-        global:{ headers:{ "x-client-info":"biteboss-admin-web/75.87" } }
+        global:{ headers:{ "x-client-info":"biteboss-admin-web/75.89" } }
       })
     : null;
 
@@ -34,6 +34,9 @@
   let adminStorePage = 1;
   let partnerRequestPage = 1;
   let adminUserPage = 1;
+  let bossPage = 1;
+  let gameOpsStorePage = 1;
+  let gameOpsOrganizationPage = 1;
   const ADMIN_PAGE_SIZE = 10;
 
   init().catch(showFatal);
@@ -850,6 +853,7 @@
 
   async function loadBosses(){
     const box = $("#bossList");
+    const nav = $("#bossPagination");
     if(!box) return;
 
     const { data, error } = await adminSb.rpc("biteboss_admin_bosses");
@@ -857,12 +861,18 @@
     if(error){
       console.warn("BiteBoss admin bosses:", error);
       box.innerHTML = `<div class="admin-empty">보스 현황을 불러오지 못했습니다.</div>`;
+      nav?.classList.add("hidden");
       return;
     }
 
     const rows = Array.isArray(data) ? data : [];
+    const total = rows.length;
+    const totalPages = Math.max(1, Math.ceil(total / ADMIN_PAGE_SIZE));
+    bossPage = Math.min(Math.max(1, bossPage), totalPages);
+    const startIndex = (bossPage - 1) * ADMIN_PAGE_SIZE;
+    const pageRows = rows.slice(startIndex, startIndex + ADMIN_PAGE_SIZE);
 
-    box.innerHTML = rows.map(row => {
+    box.innerHTML = pageRows.map(row => {
       const storeName = String(row.store_name || "매장").trim();
       const bossName = String(row.nickname || "").trim();
       const isOccupied = Boolean(bossName);
@@ -884,7 +894,7 @@
         ? `보호 ${formatRemaining(row.protected_until)}`
         : isOccupied
           ? "도전 가능"
-          : "Open";
+          : "점령 가능";
 
       const meta = [category, statusLabel].filter(Boolean).join(" · ");
       const xp = Math.max(0, Number(row.claims_for_user || 0) * 120);
@@ -903,6 +913,12 @@
         </article>
       `;
     }).join("") || `<div class="admin-empty">활성 매장이 없습니다.</div>`;
+
+    renderPagination(nav, bossPage, total, ADMIN_PAGE_SIZE, next => {
+      bossPage = next;
+      loadBosses();
+      box.scrollIntoView({ block:"start", behavior:"auto" });
+    });
   }
 
   async function loadUsers(){
@@ -975,6 +991,8 @@
     const summaryBox = $("#gameOpsSummary");
     const storesBox = $("#gameOpsStores");
     const orgsBox = $("#gameOpsOrganizations");
+    const storesNav = $("#gameOpsStorePagination");
+    const orgsNav = $("#gameOpsOrganizationPagination");
     if(!summaryBox && !storesBox && !orgsBox) return;
 
     const [overviewResult, controlsResult, orgsResult] = await Promise.all([
@@ -990,12 +1008,12 @@
       }else{
         const data = overviewResult.data || {};
         summaryBox.innerHTML = `
-          <div><span>Players</span><strong>${Number(data.players || 0)}</strong></div>
-          <div><span>Boss Stores</span><strong>${Number(data.bosses || 0)}</strong></div>
-          <div><span>Crew</span><strong>${Number(data.crews || 0)}</strong></div>
-          <div><span>Organizations</span><strong>${Number(data.organizations || 0)}</strong></div>
-          <div><span>Org Territories</span><strong>${Number(data.organization_territories || 0)}</strong></div>
-          <div><span>Challenges</span><strong>${Number(data.challenges || 0)}</strong></div>
+          <div><span>플레이어</span><strong>${Number(data.players || 0)}</strong></div>
+          <div><span>보스 매장</span><strong>${Number(data.bosses || 0)}</strong></div>
+          <div><span>크루</span><strong>${Number(data.crews || 0)}</strong></div>
+          <div><span>조직</span><strong>${Number(data.organizations || 0)}</strong></div>
+          <div><span>크루 점령지</span><strong>${Number(data.organization_territories || 0)}</strong></div>
+          <div><span>도전</span><strong>${Number(data.challenges || 0)}</strong></div>
         `;
       }
     }
@@ -1004,56 +1022,88 @@
       if(controlsResult.error){
         console.warn(controlsResult.error);
         storesBox.innerHTML = `<div class="admin-empty">매장 점령 상태를 불러오지 못했습니다.</div>`;
+        storesNav?.classList.add("hidden");
+        setText("#gameOpsStoreCount", "0");
       }else{
         const rows = Array.isArray(controlsResult.data) ? controlsResult.data : [];
-        storesBox.innerHTML = rows.map(row => {
+        const total = rows.length;
+        setText("#gameOpsStoreCount", total);
+
+        const totalPages = Math.max(1, Math.ceil(total / ADMIN_PAGE_SIZE));
+        gameOpsStorePage = Math.min(Math.max(1, gameOpsStorePage), totalPages);
+        const startIndex = (gameOpsStorePage - 1) * ADMIN_PAGE_SIZE;
+        const pageRows = rows.slice(startIndex, startIndex + ADMIN_PAGE_SIZE);
+
+        storesBox.innerHTML = pageRows.map(row => {
           const boss = row.boss_user_id
-            ? [row.boss_nickname || "Boss", row.organization_name].filter(Boolean).join(" · ")
-            : "Unclaimed";
+            ? [row.boss_nickname || "보스", row.organization_name].filter(Boolean).join(" · ")
+            : "미점령";
           const protection = row.protected_until && new Date(row.protected_until).getTime() > Date.now()
-            ? `Protected ${formatRemaining(row.protected_until)}`
-            : row.boss_user_id ? "Challengeable" : "Open";
+            ? `보호 ${formatRemaining(row.protected_until)}`
+            : row.boss_user_id ? "도전 가능" : "점령 가능";
           return `
             <article class="gameops-store-row">
-              <div>
-                <strong>${escapeHtml(row.store_name || "Store")}</strong>
+              <div class="gameops-store-copy">
+                <strong>${escapeHtml(row.store_name || "매장")}</strong>
                 <p>${escapeHtml([row.city,row.district].filter(Boolean).join(" "))}</p>
               </div>
               <div class="gameops-store-status">
                 <strong>${escapeHtml(boss)}</strong>
-                <span>${escapeHtml(protection)}${row.boss_user_id ? ` · Defense ${Number(row.boss_defense || 0)} · Lv ${Number(row.boss_level || 1)}` : ""}</span>
+                <span>${escapeHtml(protection)}${row.boss_user_id ? ` · 방어력 ${Number(row.boss_defense || 0)} · Lv ${Number(row.boss_level || 1)}` : ""}</span>
               </div>
               <div class="gameops-store-action">
-                ${row.boss_user_id ? `<button class="text-btn danger-text" data-release-boss="${escapeAttr(row.store_id)}" data-store-name="${escapeAttr(row.store_name || "Store")}" type="button">Boss 해제</button>` : ""}
+                ${row.boss_user_id ? `<button class="text-btn danger-text" data-release-boss="${escapeAttr(row.store_id)}" data-store-name="${escapeAttr(row.store_name || "매장")}" type="button">보스 해제</button>` : ""}
               </div>
             </article>
           `;
         }).join("") || `<div class="admin-empty">등록된 매장이 없습니다.</div>`;
 
         $$('[data-release-boss]').forEach(btn => btn.onclick = () => releaseStoreBoss(btn));
+
+        renderPagination(storesNav, gameOpsStorePage, total, ADMIN_PAGE_SIZE, next => {
+          gameOpsStorePage = next;
+          loadGameOps();
+          storesBox.scrollIntoView({ block:"start", behavior:"auto" });
+        });
       }
     }
 
     if(orgsBox){
       if(orgsResult.error){
         console.warn(orgsResult.error);
-        orgsBox.innerHTML = `<div class="admin-empty">조직 현황을 불러오지 못했습니다.</div>`;
+        orgsBox.innerHTML = `<div class="admin-empty">크루 현황을 불러오지 못했습니다.</div>`;
+        orgsNav?.classList.add("hidden");
+        setText("#gameOpsOrganizationCount", "0");
       }else{
         const rows = Array.isArray(orgsResult.data) ? orgsResult.data : [];
-        orgsBox.innerHTML = rows.map(row => `
+        const total = rows.length;
+        setText("#gameOpsOrganizationCount", total);
+
+        const totalPages = Math.max(1, Math.ceil(total / ADMIN_PAGE_SIZE));
+        gameOpsOrganizationPage = Math.min(Math.max(1, gameOpsOrganizationPage), totalPages);
+        const startIndex = (gameOpsOrganizationPage - 1) * ADMIN_PAGE_SIZE;
+        const pageRows = rows.slice(startIndex, startIndex + ADMIN_PAGE_SIZE);
+
+        orgsBox.innerHTML = pageRows.map(row => `
           <article class="gameops-org-row">
-            <div>
-              <strong>${escapeHtml(row.name || "Organization")}</strong>
-              <p>Founder ${escapeHtml(row.leader_name || "—")}</p>
+            <div class="gameops-org-copy">
+              <strong>${escapeHtml(row.name || "크루")}</strong>
+              <p>크루장 ${escapeHtml(row.leader_name || "—")}</p>
             </div>
-            <div>
-              <b>${Number(row.member_count || 0)}</b><span>Members</span>
+            <div class="gameops-org-metric">
+              <b>${Number(row.member_count || 0)}</b><span>멤버</span>
             </div>
-            <div>
-              <b>${Number(row.territory_count || 0)}</b><span>Territories</span>
+            <div class="gameops-org-metric">
+              <b>${Number(row.territory_count || 0)}</b><span>점령지</span>
             </div>
           </article>
-        `).join("") || `<div class="admin-empty">조직이 없습니다.</div>`;
+        `).join("") || `<div class="admin-empty">크루가 없습니다.</div>`;
+
+        renderPagination(orgsNav, gameOpsOrganizationPage, total, ADMIN_PAGE_SIZE, next => {
+          gameOpsOrganizationPage = next;
+          loadGameOps();
+          orgsBox.scrollIntoView({ block:"start", behavior:"auto" });
+        });
       }
     }
   }

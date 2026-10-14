@@ -6,9 +6,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" />
   <meta name="mobile-web-app-capable" content="yes" />
   <title>BiteBoss Admin</title>
-  <link rel="stylesheet" href="./styles.css?v=75.87" />
-  <link rel="stylesheet" href="./admin.css?v=75.87" />
-  <script src="./app-config.js?v=75.87"></script>
+  <link rel="stylesheet" href="./styles.css?v=75.89" />
+  <link rel="stylesheet" href="./admin.css?v=75.89" />
+  <script src="./app-config.js?v=75.89"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="admin-app">
@@ -136,6 +136,7 @@
       <section class="admin-dashboard-section admin-current-bosses">
         <div class="section-head"><h3>현재 보스</h3><span>실시간 점령 상태</span></div>
         <div id="bossList" class="store-list"></div>
+        <nav id="bossPagination" class="list-pagination hidden" aria-label="현재 보스 매장 페이지"></nav>
       </section>
 
       <section class="ops-recent admin-dashboard-section">
@@ -257,18 +258,26 @@
     <section class="admin-page" id="admin-users"><div class="admin-page-head"><div><span class="eyebrow">게임</span><h2>사용자</h2><p>회원 검색과 계정 상태를 확인합니다.</p></div></div><section class="admin-section-card"><div class="admin-list-toolbar"><input id="userSearch" class="input" type="search" placeholder="닉네임 검색" autocomplete="off" /></div><div id="userList" class="store-list admin-list-gap"></div><nav id="userPagination" class="list-pagination hidden" aria-label="사용자 페이지"></nav></section></section>
 
     <section class="admin-page" id="admin-gameops">
-      <div class="admin-page-head"><div><span class="eyebrow">게임</span><h2>게임 운영</h2><p>점령과 크루의 현재 상태를 운영합니다.</p></div></div>
+      <div class="admin-page-head"><div><span class="eyebrow">게임</span><h2>게임 운영</h2><p>점령과 크루의 현재 상태를 한 화면에서 확인하고 운영합니다.</p></div></div>
 
       <div id="gameOpsSummary" class="gameops-summary"></div>
 
-      <section class="admin-edit-section gameops-section">
-        <div class="section-head"><h3>점령 관리</h3><span>강제 해제는 보스 지위만 제거합니다.</span></div>
+      <section class="admin-section-card gameops-section">
+        <div class="admin-section-title admin-section-title-row">
+          <div><h3>점령 매장</h3><p>현재 보스와 보호 상태를 확인합니다. 강제 해제는 보스 지위만 제거합니다.</p></div>
+          <span id="gameOpsStoreCount" class="admin-count-chip">0</span>
+        </div>
         <div id="gameOpsStores" class="gameops-list"></div>
+        <nav id="gameOpsStorePagination" class="list-pagination hidden" aria-label="점령 매장 페이지"></nav>
       </section>
 
-      <section class="admin-edit-section gameops-section">
-        <div class="section-head"><h3>크루 현황</h3></div>
+      <section class="admin-section-card gameops-section">
+        <div class="admin-section-title admin-section-title-row">
+          <div><h3>크루 현황</h3><p>크루별 멤버와 현재 점령지를 확인합니다.</p></div>
+          <span id="gameOpsOrganizationCount" class="admin-count-chip">0</span>
+        </div>
         <div id="gameOpsOrganizations" class="gameops-list"></div>
+        <nav id="gameOpsOrganizationPagination" class="list-pagination hidden" aria-label="크루 현황 페이지"></nav>
       </section>
     </section>
 
@@ -407,6 +416,6 @@
   </section>
 </div>
 
-<script src="./admin.js?v=75.87"></script>
+<script src="./admin.js?v=75.89"></script>
 </body>
 </html>
