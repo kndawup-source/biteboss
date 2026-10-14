@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.58";
+  const BITEBOSS_BUILD = "75.59";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -218,6 +218,7 @@
   let activeStoreDetailId = "";
   const storeReclaimCache = new Map();
   const storeReclaimInflight = new Map();
+  const STORE_RECLAIM_CACHE_TTL_MS = 60 * 1000;
   let takeoverLastServerAt = 0;
   let takeoverRemaining = 0;
   let takeoverRequired = 0;
@@ -1494,7 +1495,8 @@
       data.publicGrowth = growthResult?.error ? null : (growthResult?.data || null);
       data.arena = arenaResult?.error ? null : (arenaResult?.data || null);
       data.history = historyResult?.error || !Array.isArray(historyResult?.data) ? [] : historyResult.data;
-      data.reclaim = storeReclaimCache.get(String(storeId))?.data || null;
+      const cachedReclaim = getCachedStoreReclaimState(storeId);
+      data.reclaim = cachedReclaim?.data || deriveOptimisticStoreReclaimState(data.history, String(data.game?.my_role || "visitor") === "boss");
       if(historyResult?.error && !String(historyResult.error.message||"").includes("biteboss_store_history_v71")) console.warn("BiteBoss conquest history:", historyResult.error);
       if(partnerRequestResult?.error) console.warn("BiteBoss partner request status:", partnerRequestResult.error);
       if(growthResult?.error) console.warn("BiteBoss public growth:", growthResult.error);
@@ -1518,7 +1520,7 @@
       activeStoreDetailId = String(storeId);
       renderStoreDetail(data, options);
 
-      if(playerSession?.authenticated && String(data.game?.my_role || "visitor") === "boss"){
+      if(playerSession?.authenticated && String(data.game?.my_role || "visitor") === "boss" && !cachedReclaim?.fresh){
         void refreshOwnStoreReclaimState(storeId);
       }
     }catch(error){
@@ -1528,6 +1530,36 @@
         await openStoreDetail(storeId, options);
       });
     }
+  }
+
+  function getCachedStoreReclaimState(storeId){
+    const key = String(storeId || "").trim();
+    if(!key) return null;
+    const entry = storeReclaimCache.get(key);
+    if(!entry?.data) return null;
+    const age = Date.now() - Number(entry.fetchedAt || 0);
+    return { data:entry.data, fresh:Number.isFinite(age) && age >= 0 && age < STORE_RECLAIM_CACHE_TTL_MS };
+  }
+
+  function deriveOptimisticStoreReclaimState(history = [], isBoss = false){
+    if(!isBoss || !Array.isArray(history)) return null;
+    const current = history.find(row => row && !row.ended_at && row.started_at);
+    if(!current?.started_at) return null;
+
+    const startedAtMs = new Date(current.started_at).getTime();
+    if(!Number.isFinite(startedAtMs)) return null;
+
+    const cooldownMinutes = Math.max(1, Number(config.reclaim_cooldown_minutes || 1440));
+    const availableAtMs = startedAtMs + cooldownMinutes * 60 * 1000;
+    const remainingSeconds = Math.max(0, Math.ceil((availableAtMs - Date.now()) / 1000));
+
+    return {
+      is_boss:true,
+      available_at:new Date(availableAtMs).toISOString(),
+      remaining_seconds:remainingSeconds,
+      eligible:remainingSeconds <= 0,
+      optimistic:true
+    };
   }
 
   async function refreshOwnStoreReclaimState(storeId){
@@ -1925,8 +1957,8 @@
             <small>${reclaim?.eligible ? "재방문 시 자동 재점령" : "시간 종료 후 재방문 시 자동 재점령"}</small>
           </article>` : `<article class="owner-store-reclaim is-unavailable">
             <span>재점령</span>
-            <strong>확인 중</strong>
-            <small>점령 상태를 불러오는 중입니다.</small>
+            <strong>—</strong>
+            <small>재점령 시간은 자동으로 갱신됩니다.</small>
           </article>`}
         </div>
       </section>
