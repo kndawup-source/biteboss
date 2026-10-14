@@ -15,7 +15,7 @@
           detectSessionInUrl:false,
           storageKey:"biteboss-admin-auth"
         },
-        global:{ headers:{ "x-client-info":"biteboss-admin-web/75.96" } }
+        global:{ headers:{ "x-client-info":"biteboss-admin-web/76.0" } }
       })
     : null;
 
@@ -410,7 +410,7 @@
     });
     if(error){
       console.warn("BiteBoss analytics:",error);
-      chart.innerHTML='<div class="analytics-empty">성과 데이터를 불러오지 못했습니다. v75.82 SQL 적용을 확인하세요.</div>';
+      chart.innerHTML='<div class="analytics-empty">성과 데이터를 불러오지 못했습니다. 분석 RPC 상태를 확인하세요.</div>';
       return;
     }
     renderAnalytics(data || {});
