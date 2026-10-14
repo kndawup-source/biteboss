@@ -4261,11 +4261,36 @@
       return;
     }
     const nickname = profile?.nickname || "보스";
+    const avatarUrl = String(profile?.avatar_url || "").trim();
     openModal("프로필 수정", `
-      <div class="form-grid">
-        <label>닉네임<input id="profileNickInput" class="input" maxlength="40" value="${escapeAttr(nickname)}" /></label>
-        <label>프로필 이미지<input id="profilePhotoInput" class="input" type="file" accept="image/png,image/jpeg,image/webp" /></label>
-        <button id="saveProfileBtn" class="primary-btn wide" type="button">저장</button>
+      <div class="profile-edit-form">
+        <section class="profile-edit-section">
+          <div class="profile-edit-label">
+            <strong>프로필 이미지</strong>
+            <span>다른 사용자에게 보여지는 이미지입니다.</span>
+          </div>
+          <label class="profile-image-picker" for="profilePhotoInput">
+            <span class="profile-image-picker-preview">
+              ${avatarUrl ? `<img src="${escapeAttr(avatarUrl)}" alt="" />` : `<span aria-hidden="true"></span>`}
+            </span>
+            <span class="profile-image-picker-copy">
+              <strong>이미지 선택</strong>
+              <small>JPG · PNG · WEBP</small>
+            </span>
+            <span class="profile-image-picker-action" aria-hidden="true">변경</span>
+          </label>
+          <input id="profilePhotoInput" class="visually-hidden-file" type="file" accept="image/png,image/jpeg,image/webp" />
+        </section>
+
+        <section class="profile-edit-section">
+          <div class="profile-edit-label">
+            <strong>닉네임</strong>
+            <span>다른 사용자에게 표시되는 이름입니다.</span>
+          </div>
+          <input id="profileNickInput" class="input profile-edit-input" maxlength="40" autocomplete="nickname" value="${escapeAttr(nickname)}" />
+        </section>
+
+        <button id="saveProfileBtn" class="primary-btn profile-edit-save" type="button">저장</button>
       </div>
     `);
     $("#saveProfileBtn").onclick = saveProfileFromModal;
@@ -4374,50 +4399,56 @@
     );
 
     openModal("크루 프로필", `
-      <div class="crew-avatar-editor crew-profile-editor">
-        <div class="crew-avatar-editor-preview">
-          ${currentUrl
-            ? `<img src="${escapeAttr(currentUrl)}" alt="${escapeAttr(crewName)} 크루 프로필" />`
-            : `<span aria-hidden="true">${escapeHtml(fallback)}</span>`}
-        </div>
-
-        <div>
-          <strong>${escapeHtml(crewName)}</strong>
-          <p>크루 이미지와 크루명은 개인 프로필과 별도로 관리됩니다.</p>
+      <div class="crew-profile-editor">
+        <div class="crew-profile-editor-hero">
+          <div class="crew-avatar-editor-preview">
+            ${currentUrl
+              ? `<img src="${escapeAttr(currentUrl)}" alt="${escapeAttr(crewName)} 크루 프로필" />`
+              : `<span aria-hidden="true">${escapeHtml(fallback)}</span>`}
+          </div>
+          <div class="crew-profile-hero-copy">
+            <strong>${escapeHtml(crewName)}</strong>
+            <p>크루 이미지와 크루명은 개인 프로필과 별도로 관리됩니다.</p>
+          </div>
         </div>
 
         <section class="crew-profile-edit-section">
-          <span>크루 이미지</span>
-          <label class="crew-avatar-file">
-            이미지 선택
-            <input id="organizationAvatarInput" type="file" accept="image/png,image/jpeg,image/webp" />
+          <div class="profile-edit-label">
+            <strong>크루 이미지</strong>
+            <span>크루를 대표하는 이미지를 등록하세요.</span>
+          </div>
+          <label class="crew-image-picker" for="organizationAvatarInput">
+            <span class="crew-image-picker-copy">
+              <strong>이미지 선택</strong>
+              <small>JPG · PNG · WEBP</small>
+            </span>
+            <span class="crew-image-picker-action" aria-hidden="true">선택</span>
           </label>
+          <input id="organizationAvatarInput" class="visually-hidden-file" type="file" accept="image/png,image/jpeg,image/webp" />
           <div class="crew-profile-edit-actions">
-            <button id="saveOrganizationAvatarBtn" class="primary-btn" type="button">이미지 저장</button>
+            <button id="saveOrganizationAvatarBtn" class="secondary-btn" type="button">이미지 저장</button>
             ${currentUrl ? `<button id="removeOrganizationAvatarBtn" class="text-btn crew-avatar-remove" type="button">이미지 삭제</button>` : ""}
           </div>
         </section>
 
         <section class="crew-profile-edit-section crew-name-edit-section">
-          <span>크루명</span>
+          <div class="profile-edit-label">
+            <strong>크루명</strong>
+            <span>${renameLocked ? `다음 변경까지 ${escapeHtml(formatRemaining(renameAvailableAt))}` : "크루명은 월 1회 변경할 수 있습니다."}</span>
+          </div>
           <input
             id="organizationRenameInput"
-            class="input"
+            class="input profile-edit-input"
             type="text"
             maxlength="30"
             autocomplete="off"
             value="${escapeAttr(crewName)}" />
-          <p class="crew-name-rule">
-            ${renameLocked
-              ? `다음 변경까지 ${escapeHtml(formatRemaining(renameAvailableAt))}`
-              : "크루명은 월 1회 변경할 수 있습니다."}
-          </p>
           <button
             id="renameOrganizationBtn"
-            class="secondary-btn"
+            class="primary-btn crew-name-save"
             type="button"
             ${renameLocked ? "disabled" : ""}>
-            ${renameLocked ? `변경 대기 ${escapeHtml(formatRemaining(renameAvailableAt))}` : "크루명 변경"}
+            ${renameLocked ? "변경 대기" : "크루명 저장"}
           </button>
         </section>
       </div>
