@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.68";
+  const BITEBOSS_BUILD = "75.69";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -2707,7 +2707,7 @@
         title = "보스 점령";
         detail = actor;
       }else if(result === "crew"){
-        title = "크루 합류";
+        title = "점령 실패";
         detail = actor;
       }else if(result === "boss_visit"){
         title = "방어 유지";
@@ -5679,11 +5679,11 @@
       const result = String(row.result || "");
       let title = "전투 기록";
       if(result === "boss_win") title = row.as_challenger ? "보스 점령" : "보스 상실";
-      else if(result === "crew") title = row.as_challenger ? "도전 결과 · 크루" : "방어 성공";
+      else if(result === "crew") title = row.as_challenger ? "점령 실패" : "방어 성공";
       else if(result === "boss_visit") title = "보스 활동";
       else if(result === "crew_kicked") title = "크루 강퇴";
       else if(result === "crew_left") title = "크루 탈퇴";
-      else if(result === "crew_joined") title = "크루 가입";
+      else if(result === "crew_joined") title = "크루 합류";
       else if(result === "crew_disbanded") title = "크루 해산";
       else if(result === "crew_leader_changed") title = "리더 변경";
 
