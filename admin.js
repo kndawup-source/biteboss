@@ -15,7 +15,7 @@
           detectSessionInUrl:false,
           storageKey:"biteboss-admin-auth"
         },
-        global:{ headers:{ "x-client-info":"biteboss-admin-web/66.5" } }
+        global:{ headers:{ "x-client-info":"biteboss-admin-web/75.83" } }
       })
     : null;
 
@@ -122,7 +122,7 @@
   }
 
   const ADMIN_GROUPS = {
-    overview:["dashboard"],
+    overview:["dashboard","performance"],
     stores:["stores","partner-requests","comments","qr"],
     game:["gameops","rules","users"],
     settings:["assets","ads","maintenance"]
@@ -302,8 +302,9 @@
 
   async function refreshPage(page){
     if(page === "dashboard"){
-      await Promise.all([loadDashboard(), loadAnalytics(), loadBosses()]);
+      await Promise.all([loadDashboard(), loadBosses()]);
     }
+    if(page === "performance") await loadAnalytics();
     if(page === "stores" || page === "qr") await loadStores();
     if(page === "rules") { await loadConfig(); renderRules(); }
     if(page === "bosses") await loadBosses();
