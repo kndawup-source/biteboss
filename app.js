@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.42";
+  const BITEBOSS_BUILD = "75.43";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -13,6 +13,12 @@
 
   const DEFAULT_NICKNAME_AREAS = Object.freeze(["명동","성수","홍대","연남","을지로","종로","강남","잠실","신촌","이태원","망원","합정","한남","청담","압구정","건대","문래","익선","서촌","해방촌","송리단길","가로수길","용산","마포","여의도","광화문","동대문","신사","혜화","상수"]);
   const DEFAULT_NICKNAME_TITLES = Object.freeze(["먹깨비","먹짱","맛대장","한입왕","밥도둑","맛도깨비","냠냠왕","먹보스","맛보스","쩝쩝박사","한그릇왕","두그릇왕","맛집사냥꾼","메뉴정복자","골목미식가","야식대장","간식대장","국밥대장","면치기왕","고기대장","디저트왕","커피대장","빵순례자","밥친구","맛탐험가","먹방대장","맛부장","냠냠대장","식도락왕","한입대장","배부른왕","맛고수","먹고수","맛수집가","끼니대장","메뉴헌터","맛집대장","먹대장","맛짱","푸드파이터"]);
+  const DEFAULT_NICKNAME_CAPACITY = DEFAULT_NICKNAME_AREAS.length * DEFAULT_NICKNAME_TITLES.length;
+  const NICKNAME_MAX_LENGTH = 40;
+
+  function normalizeNickname(value = ""){
+    return String(value || "").trim().replace(/\s+/g, " ").slice(0, NICKNAME_MAX_LENGTH);
+  }
 
   function stableHash(value = ""){
     let hash = 2166136261;
@@ -23,15 +29,54 @@
     return hash >>> 0;
   }
 
-  function generateDefaultNickname(seed = ""){
+  function generateDefaultNickname(seed = "", attempt = 0){
     const source = String(seed || `${Date.now()}-${Math.random()}`);
-    const hash = stableHash(source);
-    return `${DEFAULT_NICKNAME_AREAS[hash % DEFAULT_NICKNAME_AREAS.length]}${DEFAULT_NICKNAME_TITLES[Math.floor(hash / DEFAULT_NICKNAME_AREAS.length) % DEFAULT_NICKNAME_TITLES.length]}`;
+    const offset = Math.max(0, Number(attempt) || 0) % DEFAULT_NICKNAME_CAPACITY;
+    const index = (stableHash(source) + offset * 7919) % DEFAULT_NICKNAME_CAPACITY;
+    const area = DEFAULT_NICKNAME_AREAS[index % DEFAULT_NICKNAME_AREAS.length];
+    const title = DEFAULT_NICKNAME_TITLES[Math.floor(index / DEFAULT_NICKNAME_AREAS.length) % DEFAULT_NICKNAME_TITLES.length];
+    return `${area}${title}`;
   }
 
-  function isLegacyGuestNickname(value = ""){
-    return /^boss(?:[-_ ]?[0-9a-z]{3,})$/i.test(String(value || "").trim());
+
+  function isNicknameConflict(error){
+    const code = String(error?.code || "");
+    const message = String(error?.message || error || "").toLowerCase();
+    return code === "23505" || message.includes("nickname_unique") || message.includes("duplicate key") && message.includes("nickname");
   }
+
+  function rpcRow(data){
+    return Array.isArray(data) ? (data[0] || null) : (data || null);
+  }
+
+  async function nicknameAvailable(value){
+    const nickname = normalizeNickname(value);
+    if(!nickname) return false;
+    const {data,error} = await sb.rpc("biteboss_nickname_available_v7543", {p_nickname:nickname});
+    if(error) throw error;
+    return data === true;
+  }
+
+  async function findAvailableDefaultNickname(seed, maxAttempts = 120){
+    const attempts = Math.min(DEFAULT_NICKNAME_CAPACITY, Math.max(1, Number(maxAttempts) || 1));
+    for(let attempt=0; attempt<attempts; attempt+=1){
+      const candidate = generateDefaultNickname(seed, attempt);
+      if(await nicknameAvailable(candidate)) return candidate;
+    }
+    throw new Error("NICKNAME_POOL_EXHAUSTED");
+  }
+
+  async function syncAuthNickname(nickname){
+    const normalized = normalizeNickname(nickname);
+    if(!authUser || !normalized || normalizeNickname(authUser.user_metadata?.nickname) === normalized) return;
+    const {data,error} = await sb.auth.updateUser({data:{nickname:normalized}});
+    if(error){
+      console.warn("BiteBoss nickname metadata sync:", error);
+      return;
+    }
+    authUser = data?.user || authUser;
+  }
+
 
   function notificationKindLabel(kind){
     return ({
@@ -100,7 +145,7 @@
     crew_qr_invite_hours:72,
     crew_qr_max_uses:30,
     crew_max_members:30,
-    // Legacy takeover-session duration keys are kept for backend compatibility.
+    // Backend takeover-session policy keys remain available because the server RPC reads them.
     // The visible capture countdown is driven by biteboss_presence_ping only,
     // so users never see a timer finish before the server can actually award the store.
     takeover_empty_seconds:120,
@@ -575,7 +620,7 @@
       authUser = null;
     }
 
-    const guestNickname = generateDefaultNickname(`${Date.now()}-${Math.random()}`);
+    const guestNickname = generateDefaultNickname(`${Date.now()}-${Math.random()}`, 0);
     const signed = await sb.auth.signInAnonymously({
       options:{
         data:{
@@ -597,31 +642,25 @@
   }
 
   async function ensureProfile(){
-    const metadataNickname = String(authUser?.user_metadata?.nickname || "").trim();
-    const generatedNickname = generateDefaultNickname(authUser?.id || "");
-    const requestedNickname = metadataNickname || generatedNickname;
+    const metadataNickname = normalizeNickname(authUser?.user_metadata?.nickname);
+    const seed = authUser?.id || `${Date.now()}-${Math.random()}`;
+    const preferredNickname = metadataNickname || generateDefaultNickname(seed, 0);
+    let resolvedProfile = null;
 
-    const { data, error } = await sb.rpc("biteboss_ensure_profile", {
-      p_nickname:requestedNickname
-    });
-    if(error) throw error;
-
-    profile = Array.isArray(data) ? data[0] : data;
-
-    // Earlier guest profiles could receive a server fallback such as Boss163A.
-    // Replace only that legacy auto-generated pattern; user-chosen nicknames remain untouched.
-    if(isLegacyGuestNickname(profile?.nickname)){
-      const { data:updated, error:updateError } = await sb.rpc("biteboss_update_profile", {
-        p_nickname:generatedNickname,
-        p_avatar_url:String(profile?.avatar_url || "")
-      });
-
-      if(updateError){
-        console.warn("BiteBoss guest nickname migration:", updateError);
-      }else{
-        profile = Array.isArray(updated) ? updated[0] : updated;
+    for(let attempt=0; attempt<120; attempt+=1){
+      const candidate = attempt === 0 ? preferredNickname : generateDefaultNickname(seed, attempt);
+      const {data,error} = await sb.rpc("biteboss_ensure_profile", {p_nickname:candidate});
+      if(!error){
+        resolvedProfile = rpcRow(data);
+        break;
       }
+      if(!isNicknameConflict(error)) throw error;
     }
+
+    if(!resolvedProfile) throw new Error("NICKNAME_POOL_EXHAUSTED");
+    profile = resolvedProfile;
+
+    await syncAuthNickname(profile?.nickname);
   }
 
   async function loadConfig(){
@@ -4169,7 +4208,8 @@
   }
 
   function openMemberRegister(){
-    const suggestedNickname = generateDefaultNickname();
+    const suggestionSeed = `register-${Date.now()}-${Math.random()}`;
+    const suggestedNickname = generateDefaultNickname(suggestionSeed, 0);
     openModal("계정 만들기", `
       <div class="form-grid member-auth-form">
         <label class="wide">ID<input id="memberRegisterId" class="input" maxlength="32" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="yourid" /></label>
@@ -4183,11 +4223,16 @@
     `);
     $("#memberRegisterSubmit").onclick = registerMember;
     $("#memberAuthSwitchToLogin").onclick = openMemberLogin;
+
+    void findAvailableDefaultNickname(suggestionSeed).then(uniqueNickname => {
+      const input = $("#memberRegisterNick");
+      if(input && input.value === suggestedNickname) input.value = uniqueNickname;
+    }).catch(error => console.warn("BiteBoss nickname suggestion:", error));
   }
 
   async function registerMember(){
     const username = String($("#memberRegisterId")?.value || "").trim().toLowerCase();
-    const nickname = String($("#memberRegisterNick")?.value || "").trim();
+    const nickname = normalizeNickname($("#memberRegisterNick")?.value);
     const pin = String($("#memberRegisterPin")?.value || "").trim();
     const status = $("#memberAuthStatus");
     const button = $("#memberRegisterSubmit");
@@ -4196,7 +4241,9 @@
     if(button) button.disabled = true;
     setStatus(status, "계정을 만드는 중…");
     try{
-      const { data, error } = await sb.rpc("biteboss_member_register", { p_username:username, p_pin:pin, p_nickname:nickname || generateDefaultNickname(username) });
+      const finalNickname = nickname || await findAvailableDefaultNickname(username);
+      if(!(await nicknameAvailable(finalNickname))) throw new Error("NICKNAME_TAKEN");
+      const { data, error } = await sb.rpc("biteboss_member_register", { p_username:username, p_pin:pin, p_nickname:finalNickname });
       if(error) throw error;
       if(!data?.ok) throw new Error(data?.error || "REGISTER_FAILED");
       playerSession = data;
@@ -4223,7 +4270,13 @@
       }
     }catch(error){
       const code = String(error?.message || error);
-      const message = code.includes("USERNAME_TAKEN") ? "이미 사용 중인 ID입니다." : code.includes("ALREADY_REGISTERED") ? "이 기기에서 이미 회원 계정이 만들어져 있습니다." : "계정을 만들지 못했습니다.";
+      const message = code.includes("USERNAME_TAKEN")
+        ? "이미 사용 중인 ID입니다."
+        : code.includes("NICKNAME_TAKEN") || isNicknameConflict(error)
+          ? "이미 사용 중인 닉네임입니다."
+          : code.includes("ALREADY_REGISTERED")
+            ? "이 기기에서 이미 회원 계정이 만들어져 있습니다."
+            : "계정을 만들지 못했습니다.";
       setStatus(status, message);
     }finally{
       if(button) button.disabled = false;
@@ -4235,15 +4288,15 @@
     const pos = await getPositionSafe(true);
     const lat = pos?.coords?.latitude;
     const lng = pos?.coords?.longitude;
-    openModal("Add Store", `
+    openModal("매장 등록", `
       <div class="form-grid member-store-form">
-        <label class="wide">Store name<input id="memberStoreName" class="input" maxlength="120" placeholder="매장명" /></label>
-        <label>Category<select id="memberStoreCategory" class="input"><option value="restaurant">Restaurant</option><option value="cafe">Cafe</option><option value="dessert">Dessert</option><option value="bakery">Bakery</option><option value="fastfood">Fast Food</option><option value="pub">Pub</option></select></label>
-        <label>City<input id="memberStoreCity" class="input" maxlength="120" placeholder="Seoul" /></label>
-        <label>District<input id="memberStoreDistrict" class="input" maxlength="120" placeholder="Gangnam" /></label>
-        <label class="wide">Address<input id="memberStoreAddress" class="input" maxlength="300" placeholder="주소 (선택)" /></label>
+        <label class="wide">매장명<input id="memberStoreName" class="input" maxlength="120" placeholder="매장명" /></label>
+        <label>카테고리<select id="memberStoreCategory" class="input"><option value="restaurant">음식점</option><option value="cafe">카페</option><option value="dessert">디저트</option><option value="bakery">베이커리</option><option value="fastfood">패스트푸드</option><option value="pub">펍</option></select></label>
+        <label>도시<input id="memberStoreCity" class="input" maxlength="120" placeholder="Seoul" /></label>
+        <label>지역<input id="memberStoreDistrict" class="input" maxlength="120" placeholder="Gangnam" /></label>
+        <label class="wide">주소<input id="memberStoreAddress" class="input" maxlength="300" placeholder="주소 (선택)" /></label>
         <div class="wide member-location-state" id="memberStoreLocation">${Number.isFinite(lat) && Number.isFinite(lng) ? `현재 위치 확인됨 · ${lat.toFixed(5)}, ${lng.toFixed(5)}` : "현재 위치를 확인하지 못했습니다."}</div>
-        <button id="memberStoreSubmit" class="primary-btn wide" type="button" ${Number.isFinite(lat) && Number.isFinite(lng) ? "" : "disabled"}>Register non-partner store</button>
+        <button id="memberStoreSubmit" class="primary-btn wide" type="button" ${Number.isFinite(lat) && Number.isFinite(lng) ? "" : "disabled"}>매장 등록</button>
         <p id="memberStoreStatus" class="inline-status wide" aria-live="polite"></p>
       </div>
     `);
@@ -4327,28 +4380,34 @@
 
   async function saveProfileFromModal(){
     const button = $("#saveProfileBtn");
-    const nickname = String($("#profileNickInput")?.value || "").trim();
+    const nickname = normalizeNickname($("#profileNickInput")?.value);
     const file = $("#profilePhotoInput")?.files?.[0];
     if(!nickname) return toast("닉네임을 입력하세요.");
 
     if(button) button.disabled = true;
     try{
+      const currentNickname = normalizeNickname(profile?.nickname);
+      if(nickname.toLocaleLowerCase("ko-KR") !== currentNickname.toLocaleLowerCase("ko-KR") && !(await nicknameAvailable(nickname))){
+        return toast("이미 사용 중인 닉네임입니다.");
+      }
+
       let avatarUrl = profile?.avatar_url || "";
       if(file) avatarUrl = await uploadAvatar(file);
 
       const { data, error } = await sb.rpc("biteboss_update_profile", {
-        p_nickname:nickname.slice(0, 40),
+        p_nickname:nickname,
         p_avatar_url:avatarUrl
       });
 
       if(error) throw error;
-      profile = Array.isArray(data) ? data[0] : data;
+      profile = rpcRow(data);
+      await syncAuthNickname(profile?.nickname);
       closeModal();
       updateProfileUi();
       await Promise.all([loadStores(), loadHome()]);
     }catch(error){
       console.warn(error);
-      toast("프로필을 저장하지 못했습니다.");
+      toast(isNicknameConflict(error) ? "이미 사용 중인 닉네임입니다." : "프로필을 저장하지 못했습니다.");
     }finally{
       if(button) button.disabled = false;
     }
