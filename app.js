@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.30";
+  const BITEBOSS_BUILD = "75.31";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1550,12 +1550,18 @@
         </div>
       </section>` : "";
 
-    const detailBadges=[
-      isPartner ? {label:"제휴",cls:"partner"} : null,
-      offers.length ? {label:"혜택",cls:"benefit"} : null,
-      protectedNow
+    const occupancyBadge = isBoss
+      ? {label:"내 점령지",cls:"mine"}
+      : protectedNow
         ? {label:"보호 중",cls:"protected"}
-        : (!isBoss && bossExists ? {label:"도전 가능",cls:"open"} : null)
+        : bossExists
+          ? {label:"점령 중",cls:"occupied"}
+          : {label:"점령 가능",cls:"open"};
+
+    const detailBadges=[
+      occupancyBadge,
+      isPartner ? {label:"제휴",cls:"partner"} : null,
+      offers.length ? {label:"혜택",cls:"benefit"} : null
     ].filter(Boolean);
 
     const offersHtml = isPartner ? `
@@ -1670,10 +1676,10 @@
         : cooldownNow
           ? `재도전 ${formatRemaining(cooldownUntil)} 남음`
           : !bossExists
-            ? "지금 점령 가능"
+            ? "점령 가능"
             : powerNeeded > 0
               ? `파워 +${powerNeeded} 필요`
-              : "지금 도전 가능";
+              : "점령 중";
 
     const powerStateClass = isBoss
       ? "is-mine"

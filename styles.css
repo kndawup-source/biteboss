@@ -111,7 +111,7 @@ body.user-app #page-home{height:100dvh;min-height:0;padding:0;overflow:hidden}
 .store-card-status{margin-top:3px;color:#66666c;font-size:9px;line-height:1.3;font-weight:700}
 .store-card-title-row{display:grid;gap:5px;min-width:0}.store-status-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:0}
 .store-status-tag{min-height:22px;padding:0 8px;border-radius:999px;font-size:8px;font-weight:820;background:#f0f0f2;color:#737379}
-.store-status-tag.partner{color:#111}.store-status-tag.benefit{color:var(--accent)}
+.store-status-tag.open{background:rgba(215,47,56,.08);color:var(--accent)}.store-status-tag.occupied{background:#ededf0;color:#323236}.store-status-tag.mine{background:#111;color:#fff}.store-status-tag.partner{color:#111}.store-status-tag.benefit{color:var(--accent)}
 .store-list-action{min-height:35px;padding:0 12px;border:0;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;background:#fff;color:#5f5f65;font-size:10px;font-weight:820;white-space:nowrap;text-align:center;box-shadow:none}
 .store-list-action.is-primary,.store-list-action.is-live{background:#111;color:#fff}.store-list-action.is-auto{background:transparent;color:#8d8d93;padding-right:0;box-shadow:none}.store-list-action.is-owned{color:var(--accent)}
 
