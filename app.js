@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.57";
+  const BITEBOSS_BUILD = "75.58";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -215,6 +215,9 @@
   let takeoverUi = null;
   let takeoverUiTimer = null;
   let storeReclaimTimer = null;
+  let activeStoreDetailId = "";
+  const storeReclaimCache = new Map();
+  const storeReclaimInflight = new Map();
   let takeoverLastServerAt = 0;
   let takeoverRemaining = 0;
   let takeoverRequired = 0;
@@ -1457,7 +1460,7 @@
     );
 
     try{
-      const [detailResult, statusResult, orgResult, offerResult, partnerRequestResult, growthResult, arenaResult, historyResult, reclaimResult] = await Promise.all([
+      const [detailResult, statusResult, orgResult, offerResult, partnerRequestResult, growthResult, arenaResult, historyResult] = await Promise.all([
         sb.rpc("biteboss_store_detail", { p_store_id:storeId }),
         sb.rpc("biteboss_my_store_status", { p_store_id:storeId }),
         sb.rpc("biteboss_store_organization_status", { p_store_id:storeId }),
@@ -1467,10 +1470,7 @@
           : Promise.resolve({ data:null, error:null }),
         sb.rpc("biteboss_store_public_growth_v63", { p_store_id:storeId, p_days:30 }),
         sb.rpc("biteboss_store_game_board_v631", { p_store_id:storeId }),
-        sb.rpc("biteboss_store_history_v71", { p_store_id:storeId, p_limit:12 }),
-        playerSession?.authenticated
-          ? sb.rpc("biteboss_own_store_reclaim_state_v7546", { p_store_id:storeId })
-          : Promise.resolve({ data:null, error:null })
+        sb.rpc("biteboss_store_history_v71", { p_store_id:storeId, p_limit:12 })
       ]);
 
       if(detailResult.error) throw detailResult.error;
@@ -1494,9 +1494,8 @@
       data.publicGrowth = growthResult?.error ? null : (growthResult?.data || null);
       data.arena = arenaResult?.error ? null : (arenaResult?.data || null);
       data.history = historyResult?.error || !Array.isArray(historyResult?.data) ? [] : historyResult.data;
-      data.reclaim = reclaimResult?.error ? null : (reclaimResult?.data || null);
+      data.reclaim = storeReclaimCache.get(String(storeId))?.data || null;
       if(historyResult?.error && !String(historyResult.error.message||"").includes("biteboss_store_history_v71")) console.warn("BiteBoss conquest history:", historyResult.error);
-      if(reclaimResult?.error && !String(reclaimResult.error.message||"").includes("biteboss_own_store_reclaim_state_v7546")) console.warn("BiteBoss reclaim state:", reclaimResult.error);
       if(partnerRequestResult?.error) console.warn("BiteBoss partner request status:", partnerRequestResult.error);
       if(growthResult?.error) console.warn("BiteBoss public growth:", growthResult.error);
       if(arenaResult?.error) console.warn("BiteBoss arena:", arenaResult.error);
@@ -1516,7 +1515,12 @@
         }
       }
 
+      activeStoreDetailId = String(storeId);
       renderStoreDetail(data, options);
+
+      if(playerSession?.authenticated && String(data.game?.my_role || "visitor") === "boss"){
+        void refreshOwnStoreReclaimState(storeId);
+      }
     }catch(error){
       console.warn("BiteBoss store detail:", error);
       const body = $("#modalBody");
@@ -1524,6 +1528,69 @@
         await openStoreDetail(storeId, options);
       });
     }
+  }
+
+  async function refreshOwnStoreReclaimState(storeId){
+    const key = String(storeId || "").trim();
+    if(!key || !playerSession?.authenticated) return null;
+
+    let request = storeReclaimInflight.get(key);
+    if(!request){
+      request = sb.rpc("biteboss_own_store_reclaim_state_v7546", { p_store_id:storeId })
+        .then(result => {
+          if(result?.error) throw result.error;
+          const data = result?.data || null;
+          storeReclaimCache.set(key, { data, fetchedAt:Date.now() });
+          return data;
+        })
+        .catch(error => {
+          if(!String(error?.message || "").includes("biteboss_own_store_reclaim_state_v7546")){
+            console.warn("BiteBoss reclaim state:", error);
+          }
+          return null;
+        })
+        .finally(() => storeReclaimInflight.delete(key));
+      storeReclaimInflight.set(key, request);
+    }
+
+    const data = await request;
+    if(data && activeStoreDetailId === key && !$("#modal")?.classList.contains("hidden")){
+      applyOwnerReclaimState(data);
+    }
+    return data;
+  }
+
+  function applyOwnerReclaimState(reclaim = {}){
+    const card = $(".owner-store-reclaim");
+    if(!card) return;
+    const label = card.querySelector("span");
+    const value = card.querySelector("strong");
+    const note = card.querySelector("small");
+    const availableAt = reclaim?.is_boss ? String(reclaim.available_at || "").trim() : "";
+
+    card.classList.toggle("is-unavailable", !availableAt);
+    if(label) label.textContent = availableAt ? "재점령 가능까지" : "재점령";
+    if(value){
+      value.id = availableAt ? "ownerReclaimCountdown" : "";
+      if(availableAt){
+        value.dataset.reclaimAt = availableAt;
+        value.textContent = formatOwnStoreReclaim(availableAt);
+      }else{
+        delete value.dataset.reclaimAt;
+        value.textContent = "확인 불가";
+      }
+    }
+    if(note){
+      note.textContent = availableAt
+        ? (reclaim?.eligible ? "재방문 시 자동 재점령" : "시간 종료 후 재방문 시 자동 재점령")
+        : "현재 점령 상태를 확인할 수 없습니다.";
+    }
+    startOwnerReclaimCountdown();
+  }
+
+  function invalidateStoreReclaimState(storeId){
+    const key = String(storeId || "").trim();
+    if(key) storeReclaimCache.delete(key);
   }
 
   function renderStoreDetail(data, options = {}){
@@ -4117,6 +4184,7 @@
     }
 
     if(outcome === "boss_reclaim"){
+      invalidateStoreReclaimState(data?.store_id || takeoverUi?.storeId || "");
       return toast(`${storeName} 재점령 완료 · 24시간 재방문이 확인되어 점령 기록과 보호시간이 갱신되었습니다.`);
     }
 
@@ -7110,6 +7178,7 @@
     stopScanner();
     destroyStoreDetailMap();
     storeReclaimTimer = clearIntervalRef(storeReclaimTimer);
+    activeStoreDetailId = "";
 
     const modal = $("#modal");
     modal?.classList.add("hidden");
