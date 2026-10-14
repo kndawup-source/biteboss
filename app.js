@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.50";
+  const BITEBOSS_BUILD = "75.53";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1501,8 +1501,19 @@
       if(growthResult?.error) console.warn("BiteBoss public growth:", growthResult.error);
       if(arenaResult?.error) console.warn("BiteBoss arena:", arenaResult.error);
 
-      if(cached && !Number.isFinite(Number(data.store.distance_m)) && Number.isFinite(Number(cached.distance_m))){
-        data.store.distance_m = Number(cached.distance_m);
+      if(cached){
+        if(!Number.isFinite(Number(data.store.distance_m)) && Number.isFinite(Number(cached.distance_m))){
+          data.store.distance_m = Number(cached.distance_m);
+        }
+        // biteboss_store_detail is intentionally public-safe and older deployments do not
+        // return GPS coordinates. Reuse the same canonical store coordinates already loaded
+        // by the store list so the detail mini-map can render without a DB migration.
+        if(!Number.isFinite(Number(data.store.latitude)) && Number.isFinite(Number(cached.latitude))){
+          data.store.latitude = Number(cached.latitude);
+        }
+        if(!Number.isFinite(Number(data.store.longitude)) && Number.isFinite(Number(cached.longitude))){
+          data.store.longitude = Number(cached.longitude);
+        }
       }
 
       renderStoreDetail(data, options);

@@ -162,7 +162,7 @@ body.user-app #page-home{position:fixed;inset:0;height:auto;min-height:0;padding
 .rank-card{display:grid;grid-template-columns:20px 42px minmax(0,1fr) auto;gap:9px;align-items:center;padding:7px 0}
 .territory-rank-card{grid-template-columns:22px minmax(0,1fr) auto;gap:12px}
 .territory-rank-card>div{min-width:0}
-.territory-rank-card strong{white-space:normal;overflow:visible;text-overflow:clip;word-break:keep-all;overflow-wrap:anywhere}
+.territory-rank-card strong{display:block;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;word-break:keep-all;overflow-wrap:normal}
 .season-rank-card{grid-template-columns:20px minmax(0,1fr) auto;gap:6px}
 .season-rank-card>div:nth-child(2){min-width:0}
 .season-rank-line{display:flex;align-items:baseline;gap:5px;min-width:0;white-space:nowrap;overflow:visible}
