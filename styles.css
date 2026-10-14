@@ -141,7 +141,6 @@ body.user-app #page-home{position:fixed;inset:0;height:auto;min-height:0;padding
   display:grid;place-items:center;background:#e0e0e2;color:#111;line-height:1;
 }
 .store-avatar-fallback,.occupied-store-half-fallback{font-size:15px;font-weight:700}
-.store-card-photo.store-avatar-fallback{display:flex!important;align-items:center!important;justify-content:center!important;padding:0!important;text-align:center!important;line-height:1!important;text-indent:0!important}
 .boss-avatar-fallback,.occupied-boss-half-fallback{font-size:17px;font-weight:800}
 
 /* pagination */
