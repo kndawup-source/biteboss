@@ -6,18 +6,18 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" />
   <meta name="mobile-web-app-capable" content="yes" />
   <title>BiteBoss Admin</title>
-  <link rel="stylesheet" href="./styles.css?v=75.40" />
-  <link rel="stylesheet" href="./admin.css?v=75.40" />
-  <script src="./app-config.js?v=75.40"></script>
+  <link rel="stylesheet" href="./styles.css?v=75.41" />
+  <link rel="stylesheet" href="./admin.css?v=75.41" />
+  <script src="./app-config.js?v=75.41"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="admin-app">
 <div id="adminAuthGate" class="auth-gate">
   <form id="adminLoginForm" class="auth-panel">
-    <span>BITEBOSS / ADMIN</span><h1>운영자</h1>
-    <p>운영자 ID와 6자리 PIN을 입력하세요.</p>
-    <input class="input" name="admin_id" type="text" placeholder="ID" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="40" required />
-    <input class="input" name="pin" type="password" placeholder="PIN" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="current-password" required />
+    <span>BITEBOSS / ADMIN</span><h1>슈퍼 어드민</h1>
+    <p>운영자 ID와 6자리 PIN으로 로그인하세요.</p>
+    <input class="input" name="admin_id" type="text" placeholder="Admin ID" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="40" required />
+    <input class="input" name="pin" type="password" placeholder="6-digit PIN" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="current-password" required />
     <button class="primary-btn" type="submit">로그인</button>
     <small id="adminLoginStatus"></small>
   </form>
@@ -94,26 +94,38 @@
     </section>
 
     <section class="admin-page" id="admin-stores">
-      <div class="admin-page-head"><div><span class="eyebrow">매장</span><h2>매장 관리</h2><p>등록된 매장과 공개 정보를 관리합니다.</p></div></div>
-      <form id="storeForm" class="form-grid admin-form">
-        <label>매장명<input name="name" class="input" required /></label>
-        <label>브랜드명<input name="brand_name" class="input" /></label>
-        <label>카테고리<select name="category" class="input"><option value="restaurant">식당</option><option value="cafe">카페</option><option value="dessert">디저트</option><option value="bakery">베이커리</option><option value="fastfood">패스트푸드</option><option value="pub">펍</option></select></label>
-        <label>도시<input name="city" class="input" placeholder="Seoul" /></label>
-        <label>지역<input name="district" class="input" placeholder="Seongsu" /></label>
-        <label class="wide">주소<input name="address" class="input" /></label>
-        <label>위도<input name="latitude" class="input" type="number" step="any" placeholder="37.000000" required /></label>
-        <label>경도<input name="longitude" class="input" type="number" step="any" placeholder="127.000000" required /></label>
-        <div class="geo-tools wide">
-          <button id="useCurrentLocationBtn" class="secondary-btn" type="button">현재 위치로 입력</button>
-          <span id="locationStatus" class="geo-status" aria-live="polite">GPS 또는 수동 입력</span>
+      <div class="admin-page-head"><div><span class="eyebrow">매장</span><h2>매장 관리</h2><p>새 매장을 등록하고, 등록된 매장의 정보·사진·메뉴·혜택을 수정합니다.</p></div></div>
+
+      <section class="admin-section-card admin-create-store">
+        <div class="admin-section-title"><div><h3>새 매장 등록</h3><p>기본 등록은 비제휴 GPS 자동점령 매장으로 생성됩니다.</p></div></div>
+        <form id="storeForm" class="form-grid admin-form admin-form-embedded">
+          <label>매장명<input name="name" class="input" required /></label>
+          <label>브랜드명<input name="brand_name" class="input" /></label>
+          <label>카테고리<select name="category" class="input"><option value="restaurant">식당</option><option value="cafe">카페</option><option value="dessert">디저트</option><option value="bakery">베이커리</option><option value="fastfood">패스트푸드</option><option value="pub">펍</option></select></label>
+          <label>도시<input name="city" class="input" placeholder="서울" /></label>
+          <label>지역<input name="district" class="input" placeholder="성수동" /></label>
+          <label class="wide">주소<input name="address" class="input" /></label>
+          <label>위도<input name="latitude" class="input" type="number" step="any" placeholder="37.000000" required /></label>
+          <label>경도<input name="longitude" class="input" type="number" step="any" placeholder="127.000000" required /></label>
+          <div class="geo-tools wide">
+            <button id="useCurrentLocationBtn" class="secondary-btn" type="button">현재 위치 입력</button>
+            <span id="locationStatus" class="geo-status" aria-live="polite">GPS 또는 직접 입력</span>
+          </div>
+          <label>등록 유형<input class="input" value="비제휴 · GPS 자동점령" readonly /></label>
+          <label>대표 이미지 URL<input name="photo_url" class="input" placeholder="https://" /></label>
+          <div class="admin-form-actions wide"><button class="primary-btn" type="submit">매장 등록</button></div>
+          <p id="storeCreateStatus" class="asset-status wide" aria-live="polite"></p>
+        </form>
+      </section>
+
+      <section class="admin-section-card admin-registered-stores">
+        <div class="admin-section-title admin-section-title-row">
+          <div><h3>등록된 매장</h3><p>매장을 선택하면 기본 정보부터 사진·메뉴·혜택까지 수정할 수 있습니다.</p></div>
+          <span id="adminStoreCount" class="admin-count-chip">0</span>
         </div>
-        <label>등록 유형<input class="input" value="비제휴 · GPS 자동점령" readonly /></label>
-        <label>대표 이미지 URL<input name="photo_url" class="input" /></label>
-        <button class="primary-btn wide" type="submit">비제휴 매장 등록</button>
-        <p id="storeCreateStatus" class="asset-status wide" aria-live="polite"></p>
-      </form>
-      <div id="adminStoreList" class="store-list"></div>
+        <div class="admin-list-toolbar"><input id="adminStoreSearch" class="input" type="search" placeholder="매장명 · 지역 검색" autocomplete="off" /></div>
+        <div id="adminStoreList" class="store-list admin-store-list"></div>
+      </section>
     </section>
 
     <section class="admin-page" id="admin-partner-requests">
@@ -142,22 +154,22 @@
         <label>GPS 체류시간(초)<input name="gps_dwell_seconds" class="input" type="number" min="30" required /></label>
         <label>GPS 확인간격(초)<input name="gps_presence_ping_seconds" class="input" type="number" min="5" required /></label>
         <label>하루 매장별 점령 제한<input name="daily_store_limit" class="input" type="number" min="1" required /></label>
-        <label>Nearby 반경(m)<input name="nearby_radius_m" class="input" type="number" min="100" required /></label>
-        <label>Nearby 표시 수<input name="nearby_limit" class="input" type="number" min="1" max="100" required /></label>
+        <label>주변 매장 반경(m)<input name="nearby_radius_m" class="input" type="number" min="100" required /></label>
+        <label>주변 매장 표시 수<input name="nearby_limit" class="input" type="number" min="1" max="100" required /></label>
         <label>랭킹<select name="feature_ranking" class="input"><option value="true">ON</option><option value="false">OFF</option></select></label>
         <label>매장 혜택<select name="feature_offers" class="input"><option value="true">ON</option><option value="false">OFF</option></select></label>
 
-        <div class="admin-rule-divider wide">PLAYER / STORE POWER</div>
+        <div class="admin-rule-divider wide">플레이어 · 매장 파워</div>
         <label>레벨당 XP<input name="xp_per_level" class="input" type="number" min="1" required /></label>
         <label>방문 XP<input name="xp_visit" class="input" type="number" min="0" required /></label>
-        <label>Boss 승리 XP<input name="xp_boss_win" class="input" type="number" min="0" required /></label>
-        <label>Crew XP<input name="xp_crew" class="input" type="number" min="0" required /></label>
+        <label>보스 승리 XP<input name="xp_boss_win" class="input" type="number" min="0" required /></label>
+        <label>크루 XP<input name="xp_crew" class="input" type="number" min="0" required /></label>
         <label>방어 성공 XP<input name="xp_defense_success" class="input" type="number" min="0" required /></label>
-        <label>Bonus +1 방문수<input name="store_bonus_visits_per_point" class="input" type="number" min="1" required /></label>
-        <label>Store Bonus 최대<input name="store_bonus_max" class="input" type="number" min="0" required /></label>
+        <label>보너스 +1 방문수<input name="store_bonus_visits_per_point" class="input" type="number" min="1" required /></label>
+        <label>매장 보너스 최대<input name="store_bonus_max" class="input" type="number" min="0" required /></label>
         <label>도전 쿨다운(분)<input name="challenge_cooldown_minutes" class="input" type="number" min="0" required /></label>
 
-        <div class="admin-rule-divider wide">DEFENSE DECAY</div>
+        <div class="admin-rule-divider wide">방어력 감소</div>
         <label>1차 감소 시작일<input name="defense_decay_day_1" class="input" type="number" min="1" required /></label>
         <label>1차 감소값<input name="defense_decay_value_1" class="input" type="number" min="0" required /></label>
         <label>2차 감소 시작일<input name="defense_decay_day_2" class="input" type="number" min="1" required /></label>
@@ -167,7 +179,7 @@
         <label>4차 감소 시작일<input name="defense_decay_day_4" class="input" type="number" min="1" required /></label>
         <label>4차 감소값<input name="defense_decay_value_4" class="input" type="number" min="0" required /></label>
 
-        <div class="admin-rule-divider wide">ORGANIZATION</div>
+        <div class="admin-rule-divider wide">크루 운영</div>
         <label>일반 탈퇴 XP 차감(%)<input name="organization_leave_xp_percent" class="input" type="number" min="0" max="100" required /></label>
         <label>일반 탈퇴 쿨다운(일)<input name="organization_leave_cooldown_days" class="input" type="number" min="0" required /></label>
         <label>조직장 탈퇴 XP 차감(%)<input name="organization_leader_leave_xp_percent" class="input" type="number" min="0" max="100" required /></label>
@@ -179,7 +191,7 @@
     </section>
 
     
-    <section class="admin-page" id="admin-users"><div class="admin-page-head"><div><span class="eyebrow">게임</span><h2>사용자</h2><p>회원 검색과 계정 상태를 확인합니다.</p></div></div><input id="userSearch" class="input" placeholder="닉네임 검색" /><div id="userList" class="store-list admin-list-gap"></div></section>
+    <section class="admin-page" id="admin-users"><div class="admin-page-head"><div><span class="eyebrow">게임</span><h2>사용자</h2><p>회원 검색과 계정 상태를 확인합니다.</p></div></div><section class="admin-section-card"><div class="admin-list-toolbar"><input id="userSearch" class="input" type="search" placeholder="닉네임 검색" autocomplete="off" /></div><div id="userList" class="store-list admin-list-gap"></div></section></section>
 
     <section class="admin-page" id="admin-gameops">
       <div class="admin-page-head"><div><span class="eyebrow">게임</span><h2>게임 운영</h2><p>점령과 크루의 현재 상태를 운영합니다.</p></div></div>
@@ -260,7 +272,7 @@
   <div class="admin-editor-backdrop" data-close-store-editor></div>
   <section class="admin-editor-panel" role="dialog" aria-modal="true" aria-labelledby="adminStoreEditorTitle">
     <header class="admin-editor-head">
-      <div><span>STORE</span><h2 id="adminStoreEditorTitle">매장 수정</h2><p id="adminStoreEditorMeta"></p></div>
+      <div><span>매장 수정</span><h2 id="adminStoreEditorTitle">매장</h2><p id="adminStoreEditorMeta"></p></div>
       <button class="x-btn admin-editor-close" data-close-store-editor type="button" aria-label="닫기">&times;</button>
     </header>
 
@@ -305,7 +317,7 @@
           <label>메뉴명<input id="adminMenuName" class="input" required /></label>
           <label>가격<input id="adminMenuPrice" class="input" type="number" min="0" inputmode="numeric" /></label>
           <label class="wide">설명<input id="adminMenuDescription" class="input" /></label>
-          <label>대표 메뉴<select id="adminMenuSignature" class="input"><option value="false">아니오</option><option value="true">예</option></select></label>
+          <label>대표 메뉴<select id="adminMenuSignature" class="input"><option value="false">일반 메뉴</option><option value="true">대표 메뉴</option></select></label>
           <div class="admin-form-actions wide"><button class="secondary-btn" type="submit">메뉴 저장</button><button id="adminMenuCancel" class="text-btn hidden" type="button">수정 취소</button></div>
         </form>
         <div id="adminMenuList" class="admin-data-list"></div>
@@ -318,7 +330,7 @@
           <label>혜택명<input id="adminOfferTitle" class="input" required /></label>
           <label>상태<select id="adminOfferStatus" class="input"><option value="active">진행중</option><option value="draft">준비중</option><option value="ended">종료</option></select></label>
           <label class="wide">설명<input id="adminOfferDescription" class="input" /></label>
-          <label>혜택 대상<select id="adminOfferMinimumRole" class="input"><option value="visitor">Everyone</option><option value="crew">Crew + Boss</option><option value="boss">Boss only</option></select></label>
+          <label>혜택 대상<select id="adminOfferMinimumRole" class="input"><option value="visitor">전체 방문자</option><option value="crew">크루원 + 보스</option><option value="boss">보스만</option></select></label>
           <div class="admin-form-actions wide"><button class="secondary-btn" type="submit">혜택 저장</button><button id="adminOfferCancel" class="text-btn hidden" type="button">수정 취소</button></div>
         </form>
         <div id="adminOfferList" class="admin-data-list"></div>
@@ -332,6 +344,6 @@
   </section>
 </div>
 
-<script src="./admin.js?v=75.40"></script>
+<script src="./admin.js?v=75.41"></script>
 </body>
 </html>
