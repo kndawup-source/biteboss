@@ -434,7 +434,6 @@
         target?.scrollIntoView?.({ behavior:"smooth", block:"start" });
       });
     });
-    $("#memberLoginBtn")?.addEventListener("click", openMemberLogin);
     $("#storesLoginBtn")?.addEventListener("click", openMemberLogin);
     $("#addStoreBtn")?.addEventListener("click", openMemberStoreForm);
     const organizationAction = (selector, handler) => {
@@ -1718,8 +1717,6 @@
       action = `<div class="store-detail-auto"><strong>재도전 대기</strong><span>${escapeHtml(formatRemaining(cooldownUntil))} 후 다시 도전할 수 있습니다.</span></div>`;
     }else if(isPartner){
       action = `<button id="detailScanQr" class="primary-btn store-detail-primary" type="button">QR로 도전</button>`;
-    }else if(canChallenge){
-      action = `<button id="detailGpsChallenge" class="primary-btn store-detail-primary" type="button">${bossExists ? "도전하기" : "점령하기"}</button>`;
     }
 
     $("#modal")?.classList.add("store-detail-modal");
@@ -1877,15 +1874,6 @@
       scanPrompt();
     });
 
-    $("#detailGpsChallenge")?.addEventListener("click", () => {
-      const targetStoreId = String(store.id || "").trim();
-      closeModal();
-      openTab("stores");
-      window.requestAnimationFrame(() => {
-        const target = Array.from(document.querySelectorAll("[data-store-detail]")).find(item => String(item.dataset.storeDetail || "") === targetStoreId);
-        target?.scrollIntoView?.({ behavior:"smooth", block:"center" });
-      });
-    });
 
     $$("[data-benefit-offer]", body).forEach(button => {
       button.addEventListener("click", () => createBenefitPass(button.dataset.benefitOffer));
@@ -2863,7 +2851,7 @@
       items.push(`<button class="game-pulse-item is-hot" type="button" data-pulse-store="${escapeAttr(hot[0].store_id)}" data-pulse-name="${escapeAttr(hot[0].store_name||"")}"><span class="hot-flame" aria-hidden="true">🔥</span><strong>${escapeHtml(hot[0].store_name||"인기 매장")}</strong><small>가장 치열한 점령지</small></button>`);
     }
     if(newcomer && !items.length){
-      items.push(`<div class="game-pulse-info"><span>NEW BOSS</span><strong>첫 점령 가이드</strong><small>가까운 미점령 매장부터 시작해 보세요.</small></div>`);
+      items.push(`<div class="game-pulse-item is-guide" role="note"><span class="guide-bulb" aria-hidden="true">💡</span><strong>첫 점령 가이드</strong><small>가까운 미점령 매장부터 시작해 보세요.</small></div>`);
     }
 
     if(!items.length){
@@ -6001,11 +5989,9 @@
     renderProfilePhoto("#homeProfilePhoto", "#homeProfileFallback", avatar);
     renderProfilePhoto("#profilePhoto", "#profileFallback", avatar);
 
-    const login = $("#memberLoginBtn");
     const addStore = $("#addStoreBtn");
     const deleteAccount = $("#deleteAccountBtn");
     const logout = $("#logoutBtn");
-    login?.classList.toggle("hidden", loggedIn);
     addStore?.classList.toggle("hidden", !loggedIn);
     deleteAccount?.classList.toggle("hidden", !loggedIn);
     logout?.classList.toggle("hidden", !loggedIn);
