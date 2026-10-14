@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.34";
+  const BITEBOSS_BUILD = "75.42";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -12,7 +12,7 @@
   const cfg = window.BITEBOSS_CONFIG || {};
 
   const DEFAULT_NICKNAME_AREAS = Object.freeze(["명동","성수","홍대","연남","을지로","종로","강남","잠실","신촌","이태원","망원","합정","한남","청담","압구정","건대","문래","익선","서촌","해방촌","송리단길","가로수길","용산","마포","여의도","광화문","동대문","신사","혜화","상수"]);
-  const DEFAULT_NICKNAME_TITLES = Object.freeze(["불주먹","밤도깨비","골목왕","돌주먹","번개","독사","대장","철주먹","질주왕","불도저","해결사","골목대장","승부사","돌격대장","천둥","검은손","사냥꾼","집행자","끝판왕","강철심장","불꽃","질풍","호랑이","매운손","한방","직진왕","야차","철벽","선봉장","승부왕"]);
+  const DEFAULT_NICKNAME_TITLES = Object.freeze(["먹깨비","먹짱","맛대장","한입왕","밥도둑","맛도깨비","냠냠왕","먹보스","맛보스","쩝쩝박사","한그릇왕","두그릇왕","맛집사냥꾼","메뉴정복자","골목미식가","야식대장","간식대장","국밥대장","면치기왕","고기대장","디저트왕","커피대장","빵순례자","밥친구","맛탐험가","먹방대장","맛부장","냠냠대장","식도락왕","한입대장","배부른왕","맛고수","먹고수","맛수집가","끼니대장","메뉴헌터","맛집대장","먹대장","맛짱","푸드파이터"]);
 
   function stableHash(value = ""){
     let hash = 2166136261;
@@ -27,6 +27,10 @@
     const source = String(seed || `${Date.now()}-${Math.random()}`);
     const hash = stableHash(source);
     return `${DEFAULT_NICKNAME_AREAS[hash % DEFAULT_NICKNAME_AREAS.length]}${DEFAULT_NICKNAME_TITLES[Math.floor(hash / DEFAULT_NICKNAME_AREAS.length) % DEFAULT_NICKNAME_TITLES.length]}`;
+  }
+
+  function isLegacyGuestNickname(value = ""){
+    return /^boss(?:[-_ ]?[0-9a-z]{3,})$/i.test(String(value || "").trim());
   }
 
   function notificationKindLabel(kind){
@@ -571,9 +575,13 @@
       authUser = null;
     }
 
+    const guestNickname = generateDefaultNickname(`${Date.now()}-${Math.random()}`);
     const signed = await sb.auth.signInAnonymously({
       options:{
-        data:{ app:"biteboss" }
+        data:{
+          app:"biteboss",
+          nickname:guestNickname
+        }
       }
     });
 
@@ -589,10 +597,31 @@
   }
 
   async function ensureProfile(){
-    const nickname = authUser?.user_metadata?.nickname || null;
-    const { data, error } = await sb.rpc("biteboss_ensure_profile", { p_nickname:nickname });
+    const metadataNickname = String(authUser?.user_metadata?.nickname || "").trim();
+    const generatedNickname = generateDefaultNickname(authUser?.id || "");
+    const requestedNickname = metadataNickname || generatedNickname;
+
+    const { data, error } = await sb.rpc("biteboss_ensure_profile", {
+      p_nickname:requestedNickname
+    });
     if(error) throw error;
+
     profile = Array.isArray(data) ? data[0] : data;
+
+    // Earlier guest profiles could receive a server fallback such as Boss163A.
+    // Replace only that legacy auto-generated pattern; user-chosen nicknames remain untouched.
+    if(isLegacyGuestNickname(profile?.nickname)){
+      const { data:updated, error:updateError } = await sb.rpc("biteboss_update_profile", {
+        p_nickname:generatedNickname,
+        p_avatar_url:String(profile?.avatar_url || "")
+      });
+
+      if(updateError){
+        console.warn("BiteBoss guest nickname migration:", updateError);
+      }else{
+        profile = Array.isArray(updated) ? updated[0] : updated;
+      }
+    }
   }
 
   async function loadConfig(){
