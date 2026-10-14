@@ -15,7 +15,7 @@
           detectSessionInUrl:false,
           storageKey:"biteboss-admin-auth"
         },
-        global:{ headers:{ "x-client-info":"biteboss-admin-web/75.89" } }
+        global:{ headers:{ "x-client-info":"biteboss-admin-web/75.91" } }
       })
     : null;
 
@@ -555,7 +555,7 @@
       adminSb.from("biteboss_event_logs")
         .select("id,event_type,payload,created_at,biteboss_stores(name)")
         .order("created_at", { ascending:false })
-        .limit(12)
+        .limit(8)
     ]);
 
     if(!statsError && stats){
@@ -568,16 +568,26 @@
     const box = $("#adminLogs");
     if(!box) return;
     if(logsError){
-      box.innerHTML = `<div class="timeline-item muted">로그를 불러오지 못했습니다.</div>`;
+      box.innerHTML = `<div class="admin-activity-empty">최근 활동을 불러오지 못했습니다.</div>`;
       return;
     }
 
-    box.innerHTML = (logs || []).map(row => `
-      <div class="timeline-item">
-        <strong>${escapeHtml(logLabel(row.event_type))}</strong>
-        <div class="meta">${escapeHtml(row.biteboss_stores?.name || "BiteBoss")} · ${escapeHtml(formatDate(row.created_at))}</div>
-      </div>
-    `).join("") || `<div class="timeline-item muted">아직 로그가 없습니다.</div>`;
+    box.innerHTML = (logs || []).map(row => {
+      const type = String(row.event_type || "");
+      const label = logLabel(type);
+      const store = row.biteboss_stores?.name || "BiteBoss";
+      const tone = activityTone(type);
+      return `
+        <article class="admin-activity-row">
+          <span class="admin-activity-dot ${escapeAttr(tone)}" aria-hidden="true"></span>
+          <div class="admin-activity-copy">
+            <strong>${escapeHtml(label)}</strong>
+            <span>${escapeHtml(store)}</span>
+          </div>
+          <time>${escapeHtml(formatActivityTime(row.created_at))}</time>
+        </article>
+      `;
+    }).join("") || `<div class="admin-activity-empty">아직 기록된 활동이 없습니다.</div>`;
   }
 
   async function loadStores(){
@@ -1765,11 +1775,40 @@
 
   function logLabel(type){
     return ({
-      boss_claimed:"Boss 점령",
-      boss_released:"Boss 해제",
+      boss_claimed:"보스 점령",
+      boss_released:"보스 해제",
+      boss_reclaim:"보스 재점령",
+      crew_claimed:"크루 점령",
       qr_rotated:"QR 재발급",
-      claim_rejected_distance:"GPS 거리 차단"
-    })[type] || type || "Event";
+      claim_rejected_distance:"GPS 거리 차단",
+      challenge_started:"도전 시작",
+      capture_started:"점령 시작",
+      capture_completed:"점령 완료",
+      store_visit:"매장 방문",
+      partner_approved:"제휴 승인",
+      partner_rejected:"제휴 거절"
+    })[type] || "서비스 활동";
+  }
+
+  function activityTone(type){
+    if(["boss_claimed","boss_reclaim","crew_claimed","capture_completed"].includes(type)) return "strong";
+    if(["claim_rejected_distance","partner_rejected"].includes(type)) return "alert";
+    return "normal";
+  }
+
+  function formatActivityTime(value){
+    if(!value) return "-";
+    const date = new Date(value);
+    const now = Date.now();
+    const diff = Math.max(0, now - date.getTime());
+    const minutes = Math.floor(diff / 60000);
+    if(minutes < 1) return "방금";
+    if(minutes < 60) return `${minutes}분 전`;
+    const hours = Math.floor(minutes / 60);
+    if(hours < 24) return `${hours}시간 전`;
+    const days = Math.floor(hours / 24);
+    if(days < 7) return `${days}일 전`;
+    return date.toLocaleDateString("ko-KR", { month:"numeric", day:"numeric" });
   }
 
   function categoryLabel(value){
