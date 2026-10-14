@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.31";
+  const BITEBOSS_BUILD = "75.33";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1503,13 +1503,12 @@
     const address = String(store.address || "").trim();
     const detailLine = [categoryLabel(store.category), place, distance].filter(Boolean).join(" · ");
 
-    let battleState = "도전 가능";
-    if(isBoss) battleState = "점령 중";
+    let battleState = "점령 가능";
+    if(isBoss) battleState = "내 점령지";
     else if(protectedNow) battleState = "보호 중";
     else if(globalCaptureCooldownNow) battleState = "다음 점령 대기";
     else if(cooldownNow) battleState = "재도전 대기";
-    else if(bossExists) battleState = "도전 가능";
-    else battleState = "미점령";
+    else if(bossExists) battleState = "점령 중";
 
     const defenseStateRaw = String(defenseActivity.state || (defenseDecay > 0 ? "weak" : "active"));
     const defenseState = ({
@@ -1675,11 +1674,9 @@
         ? `보호 ${formatRemaining(protectionUntil)} 남음`
         : cooldownNow
           ? `재도전 ${formatRemaining(cooldownUntil)} 남음`
-          : !bossExists
-            ? "점령 가능"
-            : powerNeeded > 0
-              ? `파워 +${powerNeeded} 필요`
-              : "점령 중";
+          : powerNeeded > 0
+            ? `파워 +${powerNeeded} 필요`
+            : "";
 
     const powerStateClass = isBoss
       ? "is-mine"
@@ -1721,8 +1718,8 @@
       action = `<div class="store-detail-auto"><strong>재도전 대기</strong><span>${escapeHtml(formatRemaining(cooldownUntil))} 후 다시 도전할 수 있습니다.</span></div>`;
     }else if(isPartner){
       action = `<button id="detailScanQr" class="primary-btn store-detail-primary" type="button">QR로 도전</button>`;
-    }else{
-      action = "";
+    }else if(canChallenge){
+      action = `<button id="detailGpsChallenge" class="primary-btn store-detail-primary" type="button">${bossExists ? "도전하기" : "점령하기"}</button>`;
     }
 
     $("#modal")?.classList.add("store-detail-modal");
@@ -1784,8 +1781,6 @@
             ` : ""}
           </section>
         ` : ownerStatusHtml}
-
-        ${action ? `<div class="primary-store-action">${action}</div>` : ""}
 
         <section class="growth-compact">
           <div class="growth-compact-head">
@@ -1864,6 +1859,8 @@
         </details>
 
         ${showPartnerOwnerCard ? renderPartnerRequestCard(store, partnerRequest, isPartner) : ""}
+
+        ${action ? `<div class="store-detail-bottom-action">${action}</div>` : ""}
       </div>
     `;
 
@@ -1878,6 +1875,16 @@
     $("#detailScanQr")?.addEventListener("click", () => {
       closeModal();
       scanPrompt();
+    });
+
+    $("#detailGpsChallenge")?.addEventListener("click", () => {
+      const targetStoreId = String(store.id || "").trim();
+      closeModal();
+      openTab("stores");
+      window.requestAnimationFrame(() => {
+        const target = Array.from(document.querySelectorAll("[data-store-detail]")).find(item => String(item.dataset.storeDetail || "") === targetStoreId);
+        target?.scrollIntoView?.({ behavior:"smooth", block:"center" });
+      });
     });
 
     $$("[data-benefit-offer]", body).forEach(button => {
