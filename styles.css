@@ -99,7 +99,8 @@ body.user-app #page-home{position:fixed;inset:0;height:auto;min-height:0;padding
 .store-list{display:grid;gap:2px}
 .store-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:5px 0;background:transparent}
 .store-card-main{display:flex;align-items:center;gap:12px;min-width:0}
-.store-card-photo,.store-avatar,.occupied-store-avatar{width:52px;height:52px;flex:0 0 52px;border-radius:50%;object-fit:cover;background:#e3e3e5;overflow:hidden;position:relative}
+.store-card-photo{width:54px;height:54px;min-width:54px;flex:0 0 54px;border-radius:50%;object-fit:cover;background:#e3e3e5;overflow:hidden;position:relative}
+.store-avatar,.occupied-store-avatar{width:52px;height:52px;flex:0 0 52px;border-radius:50%;object-fit:cover;background:#e3e3e5;overflow:hidden;position:relative}
 .store-card-photo>img,.store-avatar>img,.occupied-store-half>img,.occupied-boss-half>img{width:100%;height:100%;object-fit:cover}
 .occupied-store-avatar{display:grid;grid-template-columns:50% 50%;grid-template-rows:100%;gap:0}
 .occupied-store-half,.occupied-boss-half{position:relative;display:block;width:100%;height:100%;overflow:hidden}
@@ -142,8 +143,7 @@ body.user-app #page-home{position:fixed;inset:0;height:auto;min-height:0;padding
 }
 .store-avatar-fallback{position:relative}
 .store-avatar-initial{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;width:100%;height:100%;margin:0;padding:0;line-height:1;text-align:center}
-/* Keep list fallback initials on the same Hangul metrics as the store-detail avatar.
-   iOS can rasterize some Hangul syllables differently at 15px; 14px is the canonical detail size. */
+/* Store list and store detail use the same canonical store-avatar typography. */
 .store-avatar-fallback,.occupied-store-half-fallback{font-size:14px;font-weight:700;letter-spacing:0}
 .store-avatar-initial{letter-spacing:0}
 .boss-avatar-fallback,.occupied-boss-half-fallback{font-size:17px;font-weight:800}
@@ -291,7 +291,7 @@ body.biteboss-info-page{min-height:100dvh;background:var(--bg);color:#111}.info-
   body.user-app .inner-page{padding-left:18px;padding-right:18px}
   .inner-head h2,.challenge-head h2{font-size:26px}.boss-home-hook{font-size:34px}
   .takeover-command-primary{min-height:90px;padding:15px}.takeover-command-primary strong{font-size:20px}.takeover-command-primary small{font-size:9px}
-  .store-card{grid-template-columns:minmax(0,1fr);gap:6px;padding:2px 0}.store-card-main{align-items:center}.store-card-photo,.store-avatar,.occupied-store-avatar{width:44px;height:44px;flex-basis:44px}.store-card-name{font-size:12.5px}.store-card-meta{font-size:8.5px}.store-list-action{justify-self:start;max-width:none;min-height:29px;padding:0 8px;font-size:9px}
+  .store-card{grid-template-columns:minmax(0,1fr);gap:6px;padding:2px 0}.store-card-main{align-items:center}.store-card-photo{width:50px;height:50px;min-width:50px;flex-basis:50px}.store-avatar,.occupied-store-avatar{width:44px;height:44px;flex-basis:44px}.store-card-name{font-size:12.5px}.store-card-meta{font-size:8.5px}.store-list-action{justify-self:start;max-width:none;min-height:29px;padding:0 8px;font-size:9px}
   .rank-card:not(.territory-rank-card),.my-rank-summary{grid-template-columns:18px 38px minmax(0,1fr) auto;gap:8px}.territory-rank-card{grid-template-columns:18px minmax(0,1fr) auto;gap:10px}.territory-rank-card strong{white-space:nowrap;overflow:visible;text-overflow:clip}.my-rank-avatar{width:38px;height:38px;min-width:38px;min-height:38px;max-width:38px;max-height:38px}.rank-result{min-width:38px}.rank-avatar-slot{width:38px;height:38px;min-width:38px;max-width:38px}.rank-title,.rank-card:not(.territory-rank-card) strong,.crew-rank-name-link{font-size:11px}.rank-meta,.rank-card .meta{font-size:8px}
   .profile-identity{grid-template-columns:50px minmax(0,1fr);gap:10px}.profile-identity .avatar{width:50px;height:50px}.profile-identity h3{font-size:19px}.profile-guest-info{grid-template-columns:1fr}.profile-game-stats{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.stat-card{min-height:56px;padding:9px 22px 8px 9px}.stat-card b{font-size:14px}.stat-card i{right:8px;font-size:15px}
   .organization-panel-head{grid-template-columns:auto minmax(0,1fr);gap:9px}.crew-profile-avatar{width:38px;height:38px;min-width:38px}.organization-panel-head strong{font-size:13px}.organization-stats>div{padding:9px}.organization-stats b{font-size:12px}.organization-member-row{grid-template-columns:34px minmax(0,1fr) auto;padding:8px 9px}.organization-member-avatar{width:34px;height:34px}
