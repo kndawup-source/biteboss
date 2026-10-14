@@ -140,6 +140,8 @@ body.user-app #page-home{position:fixed;inset:0;height:auto;min-height:0;padding
 .store-avatar-fallback,.boss-avatar-fallback,.occupied-store-half-fallback,.occupied-boss-half-fallback{
   display:grid;place-items:center;background:#e0e0e2;color:#111;line-height:1;
 }
+.store-avatar-fallback{position:relative}
+.store-avatar-initial{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;width:100%;height:100%;margin:0;padding:0;line-height:1;text-align:center}
 .store-avatar-fallback,.occupied-store-half-fallback{font-size:15px;font-weight:700}
 .boss-avatar-fallback,.occupied-boss-half-fallback{font-size:17px;font-weight:800}
 
