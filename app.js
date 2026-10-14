@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.77";
+  const BITEBOSS_BUILD = "75.78";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1404,28 +1404,6 @@
     return `<span class="${escapeAttr(className)} boss-avatar-fallback" aria-hidden="true"></span>`;
   }
 
-  function occupiedStoreAvatarMarkup(storePhotoUrl, storeName, bossAvatarUrl, bossName, className = "store-card-photo"){
-    const storeUrl = String(storePhotoUrl || "").trim();
-    const storeLabel = String(storeName || "매장").trim();
-    const bossUrl = String(bossAvatarUrl || "").trim();
-    const bossLabel = String(bossName || "보스").trim();
-    const storeInitial = Array.from(storeLabel)[0] || "B";
-
-    const storeHalf = storeUrl
-      ? `<img src="${escapeAttr(storeUrl)}" alt="" loading="lazy" decoding="async" />`
-      : `<span class="occupied-store-half-fallback">${escapeHtml(storeInitial)}</span>`;
-
-    const bossHalf = bossUrl
-      ? `<img src="${escapeAttr(bossUrl)}" alt="" loading="lazy" decoding="async" />`
-      : `<span class="occupied-boss-half-fallback" aria-hidden="true"></span>`;
-
-    return `
-      <span class="${escapeAttr(className)} occupied-store-avatar" role="img" aria-label="${escapeAttr(storeLabel)} · 현재 보스 ${escapeAttr(bossLabel)}">
-        <span class="occupied-store-half">${storeHalf}</span>
-        <span class="occupied-boss-half">${bossHalf}</span>
-      </span>
-    `;
-  }
 
   function storeCard(store){
     const roleState = storeRoleMap.get(String(store.id)) || {};
@@ -1435,7 +1413,6 @@
 
     const boss = String(store.current_boss_nickname || "").trim();
     const bossExists = Boolean(boss && boss !== "No Boss" && boss !== "미점령");
-    const bossAvatar = String(store.current_boss_avatar_url || "").trim();
 
     const distance = Number.isFinite(Number(store.distance_m)) ? formatDistance(store.distance_m) : "";
     const place = [store.city, store.district].filter(Boolean).join(" ");
@@ -1494,7 +1471,7 @@
     return `
       <article class="store-card store-card-open challenge-card mode-${escapeAttr(cardMode)} ${isPartner ? "is-partner-store" : ""}" data-store-detail="${escapeAttr(store.id)}" role="button" tabindex="0" aria-label="${escapeAttr(store.name)} 매장 정보 보기">
         <div class="store-card-main">
-          ${bossExists ? occupiedStoreAvatarMarkup(store.photo_url, store.name, bossAvatar, boss, "store-card-photo") : storeAvatarMarkup(store.photo_url, store.name, "store-card-photo")}
+          ${storeAvatarMarkup(store.photo_url, store.name, "store-card-photo")}
           <div class="store-card-copy">
             <div class="store-card-title-row">
               <strong class="store-card-name">${escapeHtml(store.name)}</strong>
