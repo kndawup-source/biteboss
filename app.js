@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.67";
+  const BITEBOSS_BUILD = "75.68";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -5612,13 +5612,23 @@
     openPlayerProfile(userId, avatarHint);
   }
 
+  async function fetchPlayerProfileData(userId){
+    const params = { p_user_id:userId };
+    const primary = await sb.rpc("biteboss_player_profile_v7568", params);
+    if(!primary.error) return primary;
+
+    const message = String(primary.error?.message || "");
+    const missingRpc = message.includes("Could not find the function") || message.includes("PGRST202");
+    if(!missingRpc) return primary;
+
+    return sb.rpc("biteboss_player_profile", params);
+  }
+
   async function openPlayerProfile(userId, avatarHint = ""){
     openModal("사용자 프로필", `<div class="app-state">사용자 정보를 불러오는 중…</div>`, { type:"player-profile" });
 
     try{
-      const { data, error } = await sb.rpc("biteboss_player_profile", {
-        p_user_id:userId
-      });
+      const { data, error } = await fetchPlayerProfileData(userId);
 
       if(error) throw error;
       if(!data?.ok) throw new Error(data?.error || "PLAYER_LOAD_FAILED");
@@ -5669,17 +5679,29 @@
       const result = String(row.result || "");
       let title = "전투 기록";
       if(result === "boss_win") title = row.as_challenger ? "보스 점령" : "보스 상실";
-      else if(result === "crew") title = row.as_challenger ? "크루 합류" : "방어 성공";
+      else if(result === "crew") title = row.as_challenger ? "도전 결과 · 크루" : "방어 성공";
       else if(result === "boss_visit") title = "보스 활동";
+      else if(result === "crew_kicked") title = "크루 강퇴";
+      else if(result === "crew_left") title = "크루 탈퇴";
+      else if(result === "crew_joined") title = "크루 가입";
+      else if(result === "crew_disbanded") title = "크루 해산";
+      else if(result === "crew_leader_changed") title = "리더 변경";
+
+      const hasStore = Boolean(String(row.store_id || "").trim());
+      const tag = hasStore ? "button" : "div";
+      const attrs = hasStore
+        ? `type="button" data-profile-store="${escapeAttr(row.store_id)}"`
+        : `role="group"`;
+      const subject = row.store_name || row.organization_name || "크루";
 
       return `
-        <button class="player-profile-history-row" type="button" data-profile-store="${escapeAttr(row.store_id)}">
+        <${tag} class="player-profile-history-row" ${attrs}>
           <div>
             <strong>${escapeHtml(title)}</strong>
-            <span>${escapeHtml(row.store_name || "매장")}</span>
+            <span>${escapeHtml(subject)}</span>
           </div>
           <time>${escapeHtml(formatActivityTime(row.created_at))}</time>
-        </button>
+        </${tag}>
       `;
     }).join("") || `<div class="app-state player-profile-empty">아직 전투 기록이 없습니다.</div>`;
 
