@@ -5,11 +5,11 @@
   <meta name="robots" content="noindex,nofollow,noarchive" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" />
   <title>BiteBoss Store Admin</title>
-  <link rel="stylesheet" href="./styles.css?v=75.48" />
-  <script src="./app-config.js?v=75.48"></script>
+  <link rel="stylesheet" href="./styles.css?v=75.82" />
+  <script src="./app-config.js?v=75.82"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./supabase.js?v=75.48"></script>
-  <link rel="stylesheet" href="./store-admin.css?v=75.48" />
+  <script src="./supabase.js?v=75.82"></script>
+  <link rel="stylesheet" href="./store-admin.css?v=75.82" />
 </head>
 <body class="store-admin-app">
 <div id="storeAuthGate" class="auth-gate">
@@ -48,6 +48,7 @@
       <button class="store-admin-nav" data-store-admin="store" type="button">매장 정보</button>
       <button class="store-admin-nav" data-store-admin="game" type="button">게임</button>
       <button class="store-admin-nav" data-store-admin="offers" type="button">혜택</button>
+      <button class="store-admin-nav" data-store-admin="comments" type="button">한마디</button>
       <button class="store-admin-nav" data-store-admin="qr" type="button">QR</button>
     </div>
     <div class="admin-side-actions">
@@ -155,6 +156,15 @@
       </section>
     </section>
 
+    <section class="store-admin-page" id="store-admin-comments">
+      <div class="store-admin-head"><div><span class="eyebrow">한마디</span><h2>한마디 관리</h2><p>고정, 숨김, 삭제와 신고 상태를 관리합니다.</p></div></div>
+      <section class="store-subsection">
+        <div class="store-section-head"><div><h3>매장 한마디</h3><p>최신순 · 고정 최대 3개</p></div><span id="storeCommentAdminCount">0개</span></div>
+        <div id="storeCommentAdminList" class="store-list"><div class="inline-status">불러오는 중…</div></div>
+        <div id="storeCommentAdminPagination" class="store-action-row"></div>
+      </section>
+    </section>
+
     <section class="store-admin-page" id="store-admin-qr">
       <div class="store-admin-head"><div><span class="eyebrow">QR</span><h2>점령 QR</h2><p>제휴 매장 방문자가 점령에 사용하는 QR입니다.</p></div></div>
       <section class="store-panel store-panel-flat">
@@ -188,6 +198,6 @@
     </section>
   </main>
 </div>
-<script src="./store-admin.js?v=75.48"></script>
+<script src="./store-admin.js?v=75.82"></script>
 </body>
 </html>

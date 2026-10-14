@@ -6,9 +6,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" />
   <meta name="mobile-web-app-capable" content="yes" />
   <title>BiteBoss Admin</title>
-  <link rel="stylesheet" href="./styles.css?v=75.48" />
-  <link rel="stylesheet" href="./admin.css?v=75.48" />
-  <script src="./app-config.js?v=75.48"></script>
+  <link rel="stylesheet" href="./styles.css?v=75.82" />
+  <link rel="stylesheet" href="./admin.css?v=75.82" />
+  <script src="./app-config.js?v=75.82"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="admin-app">
@@ -53,6 +53,7 @@
 
       <button class="admin-section-nav hidden" data-admin="stores" data-admin-group="stores" type="button">매장 관리</button>
       <button class="admin-section-nav hidden" data-admin="partner-requests" data-admin-group="stores" type="button">제휴 신청</button>
+      <button class="admin-section-nav hidden" data-admin="comments" data-admin-group="stores" type="button">한마디</button>
       <button class="admin-section-nav hidden" data-admin="qr" data-admin-group="stores" type="button">QR</button>
 
       <button class="admin-section-nav hidden" data-admin="gameops" data-admin-group="game" type="button">게임 운영</button>
@@ -73,9 +74,56 @@
 
   <main class="admin-main">
     <section class="admin-page active" id="admin-dashboard">
-      <div class="admin-page-head simple-head"><div><span class="eyebrow">현황</span><h2>오늘</h2><p>지금 확인해야 할 서비스 상태와 최근 변화를 먼저 보여줍니다.</p></div></div>
+      <div class="admin-page-head simple-head"><div><span class="eyebrow">현황</span><h2>성과 대시보드</h2><p>기간별 사용자 행동과 제휴 매장 성과를 비교합니다.</p></div></div>
 
-      <section class="ops-summary">
+      <section class="analytics-toolbar" aria-label="성과 기간 설정">
+        <div class="analytics-presets" id="analyticsPresets">
+          <button type="button" data-analytics-range="today">오늘</button>
+          <button type="button" data-analytics-range="7d" class="active">7일</button>
+          <button type="button" data-analytics-range="30d">30일</button>
+          <button type="button" data-analytics-range="this_month">이번 달</button>
+          <button type="button" data-analytics-range="last_month">지난달</button>
+          <button type="button" data-analytics-range="this_year">올해</button>
+          <button type="button" data-analytics-range="last_year">작년</button>
+          <button type="button" data-analytics-range="custom">직접설정</button>
+        </div>
+        <div class="analytics-custom hidden" id="analyticsCustomRange">
+          <input id="analyticsFrom" class="input" type="date" aria-label="시작일" />
+          <span>—</span>
+          <input id="analyticsTo" class="input" type="date" aria-label="종료일" />
+          <button id="analyticsApplyCustom" class="secondary-btn" type="button">적용</button>
+        </div>
+        <div class="analytics-compare-row">
+          <strong id="analyticsPeriodLabel">최근 7일</strong>
+          <select id="analyticsCompareMode" class="input" aria-label="비교 기준"><option value="previous">이전 기간 대비</option><option value="year">전년 동기 대비</option></select>
+        </div>
+      </section>
+
+      <section class="analytics-kpis" aria-label="핵심 성과">
+        <article><span>활성 사용자</span><strong id="analyticsActiveUsers">0</strong><small id="analyticsActiveUsersDelta">—</small></article>
+        <article><span>인증 방문</span><strong id="analyticsVisits">0</strong><small id="analyticsVisitsDelta">—</small></article>
+        <article><span>도전</span><strong id="analyticsChallenges">0</strong><small id="analyticsChallengesDelta">—</small></article>
+        <article><span>점령</span><strong id="analyticsCaptures">0</strong><small id="analyticsCapturesDelta">—</small></article>
+        <article><span>재방문율</span><strong id="analyticsRepeatRate">0%</strong><small id="analyticsRepeatRateDelta">—</small></article>
+      </section>
+
+      <section class="analytics-grid">
+        <article class="analytics-panel analytics-panel-wide">
+          <div class="section-head"><div><h3>인증 방문 추이</h3><span id="analyticsTrendMeta">기간별</span></div></div>
+          <div id="analyticsVisitChart" class="analytics-vbar-chart" aria-label="인증 방문 추이 그래프"></div>
+        </article>
+        <article class="analytics-panel">
+          <div class="section-head"><div><h3>제휴 효과</h3><span>매장당 평균 · 같은 기간</span></div></div>
+          <div id="analyticsPartnerChart" class="analytics-partner-chart"></div>
+          <p class="analytics-note">제휴 전후가 아닌 현재 제휴 매장과 미제휴 매장의 동일 기간 평균을 비교합니다.</p>
+        </article>
+        <article class="analytics-panel">
+          <div class="section-head"><div><h3>제휴 우위</h3><span>미제휴 대비</span></div></div>
+          <div id="analyticsPartnerLift" class="analytics-lift"></div>
+        </article>
+      </section>
+
+      <section class="ops-summary analytics-ops-summary">
         <div><span>오늘 방문</span><strong id="statScans">0</strong></div>
         <div><span>오늘 점령</span><strong id="statClaims">0</strong></div>
         <div><span>활성 매장</span><strong id="statStores">0</strong></div>
@@ -136,6 +184,15 @@
         <button id="refreshPartnerRequests" class="secondary-btn" type="button">새로고침</button>
       </div>
       <div id="partnerRequestList" class="partner-request-list"></div>
+    </section>
+
+    <section class="admin-page" id="admin-comments">
+      <div class="admin-page-head"><div><span class="eyebrow">매장</span><h2>한마디 관리</h2><p>전체 매장의 신고·고정·숨김 상태를 관리합니다.</p></div></div>
+      <section class="admin-section-card">
+        <div class="section-head"><div><h3>최근 한마디</h3><span id="adminCommentCount">0개</span></div><button id="refreshAdminComments" class="text-btn" type="button">새로고침</button></div>
+        <div id="adminCommentList" class="store-list admin-list-gap"></div>
+        <nav id="adminCommentPagination" class="list-pagination hidden" aria-label="한마디 페이지"></nav>
+      </section>
     </section>
 
     <section class="admin-page" id="admin-qr">
@@ -290,10 +347,6 @@
           <label class="wide">주소<input name="address" class="input" /></label>
           <label>위도<input name="latitude" class="input" type="number" step="any" required /></label>
           <label>경도<input name="longitude" class="input" type="number" step="any" required /></label>
-          <div class="geo-tools geo-tools-editor wide">
-            <button id="resetStoreGpsBtn" class="secondary-btn" type="button">현재 위치로 GPS 재설정</button>
-            <span id="adminStoreGpsStatus" class="geo-status" aria-live="polite">기존 좌표 유지 또는 현재 위치로 재설정</span>
-          </div>
           <label>영업시간<input name="hours" class="input" placeholder="11:00 - 22:00" /></label>
           <label>전화번호<input name="phone" class="input" /></label>
           <label class="wide">공지<textarea name="notice" class="input"></textarea></label>
@@ -348,6 +401,6 @@
   </section>
 </div>
 
-<script src="./admin.js?v=75.48"></script>
+<script src="./admin.js?v=75.82"></script>
 </body>
 </html>

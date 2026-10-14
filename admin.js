@@ -15,7 +15,7 @@
           detectSessionInUrl:false,
           storageKey:"biteboss-admin-auth"
         },
-        global:{ headers:{ "x-client-info":"biteboss-admin-web/75.48" } }
+        global:{ headers:{ "x-client-info":"biteboss-admin-web/66.5" } }
       })
     : null;
 
@@ -28,6 +28,9 @@
   let editingStoreBundle = null;
   let adCampaigns = [];
   let partnerRequests = [];
+  let analyticsRange = "7d";
+  let analyticsCompareMode = "previous";
+  let adminCommentPage = 1;
 
   init().catch(showFatal);
 
@@ -120,7 +123,7 @@
 
   const ADMIN_GROUPS = {
     overview:["dashboard"],
-    stores:["stores","partner-requests","qr"],
+    stores:["stores","partner-requests","comments","qr"],
     game:["gameops","rules","users"],
     settings:["assets","ads","maintenance"]
   };
@@ -199,10 +202,13 @@
     $("#adCampaignCancel")?.addEventListener("click", resetAdCampaignForm);
     $("#partnerRequestFilter")?.addEventListener("change", loadPartnerRequests);
     $("#refreshPartnerRequests")?.addEventListener("click", loadPartnerRequests);
+    $("#refreshAdminComments")?.addEventListener("click", () => loadAdminComments(adminCommentPage));
+    $$('[data-analytics-range]').forEach(btn => btn.addEventListener("click", () => selectAnalyticsRange(btn.dataset.analyticsRange)));
+    $("#analyticsCompareMode")?.addEventListener("change", event => { analyticsCompareMode = String(event.currentTarget.value || "previous"); loadAnalytics(); });
+    $("#analyticsApplyCustom")?.addEventListener("click", () => { analyticsRange = "custom"; syncAnalyticsPresetUi(); loadAnalytics(); });
 
     $$('[data-close-store-editor]').forEach(node => node.addEventListener('click', closeStoreEditor));
     $("#adminStoreEditForm")?.addEventListener("submit", saveAdminStoreInfo);
-    $("#resetStoreGpsBtn")?.addEventListener("click", resetEditingStoreGps);
     $("#adminPhotoForm")?.addEventListener("submit", addAdminStorePhoto);
     $("#adminMenuForm")?.addEventListener("submit", saveAdminMenu);
     $("#adminOfferForm")?.addEventListener("submit", saveAdminOffer);
@@ -221,116 +227,82 @@
     $("#adCampaignForm")?.addEventListener("submit", saveAdCampaign);
   }
 
-  async function getAdminCurrentCoordinates(){
-    let coords = null;
-    const nativeGeo = window.Capacitor?.Plugins?.Geolocation;
-
-    if(nativeGeo?.getCurrentPosition){
-      try{
-        const position = await nativeGeo.getCurrentPosition({
-          enableHighAccuracy:true,
-          timeout:12000,
-          maximumAge:0
-        });
-        coords = position?.coords || null;
-      }catch(error){
-        console.warn("Native geolocation failed, falling back to browser geolocation.", error);
-      }
-    }
-
-    if(!coords){
-      if(!navigator.geolocation) throw new Error("이 기기에서는 위치 정보를 사용할 수 없습니다.");
-      coords = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(
-          position => resolve(position.coords),
-          error => reject(error),
-          { enableHighAccuracy:true, timeout:12000, maximumAge:0 }
-        );
-      });
-    }
-
-    const latitude = Number(coords?.latitude);
-    const longitude = Number(coords?.longitude);
-    const accuracy = Number(coords?.accuracy);
-    if(!Number.isFinite(latitude) || !Number.isFinite(longitude)){
-      throw new Error("GPS 좌표를 확인할 수 없습니다.");
-    }
-
-    return { latitude, longitude, accuracy };
-  }
-
-  function adminGeolocationErrorMessage(error){
-    if(error?.code === 1) return "위치 권한을 허용해 주세요.";
-    if(error?.code === 2) return "현재 위치를 확인할 수 없습니다.";
-    if(error?.code === 3) return "위치 확인 시간이 초과됐습니다.";
-    return error?.message || "위치 정보를 불러오지 못했습니다.";
-  }
-
-  function applyCoordinatesToForm(formSelector, coords){
-    const latInput = document.querySelector(`${formSelector} [name="latitude"]`);
-    const lngInput = document.querySelector(`${formSelector} [name="longitude"]`);
-    if(!latInput || !lngInput) return false;
-
-    latInput.value = coords.latitude.toFixed(7);
-    lngInput.value = coords.longitude.toFixed(7);
-    latInput.dispatchEvent(new Event("input", { bubbles:true }));
-    lngInput.dispatchEvent(new Event("input", { bubbles:true }));
-    return true;
-  }
-
   async function fillCurrentStoreLocation(){
     const button = $("#useCurrentLocationBtn");
     const status = $("#locationStatus");
+    const latInput = document.querySelector('#storeForm [name="latitude"]');
+    const lngInput = document.querySelector('#storeForm [name="longitude"]');
+
+    if(!latInput || !lngInput) return;
+
     if(button) button.disabled = true;
     if(status) status.textContent = "현재 위치 확인 중…";
 
     try{
-      const coords = await getAdminCurrentCoordinates();
-      if(!applyCoordinatesToForm("#storeForm", coords)) return;
+      let coords = null;
+
+      const nativeGeo = window.Capacitor?.Plugins?.Geolocation;
+      if(nativeGeo?.getCurrentPosition){
+        try{
+          const position = await nativeGeo.getCurrentPosition({
+            enableHighAccuracy:true,
+            timeout:12000,
+            maximumAge:0
+          });
+          coords = position?.coords || null;
+        }catch(error){
+          console.warn("Native geolocation failed, falling back to browser geolocation.", error);
+        }
+      }
+
+      if(!coords){
+        if(!navigator.geolocation) throw new Error("이 기기에서는 위치 정보를 사용할 수 없습니다.");
+        coords = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(
+            position => resolve(position.coords),
+            error => reject(error),
+            { enableHighAccuracy:true, timeout:12000, maximumAge:0 }
+          );
+        });
+      }
+
+      const latitude = Number(coords.latitude);
+      const longitude = Number(coords.longitude);
+      if(!Number.isFinite(latitude) || !Number.isFinite(longitude)){
+        throw new Error("GPS 좌표를 확인할 수 없습니다.");
+      }
+
+      latInput.value = latitude.toFixed(7);
+      lngInput.value = longitude.toFixed(7);
+      latInput.dispatchEvent(new Event("input", { bubbles:true }));
+      lngInput.dispatchEvent(new Event("input", { bubbles:true }));
+
+      const accuracy = Number(coords.accuracy);
       if(status){
-        status.textContent = Number.isFinite(coords.accuracy)
-          ? `현재 위치 입력 완료 · 정확도 약 ${Math.round(coords.accuracy)}m`
+        status.textContent = Number.isFinite(accuracy)
+          ? `현재 위치 입력 완료 · 정확도 약 ${Math.round(accuracy)}m`
           : "현재 위치 입력 완료";
       }
     }catch(error){
       console.error("BiteBoss admin geolocation failed:", error);
-      if(status) status.textContent = adminGeolocationErrorMessage(error);
-    }finally{
-      if(button) button.disabled = false;
-    }
-  }
-
-  async function resetEditingStoreGps(){
-    if(!editingStoreId) return;
-    const button = $("#resetStoreGpsBtn");
-    const status = $("#adminStoreGpsStatus");
-    if(button) button.disabled = true;
-    if(status) status.textContent = "현재 위치 확인 중…";
-
-    try{
-      const coords = await getAdminCurrentCoordinates();
-      if(!applyCoordinatesToForm("#adminStoreEditForm", coords)) return;
-      if(status){
-        status.textContent = Number.isFinite(coords.accuracy)
-          ? `GPS 재설정 준비 완료 · 정확도 약 ${Math.round(coords.accuracy)}m · 저장 버튼을 눌러 적용`
-          : "GPS 재설정 준비 완료 · 저장 버튼을 눌러 적용";
-      }
-    }catch(error){
-      console.error("BiteBoss admin store GPS reset failed:", error);
-      if(status) status.textContent = adminGeolocationErrorMessage(error);
+      let message = error?.message || "위치 정보를 불러오지 못했습니다.";
+      if(error?.code === 1) message = "위치 권한을 허용해 주세요.";
+      if(error?.code === 2) message = "현재 위치를 확인할 수 없습니다.";
+      if(error?.code === 3) message = "위치 확인 시간이 초과됐습니다.";
+      if(status) status.textContent = message;
     }finally{
       if(button) button.disabled = false;
     }
   }
 
   async function refreshAll(){
-    await Promise.all([loadDashboard(), loadStores(), loadConfig(), loadBosses(), loadUsers(), loadGameOps(), loadAssets(), loadAds(), loadPartnerRequests()]);
+    await Promise.all([loadDashboard(), loadAnalytics(), loadStores(), loadConfig(), loadBosses(), loadUsers(), loadGameOps(), loadAssets(), loadAds(), loadPartnerRequests(), loadAdminComments()]);
     renderRules();
   }
 
   async function refreshPage(page){
     if(page === "dashboard"){
-      await Promise.all([loadDashboard(), loadBosses()]);
+      await Promise.all([loadDashboard(), loadAnalytics(), loadBosses()]);
     }
     if(page === "stores" || page === "qr") await loadStores();
     if(page === "rules") { await loadConfig(); renderRules(); }
@@ -340,8 +312,162 @@
     if(page === "assets") await loadAssets();
     if(page === "ads") await loadAds();
     if(page === "partner-requests") await loadPartnerRequests();
+    if(page === "comments") await loadAdminComments();
   }
 
+
+  function selectAnalyticsRange(range){
+    analyticsRange = String(range || "7d");
+    syncAnalyticsPresetUi();
+    if(analyticsRange !== "custom") loadAnalytics();
+  }
+
+  function syncAnalyticsPresetUi(){
+    $$('[data-analytics-range]').forEach(btn => btn.classList.toggle("active", btn.dataset.analyticsRange === analyticsRange));
+    $("#analyticsCustomRange")?.classList.toggle("hidden", analyticsRange !== "custom");
+  }
+
+  function startOfDay(date){
+    const d = new Date(date); d.setHours(0,0,0,0); return d;
+  }
+  function endOfDay(date){
+    const d = new Date(date); d.setHours(23,59,59,999); return d;
+  }
+  function shiftYear(date, amount){ const d = new Date(date); d.setFullYear(d.getFullYear()+amount); return d; }
+  function formatInputDate(date){
+    const d = new Date(date); const y=d.getFullYear(); const m=String(d.getMonth()+1).padStart(2,"0"); const day=String(d.getDate()).padStart(2,"0"); return `${y}-${m}-${day}`;
+  }
+
+  function resolveAnalyticsPeriod(){
+    const now = new Date();
+    let from, to, label;
+    if(analyticsRange === "today"){
+      from=startOfDay(now); to=endOfDay(now); label="오늘";
+    }else if(analyticsRange === "30d"){
+      to=endOfDay(now); from=startOfDay(new Date(now.getFullYear(),now.getMonth(),now.getDate()-29)); label="최근 30일";
+    }else if(analyticsRange === "this_month"){
+      from=startOfDay(new Date(now.getFullYear(),now.getMonth(),1)); to=endOfDay(now); label="이번 달";
+    }else if(analyticsRange === "last_month"){
+      from=startOfDay(new Date(now.getFullYear(),now.getMonth()-1,1)); to=endOfDay(new Date(now.getFullYear(),now.getMonth(),0)); label="지난달";
+    }else if(analyticsRange === "this_year"){
+      from=startOfDay(new Date(now.getFullYear(),0,1)); to=endOfDay(now); label=`${now.getFullYear()}년`;
+    }else if(analyticsRange === "last_year"){
+      from=startOfDay(new Date(now.getFullYear()-1,0,1)); to=endOfDay(new Date(now.getFullYear()-1,11,31)); label=`${now.getFullYear()-1}년`;
+    }else if(analyticsRange === "custom"){
+      const fromValue = $("#analyticsFrom")?.value;
+      const toValue = $("#analyticsTo")?.value;
+      from = fromValue ? startOfDay(new Date(`${fromValue}T00:00:00`)) : startOfDay(new Date(now.getFullYear(),now.getMonth(),now.getDate()-6));
+      to = toValue ? endOfDay(new Date(`${toValue}T00:00:00`)) : endOfDay(now);
+      if(from > to){ const tmp=from; from=to; to=tmp; }
+      label=`${formatInputDate(from)} ~ ${formatInputDate(to)}`;
+    }else{
+      to=endOfDay(now); from=startOfDay(new Date(now.getFullYear(),now.getMonth(),now.getDate()-6)); label="최근 7일";
+    }
+
+    const span = Math.max(1, to.getTime()-from.getTime()+1);
+    let compareFrom, compareTo;
+    if(analyticsCompareMode === "year"){
+      compareFrom=shiftYear(from,-1); compareTo=shiftYear(to,-1);
+    }else{
+      compareTo=new Date(from.getTime()-1); compareFrom=new Date(compareTo.getTime()-span+1);
+    }
+    const days = Math.max(1, Math.ceil(span/86400000));
+    const bucket = days > 120 ? "month" : days > 35 ? "week" : "day";
+    return { from,to,compareFrom,compareTo,label,bucket };
+  }
+
+  async function loadAnalytics(){
+    const chart = $("#analyticsVisitChart");
+    if(!chart) return;
+    syncAnalyticsPresetUi();
+    const period = resolveAnalyticsPeriod();
+    setText("#analyticsPeriodLabel", period.label);
+    setText("#analyticsTrendMeta", period.bucket === "month" ? "월별" : period.bucket === "week" ? "주별" : "일별");
+    if(analyticsRange === "custom"){
+      if($("#analyticsFrom") && !$("#analyticsFrom").value) $("#analyticsFrom").value=formatInputDate(period.from);
+      if($("#analyticsTo") && !$("#analyticsTo").value) $("#analyticsTo").value=formatInputDate(period.to);
+    }
+    chart.innerHTML='<div class="analytics-loading">불러오는 중…</div>';
+
+    const {data,error}=await adminSb.rpc("biteboss_admin_analytics_v7582",{
+      p_from:period.from.toISOString(), p_to:period.to.toISOString(),
+      p_compare_from:period.compareFrom.toISOString(), p_compare_to:period.compareTo.toISOString(),
+      p_bucket:period.bucket
+    });
+    if(error){
+      console.warn("BiteBoss analytics:",error);
+      chart.innerHTML='<div class="analytics-empty">성과 데이터를 불러오지 못했습니다. v75.82 SQL 적용을 확인하세요.</div>';
+      return;
+    }
+    renderAnalytics(data || {});
+  }
+
+  function renderAnalytics(data){
+    const current=data.current || {}; const compare=data.compare || {};
+    setText("#analyticsActiveUsers", Number(current.active_users||0).toLocaleString("ko-KR"));
+    setText("#analyticsVisits", Number(current.visits||0).toLocaleString("ko-KR"));
+    setText("#analyticsChallenges", Number(current.challenges||0).toLocaleString("ko-KR"));
+    setText("#analyticsCaptures", Number(current.captures||0).toLocaleString("ko-KR"));
+    setText("#analyticsRepeatRate", `${Number(current.repeat_rate||0).toFixed(1)}%`);
+    setText("#analyticsActiveUsersDelta", deltaText(current.active_users,compare.active_users));
+    setText("#analyticsVisitsDelta", deltaText(current.visits,compare.visits));
+    setText("#analyticsChallengesDelta", deltaText(current.challenges,compare.challenges));
+    setText("#analyticsCapturesDelta", deltaText(current.captures,compare.captures));
+    setText("#analyticsRepeatRateDelta", pointDeltaText(current.repeat_rate,compare.repeat_rate));
+    renderAnalyticsTrend(Array.isArray(data.trend)?data.trend:[]);
+    renderPartnerCompare(data.partner_compare || {});
+  }
+
+  function deltaText(value, base){
+    const v=Number(value||0), b=Number(base||0);
+    if(!b) return v ? "비교기간 0" : "—";
+    const pct=((v-b)/b)*100;
+    return `${pct>=0?"+":""}${pct.toFixed(1)}%`;
+  }
+  function pointDeltaText(value,base){ const d=Number(value||0)-Number(base||0); return `${d>=0?"+":""}${d.toFixed(1)}%p`; }
+
+  function renderAnalyticsTrend(rows){
+    const box=$("#analyticsVisitChart"); if(!box) return;
+    if(!rows.length){ box.innerHTML='<div class="analytics-empty">선택한 기간의 방문 데이터가 없습니다.</div>'; return; }
+    const max=Math.max(1,...rows.map(row=>Number(row.visits||0)));
+    box.innerHTML=`<div class="analytics-bars">${rows.map(row=>{
+      const value=Number(row.visits||0); const height=Math.max(value?6:1,Math.round(value/max*100));
+      return `<div class="analytics-bar-item" title="${escapeAttr(row.label||"")} · ${value.toLocaleString("ko-KR")}"><div class="analytics-bar-value">${value.toLocaleString("ko-KR")}</div><div class="analytics-bar-track"><i style="height:${height}%"></i></div><span>${escapeHtml(row.label||"")}</span></div>`;
+    }).join("")}</div>`;
+  }
+
+  function renderPartnerCompare(data){
+    const box=$("#analyticsPartnerChart"); const lift=$("#analyticsPartnerLift");
+    if(!box || !lift) return;
+    const partner=data.partner || {}, non=data.non_partner || {};
+    const metrics=[
+      ["인증 방문",Number(partner.avg_visits||0),Number(non.avg_visits||0)],
+      ["도전",Number(partner.avg_challenges||0),Number(non.avg_challenges||0)],
+      ["점령",Number(partner.avg_captures||0),Number(non.avg_captures||0)],
+      ["재방문율",Number(partner.repeat_rate||0),Number(non.repeat_rate||0)]
+    ];
+    const max=Math.max(1,...metrics.flatMap(row=>[row[1],row[2]]));
+    box.innerHTML=`<div class="partner-legend"><span><i></i>제휴</span><span><i></i>미제휴</span></div><div class="partner-bars">${metrics.map(([label,p,n])=>`<div class="partner-metric"><div class="partner-columns"><div><b>${formatAnalyticsValue(label,p)}</b><i class="is-partner" style="height:${Math.max(p?5:1,Math.round(p/max*100))}%"></i></div><div><b>${formatAnalyticsValue(label,n)}</b><i class="is-nonpartner" style="height:${Math.max(n?5:1,Math.round(n/max*100))}%"></i></div></div><span>${escapeHtml(label)}</span></div>`).join("")}</div>`;
+    lift.innerHTML=metrics.map(([label,p,n])=>{
+      const multiple=n>0?p/n:null;
+      return `<div><span>${escapeHtml(label)}</span><strong>${multiple===null?(p>0?"제휴만 기록":"—"):`${multiple.toFixed(1)}배`}</strong><small>제휴 매장 평균</small></div>`;
+    }).join("");
+  }
+  function formatAnalyticsValue(label,value){ return label.includes("율") ? `${Number(value||0).toFixed(1)}%` : Number(value||0).toFixed(1).replace(/\.0$/,""); }
+
+  async function loadAdminComments(page=1){
+    const list=$("#adminCommentList"), nav=$("#adminCommentPagination");
+    if(!list) return;
+    list.innerHTML='<div class="admin-empty">불러오는 중…</div>';
+    const {data,error}=await adminSb.rpc("biteboss_admin_store_comments_overview_v7582",{p_page:Math.max(1,Number(page||1)),p_page_size:10});
+    if(error || !data?.ok){ list.innerHTML='<div class="admin-empty">한마디를 불러오지 못했습니다.</div>'; return; }
+    adminCommentPage=Math.max(1,Number(data.page||1));
+    const total=Math.max(0,Number(data.total||0)); setText("#adminCommentCount",`${total}개`);
+    const items=Array.isArray(data.items)?data.items:[];
+    list.innerHTML=items.length?items.map(item=>`<article class="admin-store-row" data-admin-comment="${escapeAttr(item.id)}"><div><strong>${escapeHtml(item.store_name||"매장")} · ${escapeHtml(item.nickname||"사용자")}</strong><p>${escapeHtml(item.body||"")}</p><small>${escapeHtml(formatDate(item.created_at))}${item.is_pinned?" · 고정":""}${item.is_hidden?" · 숨김":""}${Number(item.report_count||0)?` · 신고 ${Number(item.report_count||0)}건`:""}</small></div><div class="admin-store-actions"><button class="text-btn" data-admin-comment-action="${item.is_pinned?"unpin":"pin"}" type="button">${item.is_pinned?"고정 해제":"고정"}</button><button class="text-btn" data-admin-comment-action="${item.is_hidden?"unhide":"hide"}" type="button">${item.is_hidden?"숨김 해제":"숨김"}</button><button class="text-btn danger" data-admin-comment-action="delete" type="button">삭제</button></div></article>`).join(""):'<div class="admin-empty">등록된 한마디가 없습니다.</div>';
+    list.querySelectorAll('[data-admin-comment-action]').forEach(button=>button.addEventListener('click',async()=>{const row=button.closest('[data-admin-comment]'); const id=row?.dataset.adminComment; const action=button.dataset.adminCommentAction; if(!id)return; if(action==='delete'&&!confirm('영구 삭제할까요?'))return; const r=await adminSb.rpc('biteboss_store_comment_moderate_v7582',{p_comment_id:id,p_action:action}); if(r.error||!r.data?.ok){alert(r.data?.error==='PIN_LIMIT'?'고정은 매장당 최대 3개입니다.':'처리하지 못했습니다.');return;} await loadAdminComments(adminCommentPage);}));
+    renderPagination(nav,adminCommentPage,total,10,next=>loadAdminComments(next));
+  }
 
   async function loadPartnerRequests(){
     const box = $("#partnerRequestList");
@@ -837,7 +963,7 @@
         const rows = Array.isArray(controlsResult.data) ? controlsResult.data : [];
         storesBox.innerHTML = rows.map(row => {
           const boss = row.boss_user_id
-            ? [row.boss_nickname || "닉네임 없음", row.organization_name].filter(Boolean).join(" · ")
+            ? [row.boss_nickname || "Boss", row.organization_name].filter(Boolean).join(" · ")
             : "Unclaimed";
           const protection = row.protected_until && new Date(row.protected_until).getTime() > Date.now()
             ? `Protected ${formatRemaining(row.protected_until)}`
@@ -1049,14 +1175,6 @@
     const store = bundle.store || {};
     setText("#adminStoreEditorTitle", store.name || "매장 수정");
     setText("#adminStoreEditorMeta", `${partnershipLabel(store.partnership_status)} · ${store.partnership_status === "partnered" ? "QR 점령" : "GPS 자동점령"}`);
-    const currentLat = Number(store.latitude);
-    const currentLng = Number(store.longitude);
-    setText(
-      "#adminStoreGpsStatus",
-      Number.isFinite(currentLat) && Number.isFinite(currentLng)
-        ? `현재 좌표 ${currentLat.toFixed(6)}, ${currentLng.toFixed(6)} · 필요할 때만 재설정`
-        : "GPS 좌표가 없습니다 · 현재 위치로 재설정하세요."
-    );
 
     const form = $("#adminStoreEditForm");
     if(form){
@@ -1612,6 +1730,18 @@
     console.error(error);
     showAuthGate();
     setText("#adminLoginStatus", error?.message === "NOT_ADMIN" ? "BiteBoss 운영자 권한이 없습니다." : "초기화에 실패했습니다.");
+  }
+
+  function renderPagination(nav, page, totalItems, pageSize, onChange){
+    if(!nav) return;
+    const total=Math.max(0,Number(totalItems||0));
+    const pages=Math.max(1,Math.ceil(total/Math.max(1,Number(pageSize||10))));
+    const current=Math.min(pages,Math.max(1,Number(page||1)));
+    nav.classList.toggle("hidden",pages<=1);
+    if(pages<=1){ nav.innerHTML=""; return; }
+    nav.innerHTML=`<button type="button" class="pagination-btn" data-page-prev ${current<=1?"disabled":""}>이전</button><span class="pagination-status"><b>${current}</b><span>/ ${pages}</span></span><button type="button" class="pagination-btn" data-page-next ${current>=pages?"disabled":""}>다음</button>`;
+    nav.querySelector("[data-page-prev]")?.addEventListener("click",()=>onChange(Math.max(1,current-1)));
+    nav.querySelector("[data-page-next]")?.addEventListener("click",()=>onChange(Math.min(pages,current+1)));
   }
 
   function setText(selector, value){ const el = $(selector); if(el) el.textContent = String(value ?? ""); }

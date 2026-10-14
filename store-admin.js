@@ -15,7 +15,7 @@
           detectSessionInUrl:false,
           storageKey:"biteboss-store-auth"
         },
-        global:{ headers:{ "x-client-info":"biteboss-store-admin-web/75.48" } }
+        global:{ headers:{ "x-client-info":"biteboss-store-admin-web/2.2" } }
       })
     : null;
 
@@ -24,11 +24,9 @@
   let accessibleStores = [];
   let currentStore = null;
   let currentRole = null;
-  let growthDashboard = null;
-  let growthDays = 30;
   let snapshot = {};
   let activeQr = null;
-  let onboarding = null;
+  let commentAdminPage = 1;
 
   init().catch(showFatal);
 
@@ -184,8 +182,6 @@
     applyRoleUi();
     hideAuthGate();
     await refreshStore();
-    await loadOnboarding();
-    renderOnboarding();
   }
 
   function showAuthGate(){
@@ -216,6 +212,7 @@
     $$(".store-admin-nav").forEach(item => item.classList.toggle("active", item.dataset.storeAdmin === name));
     $$(".store-admin-page").forEach(item => item.classList.remove("active"));
     page.classList.add("active");
+    if(name === "comments") void loadStoreCommentAdmin(commentAdminPage);
     window.scrollTo({ top:0, behavior:"smooth" });
   }
   function bindNav(){
@@ -226,29 +223,6 @@
       btn.addEventListener("click", () => openStoreAdminPage(btn.dataset.openStorePage));
     });
   }
-  function formSubmitButton(form){ return form?.querySelector?.('button[type="submit"]') || null; }
-
-  async function withFormLock(form, task, pendingLabel = "저장 중…"){
-    const button = formSubmitButton(form);
-    if(button?.disabled) return false;
-    const original = button?.textContent || "";
-    if(button){
-      button.disabled = true;
-      button.setAttribute("aria-busy", "true");
-      if(pendingLabel) button.textContent = pendingLabel;
-    }
-    try{
-      await task();
-      return true;
-    }finally{
-      if(button){
-        button.disabled = false;
-        button.removeAttribute("aria-busy");
-        button.textContent = original;
-      }
-    }
-  }
-
   function bindForms(){
     $("#storeInfoForm")?.addEventListener("submit", saveStoreInfo);
     $("#menuForm")?.addEventListener("submit", addMenu);
@@ -267,7 +241,6 @@
     $("#clearBossBtn")?.addEventListener("click", releaseBoss);
     $("#copyQrBtn")?.addEventListener("click", copyQr);
     $("#rotateQrBtn")?.addEventListener("click", rotateQr);
-    $("#storeImpactDays")?.addEventListener("change", async event => { growthDays = Math.max(7, Math.min(90, Number(event.currentTarget.value || 30))); await loadGrowthDashboard(); renderGrowthDashboard(); });
 
     const cameraInput = $("#cameraPhotoInput");
     const libraryInput = $("#libraryPhotoInput");
@@ -297,41 +270,16 @@
 
     if(snapshotResult.error) throw snapshotResult.error;
     snapshot = snapshotResult.data || {};
-    await loadGrowthDashboard();
     renderOverview();
-    renderGrowthDashboard();
     renderStoreForm();
     renderBoss();
     setText("#storeSyncStatus", "server");
   }
 
-
-  async function loadGrowthDashboard(){
-    if(!currentStore?.id) return;
-    const { data, error } = await storeSb.rpc("biteboss_store_growth_dashboard", { p_store_id:currentStore.id, p_days:growthDays });
-    if(error){ console.warn("BiteBoss store growth dashboard:", error); growthDashboard=null; return; }
-    growthDashboard=data||null;
-  }
-  function renderGrowthDashboard(){
-    const data=growthDashboard||{};
-    setText("#impactVisits", data.visits || 0);
-    setText("#impactUnique", data.unique_visitors || 0);
-    setText("#impactNew", data.new_visitors || 0);
-    setText("#impactRepeat", data.repeat_visitors || 0);
-    setText("#impactBenefits", data.benefits_used || 0);
-    renderImpactDelta("#impactVisitsDelta",data.visits_change_pct);renderImpactDelta("#impactUniqueDelta",data.unique_visitors_change_pct);renderImpactDelta("#impactNewDelta",data.new_visitors_change_pct);renderImpactDelta("#impactRepeatDelta",data.repeat_visitors_change_pct);renderImpactDelta("#impactBenefitsDelta",data.benefits_used_change_pct);
-    const select=$("#storeImpactDays"); if(select) select.value=String(growthDays);
-  }
-
-  function renderImpactDelta(selector,value){const node=$(selector);if(!node)return;if(value===null||value===undefined||!Number.isFinite(Number(value))){node.textContent="이전 기간 -";return;}const n=Math.round(Number(value)*10)/10;node.textContent=`이전 기간 대비 ${n>0?"+":""}${n}%`;node.className=`impact-delta ${n>0?"up":n<0?"down":"flat"}`;}
-  async function loadOnboarding(){if(!currentStore?.id)return;const {data,error}=await storeSb.rpc("biteboss_store_onboarding_get",{p_store_id:currentStore.id});onboarding=error?{step:1,completed:false}:(data||{step:1,completed:false});}
-  function renderOnboarding(){const box=$("#storeOnboarding");if(!box||!currentStore||onboarding?.completed){box?.classList.add("hidden");return;}const step=Math.max(1,Math.min(4,Number(onboarding?.step||1)));const steps=[["Store information","매장 정보를 확인하세요.","store"],["Add a photo","대표 사진을 등록하세요.","store"],["Create a benefit","첫 혜택을 만드세요.","offers"],["Open claim QR","점령 QR을 확인하세요.","qr"]],item=steps[step-1];box.innerHTML=`<div class="store-onboarding-inner"><span>SETUP ${step}/4</span><strong>${item[0]}</strong><p>${item[1]}</p><div><button id="onboardingOpen" class="primary-btn">Continue</button><button id="onboardingNext" class="text-btn">${step===4?"Finish":"Done · next"}</button></div></div>`;box.classList.remove("hidden");$("#onboardingOpen")?.addEventListener("click",()=>openStoreAdminPage(item[2]));$("#onboardingNext")?.addEventListener("click",advanceOnboarding);}
-  async function advanceOnboarding(){const step=Math.max(1,Math.min(4,Number(onboarding?.step||1))),completed=step>=4,next=completed?4:step+1;const {data,error}=await storeSb.rpc("biteboss_store_onboarding_set",{p_store_id:currentStore.id,p_step:next,p_completed:completed});if(error)return alert(error.message);onboarding=data||{step:next,completed};renderOnboarding();}
-
   function renderOverview(){
     setText("#storeAdminTitle", currentStore.name || "내 매장");
     setText("#storeSideName", currentStore.name || "Manager");
-    setText("#storeMetricBoss", snapshot.current_boss_nickname || "보스 없음");
+    setText("#storeMetricBoss", snapshot.current_boss_nickname || "No Boss");
     setText("#storeMetricClaims", snapshot.claims || 0);
     setText("#storeMetricCheckins", snapshot.checkins || 0);
     setText("#storeMetricExpire", snapshot.protected_until ? formatRemaining(snapshot.protected_until) : "-");
@@ -340,8 +288,8 @@
     const card = $("#storeBossCard");
     if(card){
       card.innerHTML = `
-        <div class="store-owner-avatar">${escapeHtml(initials(snapshot.current_boss_nickname || "보스 없음"))}</div>
-        <div><strong>${escapeHtml(snapshot.current_boss_nickname || "보스 없음")}</strong><p>${snapshot.protected_until ? `${escapeHtml(formatRemaining(snapshot.protected_until))} 후 보호 종료` : "현재 활성 Boss가 없습니다."}</p></div>
+        <div class="store-owner-avatar">${escapeHtml(initials(snapshot.current_boss_nickname || "No Boss"))}</div>
+        <div><strong>${escapeHtml(snapshot.current_boss_nickname || "No Boss")}</strong><p>${snapshot.protected_until ? `${escapeHtml(formatRemaining(snapshot.protected_until))} 후 보호 종료` : "현재 활성 Boss가 없습니다."}</p></div>
       `;
     }
   }
@@ -356,25 +304,20 @@
 
   async function saveStoreInfo(event){
     event.preventDefault();
-    const formEl = event.currentTarget;
-    const form = new FormData(formEl);
-    const name = String(form.get("name") || "").trim();
-    if(!name) return alert("매장명을 입력하세요.");
-    await withFormLock(formEl, async () => {
-      const { error } = await storeSb.rpc("biteboss_update_store", {
-        p_store_id:currentStore.id,
-        p_name:name,
-        p_category:String(form.get("category") || "restaurant"),
-        p_city:String(form.get("city") || "").trim(),
-        p_district:String(form.get("district") || "").trim(),
-        p_address:String(form.get("address") || "").trim(),
-        p_hours:String(form.get("hours") || "").trim(),
-        p_phone:String(form.get("phone") || "").trim(),
-        p_notice:String(form.get("notice") || "").trim()
-      });
-      if(error) throw error;
-      await refreshStore();
-    }).catch(error => alert(error?.message || "매장 정보 저장에 실패했습니다."));
+    const form = new FormData(event.currentTarget);
+    const { error } = await storeSb.rpc("biteboss_update_store", {
+      p_store_id:currentStore.id,
+      p_name:String(form.get("name") || "").trim(),
+      p_category:String(form.get("category") || "restaurant"),
+      p_city:String(form.get("city") || "").trim(),
+      p_district:String(form.get("district") || "").trim(),
+      p_address:String(form.get("address") || "").trim(),
+      p_hours:String(form.get("hours") || "").trim(),
+      p_phone:String(form.get("phone") || "").trim(),
+      p_notice:String(form.get("notice") || "").trim()
+    });
+    if(error) return alert(error.message);
+    await refreshStore();
   }
 
   async function loadPhotos(){
@@ -384,7 +327,7 @@
     if(!box) return;
     box.innerHTML = (data || []).map(photo => `
       <article class="store-photo-card">
-        <img src="${escapeAttr(photo.image_url)}" alt="" loading="lazy" decoding="async" />
+        <img src="${escapeAttr(photo.image_url)}" alt="" />
         <div><strong>${escapeHtml(photo.caption || (photo.is_cover ? "대표 사진" : "매장 사진"))}</strong><button class="badge bad" data-delete-photo="${escapeAttr(photo.id)}" data-photo-path="${escapeAttr(photo.storage_path || "")}" type="button">삭제</button></div>
       </article>
     `).join("") || `<div class="timeline-item muted">등록된 사진이 없습니다.</div>`;
@@ -465,28 +408,20 @@
 
   async function addMenu(event){
     event.preventDefault();
-    const formEl = event.currentTarget;
-    const form = new FormData(formEl);
-    const name = String(form.get("name") || "").trim();
-    if(!name) return alert("메뉴명을 입력하세요.");
-    await withFormLock(formEl, async () => {
-      const isSignature = String(form.get("is_signature")) === "true";
-      if(isSignature){
-        const cleared = await storeSb.from("biteboss_menu_items").update({ is_signature:false }).eq("store_id", currentStore.id);
-        if(cleared.error) throw cleared.error;
-      }
-      const result = await storeSb.from("biteboss_menu_items").insert({
-        store_id:currentStore.id,
-        name,
-        price:form.get("price") ? Number(form.get("price")) : null,
-        description:String(form.get("description") || "").trim(),
-        is_signature:isSignature,
-        is_active:true
-      });
-      if(result.error) throw result.error;
-      formEl.reset();
-      await loadMenu();
-    }).catch(error => alert(error?.message || "메뉴 저장에 실패했습니다."));
+    const form = new FormData(event.currentTarget);
+    const isSignature = String(form.get("is_signature")) === "true";
+    if(isSignature) await storeSb.from("biteboss_menu_items").update({ is_signature:false }).eq("store_id", currentStore.id);
+    const result = await storeSb.from("biteboss_menu_items").insert({
+      store_id:currentStore.id,
+      name:String(form.get("name") || "").trim(),
+      price:form.get("price") ? Number(form.get("price")) : null,
+      description:String(form.get("description") || "").trim(),
+      is_signature:isSignature,
+      is_active:true
+    });
+    if(result.error) return alert(result.error.message);
+    event.currentTarget.reset();
+    await loadMenu();
   }
 
   async function loadQr(){
@@ -552,7 +487,7 @@
     const box = $("#bossDetail");
     if(!box) return;
     box.innerHTML = `
-      <article class="store-owner-card"><div class="store-owner-avatar">${escapeHtml(initials(snapshot.current_boss_nickname || "보스 없음"))}</div><div><strong>${escapeHtml(snapshot.current_boss_nickname || "보스 없음")}</strong><p>점령 ${Number(snapshot.claims || 0)} · 방문 ${Number(snapshot.checkins || 0)}</p><p>${snapshot.protected_until ? `보호 만료: ${escapeHtml(formatDate(snapshot.protected_until))}` : "현재 활성 Boss가 없습니다."}</p></div></article>
+      <article class="store-owner-card"><div class="store-owner-avatar">${escapeHtml(initials(snapshot.current_boss_nickname || "No Boss"))}</div><div><strong>${escapeHtml(snapshot.current_boss_nickname || "No Boss")}</strong><p>점령 ${Number(snapshot.claims || 0)} · 방문 ${Number(snapshot.checkins || 0)}</p><p>${snapshot.protected_until ? `보호 만료: ${escapeHtml(formatDate(snapshot.protected_until))}` : "현재 활성 Boss가 없습니다."}</p></div></article>
     `;
   }
 
@@ -609,23 +544,21 @@
   async function addOffer(event){
     event.preventDefault();
     if(!currentStore) return;
-    const formEl = event.currentTarget;
-    const form = new FormData(formEl);
-    const title = String(form.get("title") || "").trim();
-    if(!title) return alert("혜택 제목을 입력하세요.");
-    await withFormLock(formEl, async () => {
-      const { data, error } = await storeSb.rpc("biteboss_store_upsert_offer", {
-        p_store_id:currentStore.id,
-        p_offer_id:null,
-        p_title:title,
-        p_description:String(form.get("description") || "").trim(),
-        p_status:String(form.get("status") || "draft"),
-        p_minimum_role:String(form.get("minimum_role") || "visitor")
-      });
-      if(error || !data?.ok) throw error || new Error(data?.error || "혜택 저장 실패");
-      formEl.reset();
-      await loadOffers();
-    }).catch(error => alert(error?.message || "혜택 저장에 실패했습니다."));
+
+    const form = new FormData(event.currentTarget);
+    const { data, error } = await storeSb.rpc("biteboss_store_upsert_offer", {
+      p_store_id:currentStore.id,
+      p_offer_id:null,
+      p_title:String(form.get("title") || "").trim(),
+      p_description:String(form.get("description") || "").trim(),
+      p_status:String(form.get("status") || "draft"),
+      p_minimum_role:String(form.get("minimum_role") || "visitor")
+    });
+
+    if(error || !data?.ok) return alert(error?.message || data?.error || "혜택 저장 실패");
+
+    event.currentTarget.reset();
+    await loadOffers();
   }
 
   async function redeemBenefitPass(event){
@@ -670,6 +603,64 @@
     }
 
     if(tokenInput) tokenInput.value = "";
+  }
+
+  async function loadStoreCommentAdmin(page=1){
+    if(!currentStore) return;
+    const list=$("#storeCommentAdminList");
+    const nav=$("#storeCommentAdminPagination");
+    if(list) list.innerHTML='<div class="inline-status">불러오는 중…</div>';
+    const {data,error}=await storeSb.rpc("biteboss_store_admin_comments_v7582",{
+      p_store_id:currentStore.id,
+      p_page:Math.max(1,Number(page||1)),
+      p_page_size:10
+    });
+    if(error || !data?.ok){
+      if(list) list.innerHTML='<div class="inline-status">한마디를 불러오지 못했습니다.</div>';
+      if(nav) nav.innerHTML='';
+      return;
+    }
+    commentAdminPage=Math.max(1,Number(data.page||page||1));
+    const total=Math.max(0,Number(data.total||0));
+    setText("#storeCommentAdminCount",`${total}개`);
+    const items=Array.isArray(data.items)?data.items:[];
+    if(list){
+      list.innerHTML=items.length?items.map(item=>`
+        <article class="store-list-row" data-admin-comment="${escapeAttr(item.id)}">
+          <div class="store-list-main">
+            <strong>${escapeHtml(item.nickname||"사용자")}${item.is_pinned?" · 고정":""}${item.is_hidden?" · 숨김":""}</strong>
+            <p>${escapeHtml(item.body||"")}</p>
+            <small>${escapeHtml(formatDate(item.created_at))}${item.edited_at?" · 수정됨":""}${Number(item.report_count||0)>0?` · 신고 ${Number(item.report_count||0)}건`:""}</small>
+          </div>
+          <div class="store-action-row">
+            <button class="text-btn" data-comment-moderate="${item.is_pinned?"unpin":"pin"}" type="button">${item.is_pinned?"고정 해제":"고정"}</button>
+            <button class="text-btn" data-comment-moderate="${item.is_hidden?"unhide":"hide"}" type="button">${item.is_hidden?"숨김 해제":"숨김"}</button>
+            <button class="text-btn danger" data-comment-moderate="delete" type="button">삭제</button>
+          </div>
+        </article>
+      `).join(""):'<div class="inline-status">등록된 한마디가 없습니다.</div>';
+      list.querySelectorAll("[data-comment-moderate]").forEach(button=>button.addEventListener("click",async()=>{
+        const row=button.closest("[data-admin-comment]");
+        const id=row?.dataset.adminComment;
+        const action=button.dataset.commentModerate;
+        if(!id) return;
+        if(action==="delete" && !confirm("이 한마디를 영구 삭제할까요?")) return;
+        button.disabled=true;
+        const result=await storeSb.rpc("biteboss_store_comment_moderate_v7582",{p_comment_id:id,p_action:action});
+        button.disabled=false;
+        if(result.error || !result.data?.ok){
+          alert(result.data?.error==="PIN_LIMIT"?"고정은 매장당 최대 3개입니다.":"처리하지 못했습니다.");
+          return;
+        }
+        await loadStoreCommentAdmin(commentAdminPage);
+      }));
+    }
+    if(nav){
+      const pages=Math.max(1,Math.ceil(total/10));
+      nav.innerHTML=pages>1?`<button class="secondary-btn" data-comment-prev type="button" ${commentAdminPage<=1?"disabled":""}>이전</button><span>${commentAdminPage} / ${pages}</span><button class="secondary-btn" data-comment-next type="button" ${commentAdminPage>=pages?"disabled":""}>다음</button>`:"";
+      nav.querySelector("[data-comment-prev]")?.addEventListener("click",()=>loadStoreCommentAdmin(Math.max(1,commentAdminPage-1)));
+      nav.querySelector("[data-comment-next]")?.addEventListener("click",()=>loadStoreCommentAdmin(Math.min(pages,commentAdminPage+1)));
+    }
   }
 
   async function loadActivity(){

@@ -334,3 +334,36 @@ body.biteboss-info-page{min-height:100dvh;background:var(--bg);color:#111}.info-
 .app-state-retry{display:grid;justify-items:start;gap:9px}.app-state-retry>span{display:block}.app-state-retry-btn{min-height:40px;padding:0 13px;border:0;border-radius:12px;background:#111;color:#fff;font-size:10px;font-weight:820;cursor:pointer}.app-state-retry-btn:disabled{opacity:.45;cursor:default}
 
 .store-detail-map-section{display:block;margin:0;padding:0;border-radius:16px;background:#ececee;overflow:hidden}.store-detail-map{width:100%;height:220px;border-radius:inherit;overflow:hidden;background:#ececee}.store-detail-map .leaflet-control-attribution{font-size:7px}.store-detail-map .leaflet-control-zoom{border:0;box-shadow:none}.store-detail-map .leaflet-control-zoom a{width:28px;height:28px;line-height:28px;border:0;border-bottom:1px solid #ececee;background:#fff;color:#111;font-size:15px}.store-detail-map .leaflet-control-zoom a:last-child{border-bottom:0}.store-detail-map .leaflet-tooltip{border:0;border-radius:8px;box-shadow:none;background:#111;color:#fff;font-size:9px;font-weight:780}.store-detail-map .leaflet-tooltip-top:before{border-top-color:#111}
+
+/* Store comments — v75.82 */
+.store-comments{margin-top:26px;border-top:1px solid var(--line,#e8e8eb);padding-top:18px}
+.store-comments-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.store-comments-head h4{margin:0;font-size:15px;line-height:1.2;font-weight:900;letter-spacing:-.025em}
+.store-comments-head h4 span{margin-left:4px;color:#8d8d93;font-size:12px;font-weight:800}
+.store-comment-form{margin-bottom:8px;padding-bottom:12px;border-bottom:1px solid var(--line,#e8e8eb)}
+.store-comment-input-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
+.store-comment-input{width:100%;min-width:0;height:42px;border:1px solid #dedee2;border-radius:0;background:#fff;color:#111;padding:0 12px;outline:0;font:inherit;font-size:13px}
+.store-comment-input:focus{border-color:#111}
+.store-comment-submit,.store-comment-login{min-height:42px;border:0;background:#111;color:#fff;padding:0 15px;font:inherit;font-size:12px;font-weight:850}
+.store-comment-login{width:100%;margin:0 0 10px}
+.store-comment-form-meta{display:flex;justify-content:space-between;gap:12px;min-height:18px;margin-top:5px;color:#97979c;font-size:9px}
+.store-comment-form-meta b{font-weight:800;color:inherit}
+.store-comment-list{border-top:1px solid #f0f0f2}
+.store-comment-row{display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:11px;align-items:start;padding:13px 0;border-bottom:1px solid #ececef}
+.store-comment-row.is-pinned{border-top:1px solid #111}
+.store-comment-profile,.store-comment-name,.store-comment-actions button{appearance:none;border:0;background:transparent;color:inherit;font:inherit;padding:0;cursor:pointer}
+.store-comment-profile{width:42px;height:42px;border-radius:50%;overflow:hidden;display:grid;place-items:center}
+.store-comment-avatar{width:42px;height:42px;border-radius:50%;object-fit:cover;display:block}
+.store-comment-copy{min-width:0}
+.store-comment-name-line{display:flex;align-items:center;gap:6px;min-width:0;margin-bottom:4px}
+.store-comment-name{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;font-size:12px;font-weight:900;letter-spacing:-.015em}
+.store-comment-badge,.store-comment-pinned{font-size:8px;font-weight:900;line-height:1;padding:3px 4px;border:1px solid #111;white-space:nowrap}
+.store-comment-pinned{border-color:#c8c8cc;color:#777}
+.store-comment-copy p{margin:0;color:#222;font-size:12px;line-height:1.45;overflow-wrap:anywhere}
+.store-comment-copy small{display:block;margin-top:5px;color:#9a9aa0;font-size:9px;line-height:1.3}
+.store-comment-actions{display:flex;gap:7px;align-items:center;padding-top:1px;white-space:nowrap}
+.store-comment-actions button{color:#8a8a90;font-size:9px;font-weight:750}
+.store-comment-actions button:hover{color:#111}
+.store-comment-empty{padding:22px 0;color:#999;font-size:11px;text-align:center;border-bottom:1px solid #ececef}
+.store-comment-pagination{margin-top:12px}
+@media(max-width:420px){.store-comment-row{grid-template-columns:38px minmax(0,1fr);gap:10px}.store-comment-profile,.store-comment-avatar{width:38px;height:38px}.store-comment-actions{grid-column:2;justify-content:flex-start;margin-top:-2px}}

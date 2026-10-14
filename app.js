@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.81";
+  const BITEBOSS_BUILD = "75.82";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -183,6 +183,7 @@
   let organizationInvites = [];
   let organizationMembers = [];
   let playerSession = null;
+  const storeCommentState = new Map();
   let stores = [];
   let lastPosition = null;
   let nearbyWatchId = null;
@@ -2174,6 +2175,28 @@
           </div>
         </details>
 
+        <section class="store-comments" data-store-comments="${escapeAttr(store.id)}" aria-label="매장 한마디">
+          <div class="store-comments-head">
+            <h4>한마디 <span data-store-comment-count>0</span></h4>
+          </div>
+          ${playerSession?.authenticated ? `
+            <form class="store-comment-form" data-store-comment-form="${escapeAttr(store.id)}">
+              <div class="store-comment-input-row">
+                <input class="store-comment-input" name="body" type="text" maxlength="120" autocomplete="off" placeholder="이 매장에 한마디" aria-label="한마디 입력" />
+                <button class="store-comment-submit" type="submit">등록</button>
+              </div>
+              <div class="store-comment-form-meta">
+                <span data-store-comment-status aria-live="polite"></span>
+                <span><b data-store-comment-length>0</b>/120</span>
+              </div>
+            </form>
+          ` : `<button class="store-comment-login" data-store-comment-login type="button">로그인하고 한마디 남기기</button>`}
+          <div class="store-comment-list" data-store-comment-list>
+            <div class="app-state">한마디를 불러오는 중…</div>
+          </div>
+          <nav class="list-pagination store-comment-pagination hidden" data-store-comment-pagination aria-label="한마디 페이지"></nav>
+        </section>
+
         ${showStoreManagerCard ? renderPartnerRequestCard(store, partnerRequest, isPartner) : ""}
 
         ${action ? `<div class="store-detail-bottom-action">${action}</div>` : ""}
@@ -2181,6 +2204,7 @@
     `;
 
     renderStoreDetailMap(store);
+    bindStoreComments(store.id);
 
     if(showStoreManagerCard){
       $("#detailPartnerRequest")?.addEventListener("click", () => openPartnerRequestForm(store));
@@ -2203,6 +2227,200 @@
     });
   }
 
+
+  function bindStoreComments(storeId){
+    const root = $(`[data-store-comments="${cssEscape(storeId)}"]`);
+    if(!root) return;
+
+    const input = root.querySelector(".store-comment-input");
+    const length = root.querySelector("[data-store-comment-length]");
+    if(input && length){
+      const syncLength = () => { length.textContent = String(Array.from(input.value || "").length); };
+      input.addEventListener("input", syncLength);
+      syncLength();
+    }
+
+    root.querySelector("[data-store-comment-login]")?.addEventListener("click", () => openMemberLogin());
+    root.querySelector("[data-store-comment-form]")?.addEventListener("submit", event => submitStoreComment(event, storeId));
+    void loadStoreComments(storeId, 1);
+  }
+
+  function cssEscape(value){
+    if(window.CSS?.escape) return CSS.escape(String(value ?? ""));
+    return String(value ?? "").replace(/["\\]/g, "\\$&");
+  }
+
+  async function loadStoreComments(storeId, page=1){
+    const root = $(`[data-store-comments="${cssEscape(storeId)}"]`);
+    if(!root) return;
+    const list = root.querySelector("[data-store-comment-list]");
+    const pagination = root.querySelector("[data-store-comment-pagination]");
+    if(list) list.innerHTML = `<div class="app-state">한마디를 불러오는 중…</div>`;
+
+    const { data, error } = await sb.rpc("biteboss_store_comments_v7582", {
+      p_store_id:storeId,
+      p_page:Math.max(1, Number(page || 1)),
+      p_page_size:10
+    });
+
+    if(error){
+      console.warn("BiteBoss store comments:", error);
+      if(list) setRetryState(list, "한마디를 불러오지 못했습니다.", () => loadStoreComments(storeId, page));
+      return;
+    }
+
+    const payload = data && typeof data === "object" ? data : {};
+    const items = Array.isArray(payload.items) ? payload.items : [];
+    const total = Math.max(0, Number(payload.total || 0));
+    const safePage = Math.max(1, Number(payload.page || page || 1));
+    storeCommentState.set(String(storeId), { page:safePage, total });
+
+    const count = root.querySelector("[data-store-comment-count]");
+    if(count) count.textContent = String(total);
+
+    if(list){
+      list.innerHTML = items.length
+        ? items.map(comment => storeCommentMarkup(comment)).join("")
+        : `<div class="store-comment-empty">아직 한마디가 없습니다.</div>`;
+    }
+
+    bindStoreCommentRows(root, storeId);
+    renderPagination(pagination, safePage, total, 10, next => loadStoreComments(storeId, next));
+  }
+
+  function storeCommentMarkup(comment){
+    const nickname = String(comment.nickname || "사용자");
+    const meta = [
+      comment.crew_name ? String(comment.crew_name) : "",
+      formatCommentTime(comment.created_at),
+      comment.edited_at ? "수정됨" : ""
+    ].filter(Boolean).join(" · ");
+
+    return `
+      <article class="store-comment-row ${comment.is_pinned ? "is-pinned" : ""}" data-store-comment-id="${escapeAttr(comment.id)}">
+        <button class="store-comment-profile" type="button" data-player-profile="${escapeAttr(comment.user_id || "")}" aria-label="${escapeAttr(nickname)} 프로필">
+          ${bossAvatarMarkup(comment.avatar_url || "", nickname, "store-comment-avatar")}
+        </button>
+        <div class="store-comment-copy">
+          <div class="store-comment-name-line">
+            <button type="button" class="store-comment-name" data-player-profile="${escapeAttr(comment.user_id || "")}">${escapeHtml(nickname)}</button>
+            ${comment.is_boss ? `<span class="store-comment-badge">BOSS</span>` : ""}
+            ${comment.is_pinned ? `<span class="store-comment-pinned">고정</span>` : ""}
+          </div>
+          <p>${escapeHtml(comment.body || "")}</p>
+          <small>${escapeHtml(meta)}</small>
+        </div>
+        <div class="store-comment-actions">
+          ${comment.is_mine ? `<button type="button" data-comment-edit>수정</button><button type="button" data-comment-delete>삭제</button>` : `<button type="button" data-comment-report>신고</button>`}
+        </div>
+      </article>
+    `;
+  }
+
+  function bindStoreCommentRows(root, storeId){
+    root.querySelectorAll("[data-store-comment-id]").forEach(row => {
+      const id = String(row.dataset.storeCommentId || "");
+      row.querySelector("[data-comment-edit]")?.addEventListener("click", async () => {
+        const bodyEl = row.querySelector(".store-comment-copy p");
+        const current = String(bodyEl?.textContent || "");
+        const next = prompt("한마디 수정", current);
+        if(next === null) return;
+        const body = String(next).trim();
+        if(!body || Array.from(body).length > 120){
+          toast("한마디는 1~120자로 작성해 주세요.");
+          return;
+        }
+        const { data, error } = await sb.rpc("biteboss_store_comment_update_v7582", { p_comment_id:id, p_body:body });
+        if(error || !data?.ok){
+          toast("수정하지 못했습니다.");
+          return;
+        }
+        const state = storeCommentState.get(String(storeId));
+        await loadStoreComments(storeId, state?.page || 1);
+      });
+
+      row.querySelector("[data-comment-delete]")?.addEventListener("click", async () => {
+        if(!confirm("이 한마디를 삭제할까요?")) return;
+        const { data, error } = await sb.rpc("biteboss_store_comment_delete_v7582", { p_comment_id:id });
+        if(error || !data?.ok){
+          toast("삭제하지 못했습니다.");
+          return;
+        }
+        const state = storeCommentState.get(String(storeId));
+        await loadStoreComments(storeId, state?.page || 1);
+      });
+
+      row.querySelector("[data-comment-report]")?.addEventListener("click", async () => {
+        if(!playerSession?.authenticated){
+          openMemberLogin();
+          return;
+        }
+        const { data, error } = await sb.rpc("biteboss_store_comment_report_v7582", { p_comment_id:id, p_reason:"user_report" });
+        if(error || !data?.ok){
+          const code = String(data?.error || error?.message || "");
+          toast(code.includes("ALREADY_REPORTED") ? "이미 신고한 한마디입니다." : "신고하지 못했습니다.");
+          return;
+        }
+        toast("신고가 접수되었습니다.");
+      });
+    });
+  }
+
+  async function submitStoreComment(event, storeId){
+    event.preventDefault();
+    if(!playerSession?.authenticated){
+      openMemberLogin();
+      return;
+    }
+    const form = event.currentTarget;
+    const input = form.elements.body;
+    const button = form.querySelector('button[type="submit"]');
+    const status = form.querySelector("[data-store-comment-status]");
+    const body = String(input?.value || "").trim();
+
+    if(!body || Array.from(body).length > 120){
+      if(status) status.textContent = "1~120자로 작성해 주세요.";
+      return;
+    }
+
+    if(button) button.disabled = true;
+    if(status) status.textContent = "등록 중…";
+    try{
+      const { data, error } = await sb.rpc("biteboss_store_comment_create_v7582", {
+        p_store_id:storeId,
+        p_body:body
+      });
+      if(error || !data?.ok){
+        const code = String(data?.error || error?.message || "");
+        if(status) status.textContent = code.includes("COMMENT_COOLDOWN")
+          ? "잠시 후 다시 작성해 주세요."
+          : "등록하지 못했습니다.";
+        return;
+      }
+      form.reset();
+      const length = form.querySelector("[data-store-comment-length]");
+      if(length) length.textContent = "0";
+      if(status) status.textContent = "";
+      await loadStoreComments(storeId, 1);
+    }finally{
+      if(button) button.disabled = false;
+    }
+  }
+
+  function formatCommentTime(value){
+    if(!value) return "";
+    const time = new Date(value).getTime();
+    if(!Number.isFinite(time)) return "";
+    const seconds = Math.max(0, Math.floor((Date.now() - time) / 1000));
+    if(seconds < 60) return "방금 전";
+    const minutes = Math.floor(seconds / 60);
+    if(minutes < 60) return `${minutes}분 전`;
+    const hours = Math.floor(minutes / 60);
+    if(hours < 24) return `${hours}시간 전`;
+    const days = Math.floor(hours / 24);
+    if(days < 7) return `${days}일 전`;
+    return new Date(value).toLocaleDateString("ko-KR", { month:"numeric", day:"numeric" });
+  }
 
   function destroyStoreDetailMap(){
     if(!storeDetailMap) return;
