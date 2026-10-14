@@ -15,7 +15,7 @@
           detectSessionInUrl:false,
           storageKey:"biteboss-store-auth"
         },
-        global:{ headers:{ "x-client-info":"biteboss-store-admin-web/2.2" } }
+        global:{ headers:{ "x-client-info":"biteboss-store-admin-web/75.44" } }
       })
     : null;
 
@@ -331,7 +331,7 @@
   function renderOverview(){
     setText("#storeAdminTitle", currentStore.name || "내 매장");
     setText("#storeSideName", currentStore.name || "Manager");
-    setText("#storeMetricBoss", snapshot.current_boss_nickname || "No Boss");
+    setText("#storeMetricBoss", snapshot.current_boss_nickname || "보스 없음");
     setText("#storeMetricClaims", snapshot.claims || 0);
     setText("#storeMetricCheckins", snapshot.checkins || 0);
     setText("#storeMetricExpire", snapshot.protected_until ? formatRemaining(snapshot.protected_until) : "-");
@@ -340,8 +340,8 @@
     const card = $("#storeBossCard");
     if(card){
       card.innerHTML = `
-        <div class="store-owner-avatar">${escapeHtml(initials(snapshot.current_boss_nickname || "No Boss"))}</div>
-        <div><strong>${escapeHtml(snapshot.current_boss_nickname || "No Boss")}</strong><p>${snapshot.protected_until ? `${escapeHtml(formatRemaining(snapshot.protected_until))} 후 보호 종료` : "현재 활성 Boss가 없습니다."}</p></div>
+        <div class="store-owner-avatar">${escapeHtml(initials(snapshot.current_boss_nickname || "보스 없음"))}</div>
+        <div><strong>${escapeHtml(snapshot.current_boss_nickname || "보스 없음")}</strong><p>${snapshot.protected_until ? `${escapeHtml(formatRemaining(snapshot.protected_until))} 후 보호 종료` : "현재 활성 Boss가 없습니다."}</p></div>
       `;
     }
   }
@@ -552,7 +552,7 @@
     const box = $("#bossDetail");
     if(!box) return;
     box.innerHTML = `
-      <article class="store-owner-card"><div class="store-owner-avatar">${escapeHtml(initials(snapshot.current_boss_nickname || "No Boss"))}</div><div><strong>${escapeHtml(snapshot.current_boss_nickname || "No Boss")}</strong><p>점령 ${Number(snapshot.claims || 0)} · 방문 ${Number(snapshot.checkins || 0)}</p><p>${snapshot.protected_until ? `보호 만료: ${escapeHtml(formatDate(snapshot.protected_until))}` : "현재 활성 Boss가 없습니다."}</p></div></article>
+      <article class="store-owner-card"><div class="store-owner-avatar">${escapeHtml(initials(snapshot.current_boss_nickname || "보스 없음"))}</div><div><strong>${escapeHtml(snapshot.current_boss_nickname || "보스 없음")}</strong><p>점령 ${Number(snapshot.claims || 0)} · 방문 ${Number(snapshot.checkins || 0)}</p><p>${snapshot.protected_until ? `보호 만료: ${escapeHtml(formatDate(snapshot.protected_until))}` : "현재 활성 Boss가 없습니다."}</p></div></article>
     `;
   }
 

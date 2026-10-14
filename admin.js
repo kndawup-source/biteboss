@@ -15,7 +15,7 @@
           detectSessionInUrl:false,
           storageKey:"biteboss-admin-auth"
         },
-        global:{ headers:{ "x-client-info":"biteboss-admin-web/66.5" } }
+        global:{ headers:{ "x-client-info":"biteboss-admin-web/75.44" } }
       })
     : null;
 
@@ -802,7 +802,7 @@
         const rows = Array.isArray(controlsResult.data) ? controlsResult.data : [];
         storesBox.innerHTML = rows.map(row => {
           const boss = row.boss_user_id
-            ? [row.boss_nickname || "Boss", row.organization_name].filter(Boolean).join(" · ")
+            ? [row.boss_nickname || "닉네임 없음", row.organization_name].filter(Boolean).join(" · ")
             : "Unclaimed";
           const protection = row.protected_until && new Date(row.protected_until).getTime() > Date.now()
             ? `Protected ${formatRemaining(row.protected_until)}`
