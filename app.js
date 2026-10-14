@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.63";
+  const BITEBOSS_BUILD = "75.64";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1396,7 +1396,8 @@
 
     const distance = Number.isFinite(Number(store.distance_m)) ? formatDistance(store.distance_m) : "";
     const place = [store.city, store.district].filter(Boolean).join(" ");
-    const details = [categoryLabel(store.category), place, distance].filter(Boolean).join(" · ");
+    const protectionSummary = protectedNow ? `보호 ${formatRemaining(protectionUntil)} 남음` : "";
+    const details = [categoryLabel(store.category), place, distance, protectionSummary].filter(Boolean).join(" · ");
     const isPartner = String(store.partnership_status || "unclaimed") === "partnered";
     const presence = presenceState.get(String(store.id));
     const requiredSeconds = Math.max(30, Number(presence?.required_seconds || config.gps_dwell_seconds || 120));
@@ -1412,11 +1413,12 @@
       }else if(presence?.status === "low_accuracy"){
         status = "재점령 GPS 정확도 확인 중";
       }else{
-        // Ownership is expressed by ordering and the split avatar, not repeated copy.
-        status = protectedNow ? `보호 ${formatRemaining(protectionUntil)} 남음` : "";
+        // Protected state is folded into the metadata line so store cards stay two lines.
+        status = "";
       }
     }else if(bossExists && protectedNow){
-      status = `보호 ${formatRemaining(protectionUntil)} 남음`;
+      // Keep protected store cards at the same two-line height as ordinary stores.
+      status = "";
     }else if(presence?.status === "tracking"){
       status = `자동 점령 진행 중 · ${formatPresenceSeconds(remainingSeconds)} 남음`;
     }else if(presence?.status === "outside"){
@@ -1436,8 +1438,7 @@
 
     const badges = [
       isPartner ? {label:"제휴", cls:"partner"} : null,
-      Boolean(store.has_benefit || Number(store.active_offer_count || 0) > 0) ? {label:"혜택", cls:"benefit"} : null,
-      protectedNow ? {label:"보호 중", cls:"protected"} : null
+      Boolean(store.has_benefit || Number(store.active_offer_count || 0) > 0) ? {label:"혜택", cls:"benefit"} : null
     ].filter(Boolean);
 
 
