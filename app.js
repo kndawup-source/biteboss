@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.73";
+  const BITEBOSS_BUILD = "75.74";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1392,7 +1392,7 @@
     }
 
     const initial = Array.from(name)[0] || "B";
-    return `<span class="${escapeAttr(className)} store-avatar-fallback" aria-hidden="true">${escapeHtml(initial)}</span>`;
+    return `<span class="${escapeAttr(className)} store-avatar-fallback" aria-hidden="true"><span class="store-avatar-initial">${escapeHtml(initial)}</span></span>`;
   }
 
   function bossAvatarMarkup(avatarUrl, nickname, className = "boss-avatar"){
