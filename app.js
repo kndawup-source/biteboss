@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.66";
+  const BITEBOSS_BUILD = "75.67";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -6442,17 +6442,21 @@
 
     openModal(title, `
       <div class="organization-leave-confirm">
-        <strong>${escapeHtml(orgName)}</strong>
-        <p>현재 보스 매장은 유지되지만 이 크루의 점령지에서는 제외됩니다.</p>
-        <p>탈퇴 후 XP는 최대 ${penaltyPercent}% 차감되고 ${cooldownDays}일 동안 조직 가입·창설이 제한됩니다.</p>
+        <section class="organization-leave-summary">
+          <strong class="organization-leave-name">${escapeHtml(orgName)}</strong>
+          <div class="organization-leave-copy">
+            <p>현재 보스 매장은 유지되지만 이 크루의 점령지에서는 제외됩니다.</p>
+            <p>탈퇴 후 XP는 최대 ${penaltyPercent}% 차감되고 ${cooldownDays}일 동안 조직 가입·창설이 제한됩니다.</p>
+          </div>
+        </section>
         ${isLeader ? `
-          <label>
-            해산 확인
+          <section class="organization-disband-confirm">
+            <label for="organizationDisbandNameConfirm">해산 확인</label>
             <input id="organizationDisbandNameConfirm" class="input" autocomplete="off" placeholder="${escapeAttr(orgName)}" />
-          </label>
-          <p class="organization-create-note">실수 방지를 위해 조직명을 정확히 입력해야 해산할 수 있습니다.</p>
+            <p class="organization-disband-note">실수 방지를 위해 크루명을 정확히 입력해야 해산할 수 있습니다.</p>
+          </section>
         ` : ""}
-        <button id="organizationLeaveConfirm" class="danger-btn" type="button">${isLeader ? "크루 해산" : "크루 탈퇴"}</button>
+        <button id="organizationLeaveConfirm" class="danger-btn organization-leave-submit" type="button">${isLeader ? "크루 해산" : "크루 탈퇴"}</button>
       </div>
     `);
 
