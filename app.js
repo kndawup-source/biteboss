@@ -606,6 +606,7 @@
       loadHistory();
       loadMyOrganization();
       loadGameActivity();
+      loadMyCommentHistory(1);
     }
   }
 
@@ -2125,20 +2126,7 @@
                 <div><span>레벨</span><strong>Lv ${bossLevel}</strong><small>보너스 +${bossLevelBonus}</small></div>
                 <div><span>방어력</span><strong>${bossDefense}</strong><small>${escapeHtml(defenseState)}</small></div>
                 <div><span>크루</span><strong>${escapeHtml(bossOrganizationName || "없음")}</strong></div>
-              </section>
-
-              <section class="store-detail-subsection">
-                <div class="subsection-title">점령자 방어 정보</div>
-                <div class="detail-line-row"><span>방어 상태</span><strong>${escapeHtml(defenseState)}${defenseDecay ? ` · -${defenseDecay}` : ""}</strong></div>
-                <div class="detail-line-row"><span>점령자 레벨</span><strong>Lv ${bossLevel} · +${bossLevelBonus}</strong></div>
-                <div class="detail-line-row"><span>점령자 매장 보너스</span><strong>+${bossStoreBonus}</strong></div>
-                ${defenseTimelineCopy ? `<p class="detail-note">${escapeHtml(defenseTimelineCopy)}</p>` : ""}
-              </section>` : `
-              <section class="store-detail-subsection">
-                <div class="subsection-title">점령 상태</div>
-                <div class="detail-line-row"><span>현재 점령자</span><strong>없음</strong></div>
-                <p class="detail-note">현재 점령 가능한 매장입니다.</p>
-              </section>`}
+              </section>` : ""}
 
             <section class="store-detail-subsection">
               <div class="subsection-title">점령 현황</div>
@@ -5939,14 +5927,6 @@
           <div class="player-profile-history-list">${recentHtml}</div>
         </section>
 
-        <section class="player-profile-comments" data-player-comment-history="${escapeAttr(userId || "")}">
-          <div class="player-profile-section-head">
-            <span>작성한 한마디</span>
-            <strong data-player-comment-total>0건</strong>
-          </div>
-          <div class="player-profile-comment-list"><div class="app-state">한마디 기록을 불러오는 중…</div></div>
-          <nav class="list-pagination player-profile-comment-pagination hidden" aria-label="작성한 한마디 페이지"></nav>
-        </section>
       </div>
     `;
 
@@ -5963,15 +5943,37 @@
       });
     });
 
-    loadPlayerCommentHistory(userId, 1);
   }
 
-  async function loadPlayerCommentHistory(userId, page = 1){
-    const root = $(`[data-player-comment-history="${cssEscape(userId || "")}"]`);
-    if(!root || !userId) return;
-    const list = root.querySelector(".player-profile-comment-list");
-    const pagination = root.querySelector(".player-profile-comment-pagination");
-    if(list) list.innerHTML = `<div class="app-state">한마디 기록을 불러오는 중…</div>`;
+  async function loadMyCommentHistory(page = 1){
+    const section = $("#profileCommentSection");
+    const list = $("#profileCommentList");
+    const pagination = $("#profileCommentPagination");
+    const totalEl = $("#profileCommentCount");
+    if(!section || !list) return;
+
+    if(!playerSession?.authenticated){
+      section.classList.add("hidden");
+      list.innerHTML = "";
+      if(totalEl) totalEl.textContent = "0건";
+      pagination?.classList.add("hidden");
+      return;
+    }
+
+    const userId = String(
+      playerSession?.player_user_id ||
+      profile?.user_id ||
+      authUser?.id ||
+      ""
+    ).trim();
+
+    if(!userId){
+      section.classList.add("hidden");
+      return;
+    }
+
+    section.classList.remove("hidden");
+    list.innerHTML = `<div class="app-state">한마디 기록을 불러오는 중…</div>`;
 
     const { data, error } = await sb.rpc("biteboss_player_comment_history_v7585", {
       p_user_id:userId,
@@ -5980,8 +5982,8 @@
     });
 
     if(error){
-      console.warn("BiteBoss player comment history:", error);
-      if(list) setRetryState(list, "한마디 기록을 불러오지 못했습니다.", () => loadPlayerCommentHistory(userId, page));
+      console.warn("BiteBoss my comment history:", error);
+      setRetryState(list, "한마디 기록을 불러오지 못했습니다.", () => loadMyCommentHistory(page));
       return;
     }
 
@@ -5989,30 +5991,27 @@
     const items = Array.isArray(payload.items) ? payload.items : [];
     const total = Math.max(0, Number(payload.total || 0));
     const safePage = Math.max(1, Number(payload.page || page || 1));
-    const totalEl = root.querySelector("[data-player-comment-total]");
+
     if(totalEl) totalEl.textContent = `${total.toLocaleString("ko-KR")}건`;
 
-    if(list){
-      list.innerHTML = items.length ? items.map(row => `
-        <button class="player-profile-comment-row" type="button" data-profile-comment-store="${escapeAttr(row.store_id || "")}">
-          <div class="player-profile-comment-meta">
-            <strong>${escapeHtml(row.store_name || "매장")}</strong>
-            <time>${escapeHtml(formatCommentTime(row.created_at))}${row.edited_at ? " · 수정됨" : ""}</time>
-          </div>
-          <p>${escapeHtml(row.body || "")}</p>
-        </button>
-      `).join("") : `<div class="app-state player-profile-empty">작성한 한마디가 없습니다.</div>`;
-    }
+    list.innerHTML = items.length ? items.map(row => `
+      <button class="player-profile-comment-row" type="button" data-profile-comment-store="${escapeAttr(row.store_id || "")}">
+        <div class="player-profile-comment-meta">
+          <strong>${escapeHtml(row.store_name || "매장")}</strong>
+          <time>${escapeHtml(formatCommentTime(row.created_at))}${row.edited_at ? " · 수정됨" : ""}</time>
+        </div>
+        <p>${escapeHtml(row.body || "")}</p>
+      </button>
+    `).join("") : `<div class="app-state player-profile-empty">아직 남긴 한마디가 없습니다.</div>`;
 
-    root.querySelectorAll("[data-profile-comment-store]").forEach(button => {
+    list.querySelectorAll("[data-profile-comment-store]").forEach(button => {
       button.addEventListener("click", () => {
         const storeId = button.dataset.profileCommentStore;
-        closeModal();
-        if(storeId) openStoreDetail(storeId, { source:"player_profile_comment", showStoreManagerCard:false });
+        if(storeId) openStoreDetail(storeId, { source:"my_profile_comment", showStoreManagerCard:false });
       });
     });
 
-    renderPagination(pagination, safePage, total, 5, next => loadPlayerCommentHistory(userId, next));
+    renderPagination(pagination, safePage, total, 5, next => loadMyCommentHistory(next));
   }
 
   async function openCurrentOrganizationDetail(){
@@ -6857,6 +6856,12 @@
     if(history) history.innerHTML = `<div class="activity-empty">로그인 후 전투 기록을 확인할 수 있습니다.</div>`;
     const activity = $("#profileActivity");
     if(activity) activity.innerHTML = `<div class="activity-empty">로그인 후 전투 기록을 확인할 수 있습니다.</div>`;
+    const commentSection = $("#profileCommentSection");
+    commentSection?.classList.add("hidden");
+    const commentList = $("#profileCommentList");
+    if(commentList) commentList.innerHTML = "";
+    setText("#profileCommentCount", "0건");
+    $("#profileCommentPagination")?.classList.add("hidden");
   }
 
   function renderProfilePhoto(imageSelector, fallbackSelector, url){
