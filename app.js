@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.69";
+  const BITEBOSS_BUILD = "75.70";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1735,11 +1735,6 @@
     const isBoss = myRole === "boss";
     const isCrew = myRole === "crew";
     const showStoreManagerCard = shouldShowStoreManagerCard({ isBoss, options });
-    const roleCopy = isBoss ? "보스" : (isCrew ? "크루" : "방문자");
-
-    const myLevel = Math.max(1, Number(game.my_level || summary?.level || 1));
-    const myLevelBonus = Math.max(0, Number(game.my_level_bonus ?? 0));
-    const battleBasePower = Math.max(0, Number(game.battle_base_power ?? 1));
     const myPower = Math.max(0, Number(game.my_power ?? 0));
     const storeBonus = Math.max(0, Number(game.my_store_bonus ?? growth.store_bonus ?? 0));
     const validVisits = Math.max(0, Number(game.my_valid_visits ?? growth.valid_visits ?? 0));
@@ -1894,7 +1889,6 @@
       <section class="store-detail-section partner-benefits">
         <div class="partner-benefits-head">
           <h4>혜택</h4>
-          <span>${escapeHtml((offerAccess.player_role || myRole || "visitor").toUpperCase())}</span>
         </div>
         <div class="store-detail-offers">
           ${offers.length ? offers.map(item => {
@@ -2098,50 +2092,11 @@
               ${bossAvatarMarkup(bossAvatar, bossName || "보스", "boss-focus-avatar")}
               <div class="boss-focus-copy">
                 <strong>${escapeHtml(bossName || "보스")}</strong>
-                ${bossOrganizationName ? `<small>${escapeHtml(bossOrganizationName)}</small>` : ""}
+                <small>${escapeHtml([bossOrganizationName, `Lv ${bossLevel}`, `방어력 ${bossDefense}`].filter(Boolean).join(" · "))}</small>
               </div>
             </div>
           </section>
         ` : ""}
-
-        ${!isBoss ? `
-          <section class="power-matchup" aria-label="도전 전력">
-            <div class="power-matchup-values">
-              <article>
-                <span>내 파워</span>
-                <strong>${myPower}</strong>
-              </article>
-              <i aria-hidden="true">VS</i>
-              <article>
-                <span>보스 방어력</span>
-                <strong>${bossExists ? bossDefense : "—"}</strong>
-              </article>
-            </div>
-            ${powerState ? `
-              <div class="power-matchup-result ${powerStateClass}">
-                <strong>${escapeHtml(powerState)}</strong>
-                ${powerNeeded > 0 ? `<small>방문 보너스와 레벨 보너스를 올리면 다시 도전할 수 있습니다.</small>` : ""}
-              </div>
-            ` : ""}
-          </section>
-        ` : ""}
-
-        <section class="growth-compact">
-          <div class="growth-compact-head">
-            <div>
-              <span>매장 보너스</span>
-              <strong>+${storeBonus}</strong>
-            </div>
-            <small>${escapeHtml(growthTargetText)}</small>
-          </div>
-          <div class="store-growth-track" aria-hidden="true">
-            <i style="width:${storeBonus >= bonusMax ? 100 : bonusProgress}%"></i>
-          </div>
-          <div class="growth-compact-meta">
-            <span>유효 방문 ${validVisits}회</span>
-            <span>최대 +${bonusMax}</span>
-          </div>
-        </section>
 
         ${offersHtml}
 
@@ -2151,21 +2106,26 @@
             <b aria-hidden="true">+</b>
           </summary>
           <div class="store-more-body">
-            <section class="store-more-stats">
-              <div><span>레벨</span><strong>Lv ${myLevel}</strong><small>보너스 +${myLevelBonus}</small></div>
-              <div><span>내 역할</span><strong>${escapeHtml(roleCopy)}</strong></div>
-              <div><span>상태</span><strong>${escapeHtml(battleState)}</strong></div>
-              <div><span>매장 보너스</span><strong>+${storeBonus}</strong><small>기본 ${battleBasePower}</small></div>
-            </section>
+            ${bossExists ? `
+              <section class="store-more-stats">
+                <div><span>점령자</span><strong>${escapeHtml(bossName || "보스")}</strong></div>
+                <div><span>레벨</span><strong>Lv ${bossLevel}</strong><small>보너스 +${bossLevelBonus}</small></div>
+                <div><span>방어력</span><strong>${bossDefense}</strong><small>${escapeHtml(defenseState)}</small></div>
+                <div><span>크루</span><strong>${escapeHtml(bossOrganizationName || "없음")}</strong></div>
+              </section>
 
-            ${!isBoss && bossExists ? `
               <section class="store-detail-subsection">
-                <div class="subsection-title">보스 방어 정보</div>
+                <div class="subsection-title">점령자 방어 정보</div>
                 <div class="detail-line-row"><span>방어 상태</span><strong>${escapeHtml(defenseState)}${defenseDecay ? ` · -${defenseDecay}` : ""}</strong></div>
-                <div class="detail-line-row"><span>보스 레벨</span><strong>Lv ${bossLevel} · +${bossLevelBonus}</strong></div>
-                <div class="detail-line-row"><span>보스 매장 보너스</span><strong>+${bossStoreBonus}</strong></div>
+                <div class="detail-line-row"><span>점령자 레벨</span><strong>Lv ${bossLevel} · +${bossLevelBonus}</strong></div>
+                <div class="detail-line-row"><span>점령자 매장 보너스</span><strong>+${bossStoreBonus}</strong></div>
                 ${defenseTimelineCopy ? `<p class="detail-note">${escapeHtml(defenseTimelineCopy)}</p>` : ""}
-              </section>` : ""}
+              </section>` : `
+              <section class="store-detail-subsection">
+                <div class="subsection-title">점령 상태</div>
+                <div class="detail-line-row"><span>현재 점령자</span><strong>없음</strong></div>
+                <p class="detail-note">현재 점령 가능한 매장입니다.</p>
+              </section>`}
 
             <section class="store-detail-subsection">
               <div class="subsection-title">점령 현황</div>
