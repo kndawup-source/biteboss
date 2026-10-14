@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "76.1";
+  const BITEBOSS_BUILD = "76.2";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -3630,6 +3630,8 @@
         return;
       }
 
+      const hadOrganizationBeforeChallenge = Boolean(String(organization?.id || "").trim());
+
       const { data, error } = await sb.rpc("biteboss_presence_ping_v7546", {
         p_store_id:nearest.store.id,
         p_lat:pos.coords.latitude,
@@ -3711,9 +3713,15 @@
         }
         showChallengeOutcome({
           ...data,
-          store_name:data?.store_name || nearest.store.name || "매장"
+          store_name:data?.store_name || nearest.store.name || "매장",
+          had_organization_before:hadOrganizationBeforeChallenge
         });
-        await Promise.all([loadCaptureCooldownStatus(true), loadStores(), loadHome()]);
+        await Promise.all([
+          loadCaptureCooldownStatus(true),
+          loadStores(),
+          loadHome(),
+          loadMyOrganization()
+        ]);
         if(String(activeStoreDetailId || "") === String(nearest.store.id))
           await openStoreDetail(nearest.store.id, { preserveModal:true, showStoreManagerCard:false });
         return;
@@ -4531,6 +4539,8 @@
     const pos = await getPositionSafe(true);
     if(!pos) return toast("보스 점령에는 위치 권한이 필요합니다.");
 
+    const hadOrganizationBeforeChallenge = Boolean(String(organization?.id || "").trim());
+
     const { data, error } = await sb.rpc("biteboss_claim_store", {
       p_qr_token:cleanToken,
       p_lat:pos.coords.latitude,
@@ -4543,7 +4553,10 @@
       return toast(claimErrorMessage(error.message));
     }
 
-    showChallengeOutcome(data);
+    showChallengeOutcome({
+      ...data,
+      had_organization_before:hadOrganizationBeforeChallenge
+    });
     lastPosition = pos;
     await Promise.all([
       loadCaptureCooldownStatus(true),
@@ -4551,7 +4564,8 @@
       loadHome(),
       loadRank(),
       loadGameActivity(),
-      loadAlerts()
+      loadAlerts(),
+      loadMyOrganization()
     ]);
   }
 
@@ -4563,7 +4577,11 @@
       const myPower = Number(data?.challenger_power || 0);
       const bossPower = Number(data?.defender_power || 0);
       const needed = myPower && bossPower && myPower <= bossPower ? bossPower - myPower + 1 : 0;
-      return toast(`${storeName} 도전 실패 · 크루 합류 + 상대 정보 공개.${myPower && bossPower ? ` 내 파워 ${myPower} / 보스 방어력 ${bossPower}.` : ""}${needed ? ` 파워 +${needed}이면 다시 도전할 수 있습니다.` : ""}`);
+      const hadOrganizationBefore = Boolean(data?.had_organization_before);
+      const resultCopy = hadOrganizationBefore
+        ? "도전 실패 · 기존 크루 유지 + 상대 정보 공개."
+        : "도전 실패 · 크루 합류 + 상대 정보 공개.";
+      return toast(`${storeName} ${resultCopy}${myPower && bossPower ? ` 내 파워 ${myPower} / 보스 방어력 ${bossPower}.` : ""}${needed ? ` 파워 +${needed}이면 다시 도전할 수 있습니다.` : ""}`);
     }
 
     if(outcome === "boss_visit"){
