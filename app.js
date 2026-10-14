@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.85";
+  const BITEBOSS_BUILD = "75.92";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -2289,7 +2289,7 @@
           <div class="store-comment-topline">
             <div class="store-comment-identity">
               <button type="button" class="store-comment-name" data-player-profile="${escapeAttr(comment.user_id || "")}">${escapeHtml(nickname)}</button>
-              ${comment.is_boss ? `<span class="store-comment-badge">BOSS</span>` : ""}
+              ${comment.is_boss ? `<span class="store-comment-crown" aria-label="현재 보스" title="현재 보스">👑</span>` : ""}
               ${comment.is_pinned ? `<span class="store-comment-pinned">고정</span>` : ""}
               <time>${escapeHtml(time + edited)}</time>
             </div>
