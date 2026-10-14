@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.75";
+  const BITEBOSS_BUILD = "75.77";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -2695,14 +2695,21 @@
       const defender = row.defender_name || "보스";
       const storeName = row.store_name || "매장";
 
+      const perspective = String(row.viewer_side || "");
       let title = "보스 도전";
       let detail = `${actor} → ${defender}`;
 
       if(result === "boss_win"){
-        title = "보스 점령";
-        detail = actor;
+        if(perspective === "defender") title = "보스 상실";
+        else if(perspective === "org_defender") title = "크루 점령지 상실";
+        else if(perspective === "org_challenger") title = "크루 점령";
+        else title = "보스 점령";
+        detail = perspective === "defender" || perspective === "org_defender" ? actor : actor;
       }else if(result === "crew"){
-        title = "점령 실패";
+        if(perspective === "defender") title = "방어 성공";
+        else if(perspective === "org_defender") title = "크루 방어 성공";
+        else if(perspective === "org_challenger") title = "크루 점령 실패";
+        else title = "점령 실패";
         detail = actor;
       }else if(result === "boss_visit"){
         title = "방어 유지";
