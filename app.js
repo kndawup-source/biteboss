@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.29";
+  const BITEBOSS_BUILD = "75.30";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -478,7 +478,6 @@
       if(!organization?.id) return;
       openCurrentOrganizationDetail();
     });
-    $("#notificationSettingsBtn")?.addEventListener("click", openNotificationSettings);
     $("#takeoverCancelBtn")?.addEventListener("click", cancelTakeoverUi);
     $("#challengeNextCard")?.addEventListener("click", () => {
       const storeId = String($("#challengeNextCard")?.dataset.storeId || "").trim();
@@ -3757,7 +3756,7 @@
           </div>
           <div class="crew-invite-detail-actions">${actionHtml}</div>
         </div>
-      `);
+      `, { type:"detail-sheet" });
 
       $("#crewQrJoinBtn")?.addEventListener("click", () => joinCrewByQr(cleanToken));
       $("#crewQrLoginBtn")?.addEventListener("click", openMemberLogin);
@@ -5245,7 +5244,7 @@
   }
 
   async function openOrganizationDetail(orgId){
-    openModal("크루 프로필", `<div class="store-detail-loading">크루 정보를 불러오는 중…</div>`);
+    openModal("크루 프로필", `<div class="store-detail-loading">크루 정보를 불러오는 중…</div>`, { type:"detail-sheet" });
 
     try{
       const { data, error } = await sb.rpc("biteboss_organization_detail", {
@@ -5557,7 +5556,7 @@
       <div class="crew-invite-shell">
         <div class="crew-invite-loading">크루 QR을 준비하는 중…</div>
       </div>
-    `);
+    `, { type:"detail-sheet" });
 
     await loadCrewInviteQr();
   }
@@ -5970,15 +5969,12 @@
 
     const login = $("#memberLoginBtn");
     const addStore = $("#addStoreBtn");
-    const notificationSettings = $("#notificationSettingsBtn");
     const deleteAccount = $("#deleteAccountBtn");
     const logout = $("#logoutBtn");
     login?.classList.toggle("hidden", loggedIn);
     addStore?.classList.toggle("hidden", !loggedIn);
-    notificationSettings?.classList.toggle("hidden", !loggedIn);
     deleteAccount?.classList.toggle("hidden", !loggedIn);
     logout?.classList.toggle("hidden", !loggedIn);
-    renderNotificationSettingsState();
     setText("#memberSessionLabel", "");
     renderOrganizationUi();
   }
@@ -6050,8 +6046,7 @@
         if(error) throw error;
         if(!data?.ok) throw new Error(data?.error || "PUSH_REGISTER_FAILED");
         try{ localStorage.setItem("biteboss-push-token", pushDeviceToken); }catch{}
-        renderNotificationSettingsState();
-      }catch(error){
+          }catch(error){
         console.warn("BiteBoss push token register:", error);
       }
     });
@@ -6059,8 +6054,7 @@
     await push.addListener("registrationError", error => {
       console.warn("BiteBoss push registration:", error);
       pushPermissionState = "error";
-      renderNotificationSettingsState();
-    });
+      });
 
     await push.addListener("pushNotificationReceived", async notification => {
       const data = notification?.data || {};
@@ -6159,8 +6153,7 @@
 
       if(permission !== "granted"){
         toast("알림 권한이 허용되지 않았습니다. iPhone 설정에서 BiteBoss 알림을 허용해 주세요.");
-        renderNotificationSettingsState();
-        return;
+            return;
       }
 
       await push.register();
@@ -6209,8 +6202,7 @@
       pushPreferences = null;
       pushUnreadCount = 0;
       pushPermissionState = isNativeApp() ? "unknown" : "web";
-      renderNotificationSettingsState();
-      return;
+        return;
     }
 
     await Promise.all([
@@ -6222,7 +6214,6 @@
     if(registerIfGranted && pushPermissionState === "granted" && pushPreferences?.push_enabled !== false){
       await registerPushIfGranted();
     }
-    renderNotificationSettingsState();
   }
 
   async function loadNotificationPreferences(){
@@ -6239,15 +6230,13 @@
   async function refreshPushInboxSummary(){
     if(!playerSession?.authenticated){
       pushUnreadCount = 0;
-      renderNotificationSettingsState();
-      return;
+        return;
     }
     try{
       const { data, error } = await sb.rpc("biteboss_notification_summary_v627");
       if(error) throw error;
       pushUnreadCount = Math.max(0, Number(data?.unread_count || 0));
-      renderNotificationSettingsState();
-    }catch(error){
+      }catch(error){
       console.warn("BiteBoss notification summary:", error);
     }
   }
@@ -6292,8 +6281,7 @@
       const { error } = await sb.rpc("biteboss_mark_notifications_read_v627");
       if(error) throw error;
       pushUnreadCount = 0;
-      renderNotificationSettingsState();
-    }catch(error){
+      }catch(error){
       console.warn("BiteBoss mark notifications read:", error);
     }
   }
@@ -6428,8 +6416,7 @@
           if(error) throw error;
           pushPreferences = data || next;
           renderNotificationSettingsModal();
-          renderNotificationSettingsState();
-        }catch(error){
+              }catch(error){
           console.warn("BiteBoss notification pref update:", error);
           toast("알림 설정을 변경하지 못했습니다.");
           button.disabled = false;
@@ -6745,11 +6732,13 @@
     modalScrollY = window.scrollY || window.pageYOffset || 0;
     document.body.style.top = `-${modalScrollY}px`;
     document.body.classList.add("modal-open");
+    document.documentElement.classList.add("modal-open");
   }
 
   function unlockModalScroll(){
     if(!document.body.classList.contains("modal-open")) return;
     document.body.classList.remove("modal-open");
+    document.documentElement.classList.remove("modal-open");
     document.body.style.top = "";
     window.scrollTo(0, modalScrollY);
   }
@@ -6762,7 +6751,11 @@
     if(!modal) return;
 
     modalReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    modal.classList.remove("store-detail-modal", "player-profile-modal", "notice-modal", "victory-modal");
+    const detailTypes = new Set(["detail-sheet", "store-detail", "player-profile"]);
+    const isDetailSheet = detailTypes.has(modalType);
+    modal.classList.remove("modal-detail-sheet", "modal-compact", "store-detail-modal", "player-profile-modal", "notice-modal", "victory-modal");
+    modal.classList.toggle("modal-detail-sheet", isDetailSheet);
+    modal.classList.toggle("modal-compact", !isDetailSheet);
     modal.classList.toggle("store-detail-modal", modalType === "store-detail");
     modal.classList.toggle("player-profile-modal", modalType === "player-profile");
     modal.classList.toggle("notice-modal", modalType === "notice");
@@ -6786,7 +6779,7 @@
 
     const modal = $("#modal");
     modal?.classList.add("hidden");
-    modal?.classList.remove("store-detail-modal", "player-profile-modal", "notice-modal", "victory-modal");
+    modal?.classList.remove("modal-detail-sheet", "modal-compact", "store-detail-modal", "player-profile-modal", "notice-modal", "victory-modal");
     unlockModalScroll();
     const returnFocus = modalReturnFocus;
     modalReturnFocus = null;
