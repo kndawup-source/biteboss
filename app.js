@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "76.6";
+  const BITEBOSS_BUILD = "76.7";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -2511,8 +2511,8 @@
     return `
       <section class="store-detail-section partner-owner-card">
         <span class="partner-owner-kicker">매장 관리자</span>
-        <strong>${status === "rejected" ? "매장 관리자 인증을 다시 신청할 수 있습니다." : "이 매장의 관리자이신가요?"}</strong>
-        <p>지금도 BiteBoss 방문·도전 데이터가 쌓이고 있습니다.</p>
+        <strong>${status === "rejected" ? "매장 관리자 인증을 다시 신청할 수 있습니다." : "내 매장, 직접 관리하세요."}</strong>
+        <p>${status === "rejected" ? "인증 정보를 확인한 뒤 다시 신청해주세요." : "매장 인증 후 방문·도전 현황과 매장 정보를 확인하고 관리할 수 있습니다."}</p>
         <button id="detailPartnerRequest" class="primary-btn claim-store-btn" type="button">매장 인증</button>
       </section>`;
   }
