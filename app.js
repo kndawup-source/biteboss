@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.48";
+  const BITEBOSS_BUILD = "75.50";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1653,6 +1653,16 @@
         </div>
       </section>` : "";
 
+    const history = Array.isArray(data.history) ? data.history : [];
+    const currentPlayerId = String(playerSession?.player_user_id || authUser?.id || "").trim();
+    const myPastReigns = currentPlayerId
+      ? history.filter(row => String(row?.boss_user_id || "") === currentPlayerId)
+      : [];
+    const wasPastBoss = !isBoss && myPastReigns.some(row => Boolean(row?.ended_at));
+    const hasVisitHistory = validVisits > 0;
+    const isNewStore = !bossExists && history.length === 0;
+    const reclaimAvailable = isBoss && reclaim?.eligible !== false && Number(reclaim?.remaining_seconds || 0) <= 0;
+
     const occupancyBadge = isBoss
       ? {label:"내 점령지",cls:"mine"}
       : protectedNow
@@ -1661,8 +1671,32 @@
           ? {label:"점령 중",cls:"occupied"}
           : {label:"점령 가능",cls:"open"};
 
+    const relationshipBadge = wasPastBoss
+      ? {label:"과거 점령지",cls:"history"}
+      : isBoss
+        ? {label:hasVisitHistory ? "재방문" : "첫 점령",cls:"history"}
+        : hasVisitHistory
+          ? {label:"방문 이력",cls:"history"}
+          : {label:"첫 방문",cls:"history"};
+
+    const opportunityBadge = isNewStore
+      ? {label:"신규 매장",cls:"new"}
+      : isBoss
+        ? {label:reclaimAvailable ? "재점령 가능" : "재점령 대기",cls:reclaimAvailable ? "open" : "history"}
+        : canChallenge
+          ? {label:"도전 가능",cls:"open"}
+          : protectedNow
+            ? {label:"도전 대기",cls:"history"}
+            : cooldownNow || globalCaptureCooldownNow
+              ? {label:"대기 중",cls:"history"}
+              : bossExists
+                ? {label:"도전 준비",cls:"history"}
+                : {label:"첫 점령 가능",cls:"open"};
+
     const detailBadges=[
       occupancyBadge,
+      relationshipBadge,
+      opportunityBadge,
       isPartner ? {label:"제휴",cls:"partner"} : null,
       offers.length ? {label:"혜택",cls:"benefit"} : null
     ].filter(Boolean);
@@ -1713,7 +1747,6 @@
     const arenaCrew = String(arena.current_crew_name || "");
     const arenaCrewTerritory = Math.max(0, Number(arena.current_crew_territory || 0));
 
-    const history = Array.isArray(data.history) ? data.history : [];
     const historyHtml = history.length ? `
       <section class="store-detail-section conquest-history">
         <h4>점령 히스토리</h4>
@@ -1809,7 +1842,7 @@
               : "점령 유지 중")}</small>
         </div>
         ${reclaimAvailableAt ? `<div class="owner-store-reclaim"><span>재점령</span><strong id="ownerReclaimCountdown" data-reclaim-at="${escapeAttr(reclaimAvailableAt)}">${escapeHtml(formatOwnStoreReclaim(reclaimAvailableAt))}</strong></div>` : ""}
-        <p>${defenseTimelineCopy ? escapeHtml(defenseTimelineCopy) : "다시 방문하면 방어력이 유지됩니다."}</p>
+        <p>${reclaim?.eligible ? "지금 다시 방문하면 자동으로 재점령됩니다." : "24시간 후 다시 방문하면 자동으로 재점령됩니다."}</p>
       </section>
     ` : "";
 
