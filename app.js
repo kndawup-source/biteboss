@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.47";
+  const BITEBOSS_BUILD = "75.48";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -214,6 +214,7 @@
   let presenceBlockedReason = "";
   let takeoverUi = null;
   let takeoverUiTimer = null;
+  let storeReclaimTimer = null;
   let takeoverLastServerAt = 0;
   let takeoverRemaining = 0;
   let takeoverRequired = 0;
@@ -397,6 +398,7 @@
     stopNearbyLocationWatch();
     storeSearchTimer = clearTimeoutRef(storeSearchTimer);
     takeoverUiTimer = clearIntervalRef(takeoverUiTimer);
+    storeReclaimTimer = clearIntervalRef(storeReclaimTimer);
     delayedTakeoverCloseTimer = clearTimeoutRef(delayedTakeoverCloseTimer);
     takeoverCancelResetTimer = clearTimeoutRef(takeoverCancelResetTimer);
   }
@@ -1454,7 +1456,7 @@
     );
 
     try{
-      const [detailResult, statusResult, orgResult, offerResult, partnerRequestResult, growthResult, arenaResult, historyResult] = await Promise.all([
+      const [detailResult, statusResult, orgResult, offerResult, partnerRequestResult, growthResult, arenaResult, historyResult, reclaimResult] = await Promise.all([
         sb.rpc("biteboss_store_detail", { p_store_id:storeId }),
         sb.rpc("biteboss_my_store_status", { p_store_id:storeId }),
         sb.rpc("biteboss_store_organization_status", { p_store_id:storeId }),
@@ -1464,7 +1466,10 @@
           : Promise.resolve({ data:null, error:null }),
         sb.rpc("biteboss_store_public_growth_v63", { p_store_id:storeId, p_days:30 }),
         sb.rpc("biteboss_store_game_board_v631", { p_store_id:storeId }),
-        sb.rpc("biteboss_store_history_v71", { p_store_id:storeId, p_limit:12 })
+        sb.rpc("biteboss_store_history_v71", { p_store_id:storeId, p_limit:12 }),
+        playerSession?.authenticated
+          ? sb.rpc("biteboss_own_store_reclaim_state_v7546", { p_store_id:storeId })
+          : Promise.resolve({ data:null, error:null })
       ]);
 
       if(detailResult.error) throw detailResult.error;
@@ -1488,7 +1493,9 @@
       data.publicGrowth = growthResult?.error ? null : (growthResult?.data || null);
       data.arena = arenaResult?.error ? null : (arenaResult?.data || null);
       data.history = historyResult?.error || !Array.isArray(historyResult?.data) ? [] : historyResult.data;
+      data.reclaim = reclaimResult?.error ? null : (reclaimResult?.data || null);
       if(historyResult?.error && !String(historyResult.error.message||"").includes("biteboss_store_history_v71")) console.warn("BiteBoss conquest history:", historyResult.error);
+      if(reclaimResult?.error && !String(reclaimResult.error.message||"").includes("biteboss_own_store_reclaim_state_v7546")) console.warn("BiteBoss reclaim state:", reclaimResult.error);
       if(partnerRequestResult?.error) console.warn("BiteBoss partner request status:", partnerRequestResult.error);
       if(growthResult?.error) console.warn("BiteBoss public growth:", growthResult.error);
       if(arenaResult?.error) console.warn("BiteBoss arena:", arenaResult.error);
@@ -1515,6 +1522,7 @@
     const partnerRequest = data.partnerRequest || {};
     const publicGrowth = data.publicGrowth || {};
     const arena = data.arena || {};
+    const reclaim = data.reclaim || {};
     const growth = game.growth || {};
     const defenseActivity = game.defense_activity || {};
     const photos = Array.isArray(data.photos) ? data.photos : [];
@@ -1786,6 +1794,7 @@
       ? "매장 보너스 최대"
       : `다음 +${nextBonus}까지 유효 방문 ${visitsToNextBonus}회`;
 
+    const reclaimAvailableAt = reclaim?.is_boss ? reclaim.available_at : null;
     const ownerStatusHtml = isBoss && bossExists ? `
       <section class="owner-store-status" aria-label="점령 상태">
         <div class="owner-store-status-main">
@@ -1799,6 +1808,7 @@
               ? `다음 약화까지 ${escapeHtml(formatRemaining(nextDefenseAt))}`
               : "점령 유지 중")}</small>
         </div>
+        ${reclaimAvailableAt ? `<div class="owner-store-reclaim"><span>재점령</span><strong id="ownerReclaimCountdown" data-reclaim-at="${escapeAttr(reclaimAvailableAt)}">${escapeHtml(formatOwnStoreReclaim(reclaimAvailableAt))}</strong></div>` : ""}
         <p>${defenseTimelineCopy ? escapeHtml(defenseTimelineCopy) : "다시 방문하면 방어력이 유지됩니다."}</p>
       </section>
     ` : "";
@@ -1968,6 +1978,8 @@
       store,bossName,bossDefense,protectedNow,protectionUntil,myPower,isBoss,context:"store_detail"
     }));
     $("#detailPartnerAdmin")?.addEventListener("click", () => { location.href = "./store-admin.html"; });
+
+    startOwnerReclaimCountdown();
 
     $("#detailScanQr")?.addEventListener("click", () => {
       closeModal();
@@ -2554,7 +2566,7 @@
 
     box.innerHTML = view.rows.map(entry => {
       const storeName = String(entry.store_name || "매장").trim();
-      const place = [entry.city, entry.district].filter(Boolean).join(", ") || entry.address || categoryLabel(entry.category) || "";
+      const place = [entry.city, entry.district].filter(Boolean).join(" ") || entry.address || categoryLabel(entry.category) || "";
       const cachedStore = stores.find(item => String(item.id) === String(entry.store_id)) || null;
       const photoUrl = String(
         entry.store_photo_url ||
@@ -6870,6 +6882,33 @@
     })[category] || category || "매장";
   }
 
+  function formatOwnStoreReclaim(value){
+    const diff = new Date(value).getTime() - Date.now();
+    if(!Number.isFinite(diff) || diff <= 0) return "재점령 가능";
+    const totalMinutes = Math.ceil(diff / 60000);
+    if(totalMinutes <= 1) return "곧 재점령 가능";
+    if(totalMinutes < 60) return `재점령 가능까지 ${totalMinutes}분`;
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return `재점령 가능까지 ${hours}시간${minutes ? ` ${minutes}분` : ""}`;
+  }
+
+  function updateOwnerReclaimCountdown(){
+    const target = $("#ownerReclaimCountdown");
+    if(!target) return;
+    const availableAt = String(target.dataset.reclaimAt || "").trim();
+    if(!availableAt) return;
+    target.textContent = formatOwnStoreReclaim(availableAt);
+  }
+
+  function startOwnerReclaimCountdown(){
+    storeReclaimTimer = clearIntervalRef(storeReclaimTimer);
+    const target = $("#ownerReclaimCountdown");
+    if(!target) return;
+    updateOwnerReclaimCountdown();
+    storeReclaimTimer = setInterval(updateOwnerReclaimCountdown, 30000);
+  }
+
   function formatRemaining(value){
     const diff = new Date(value).getTime() - Date.now();
     if(!Number.isFinite(diff) || diff <= 0) return "종료";
@@ -6958,6 +6997,7 @@
 
   function closeModal(){
     stopScanner();
+    storeReclaimTimer = clearIntervalRef(storeReclaimTimer);
 
     const modal = $("#modal");
     modal?.classList.add("hidden");
