@@ -15,7 +15,7 @@
           detectSessionInUrl:false,
           storageKey:"biteboss-admin-auth"
         },
-        global:{ headers:{ "x-client-info":"biteboss-admin-web/75.85" } }
+        global:{ headers:{ "x-client-info":"biteboss-admin-web/75.87" } }
       })
     : null;
 
@@ -31,6 +31,10 @@
   let analyticsRange = "7d";
   let analyticsCompareMode = "previous";
   let adminCommentPage = 1;
+  let adminStorePage = 1;
+  let partnerRequestPage = 1;
+  let adminUserPage = 1;
+  const ADMIN_PAGE_SIZE = 10;
 
   init().catch(showFatal);
 
@@ -197,10 +201,10 @@
       admin = null;
       location.reload();
     });
-    $("#userSearch")?.addEventListener("input", loadUsers);
-    $("#adminStoreSearch")?.addEventListener("input", renderStores);
+    $("#userSearch")?.addEventListener("input", () => { adminUserPage = 1; loadUsers(); });
+    $("#adminStoreSearch")?.addEventListener("input", () => { adminStorePage = 1; renderStores(); });
     $("#adCampaignCancel")?.addEventListener("click", resetAdCampaignForm);
-    $("#partnerRequestFilter")?.addEventListener("change", loadPartnerRequests);
+    $("#partnerRequestFilter")?.addEventListener("change", () => { partnerRequestPage = 1; loadPartnerRequests(); });
     $("#refreshPartnerRequests")?.addEventListener("click", loadPartnerRequests);
     $("#refreshAdminComments")?.addEventListener("click", () => loadAdminComments(adminCommentPage));
     $$('[data-analytics-range]').forEach(btn => btn.addEventListener("click", () => selectAnalyticsRange(btn.dataset.analyticsRange)));
@@ -475,7 +479,7 @@
     const filter = String($("#partnerRequestFilter")?.value || "pending");
     const statuses = ["pending", "approved", "rejected"];
     const [currentResult, ...countResults] = await Promise.all([
-      adminSb.rpc("biteboss_admin_partner_requests", {p_status: filter, p_limit: 100}),
+      adminSb.rpc("biteboss_admin_partner_requests", {p_status: filter, p_limit: 1000}),
       ...statuses.map(status => adminSb.rpc("biteboss_admin_partner_requests", {p_status: status, p_limit: 1000}))
     ]);
     const {data,error} = currentResult;
@@ -493,8 +497,16 @@
 
   function renderPartnerRequests(){
     const box = $("#partnerRequestList");
+    const nav = $("#partnerRequestPagination");
     if(!box) return;
-    box.innerHTML = partnerRequests.length ? partnerRequests.map(row => {
+
+    const total = partnerRequests.length;
+    const totalPages = Math.max(1, Math.ceil(total / ADMIN_PAGE_SIZE));
+    partnerRequestPage = Math.min(Math.max(1, partnerRequestPage), totalPages);
+    const startIndex = (partnerRequestPage - 1) * ADMIN_PAGE_SIZE;
+    const rows = partnerRequests.slice(startIndex, startIndex + ADMIN_PAGE_SIZE);
+
+    box.innerHTML = rows.length ? rows.map(row => {
       const status = String(row.status || "pending");
       const canReview = status === "pending";
       const code = String(row.activation_code || "").trim();
@@ -507,9 +519,16 @@
         ${canReview ? `<div class="partner-request-actions"><button class="primary-btn" data-partner-approve="${escapeAttr(row.id)}" type="button">제휴 승인</button><button class="secondary-btn" data-partner-reject="${escapeAttr(row.id)}" type="button">거절</button></div>` : ""}
       </article>`;
     }).join("") : `<div class="timeline-item muted">해당 상태의 제휴 신청이 없습니다.</div>`;
+
     $$('[data-partner-approve]').forEach(btn => btn.onclick = () => reviewPartnerRequest(btn.dataset.partnerApprove, "approve", btn));
     $$('[data-partner-reject]').forEach(btn => btn.onclick = () => reviewPartnerRequest(btn.dataset.partnerReject, "reject", btn));
     $$('[data-copy-partner-code]').forEach(btn => btn.onclick = async () => { try{ await navigator.clipboard.writeText(btn.dataset.copyPartnerCode || ""); btn.textContent="복사됨"; setTimeout(()=>btn.textContent="복사",1200); }catch{ alert(btn.dataset.copyPartnerCode || ""); } });
+
+    renderPagination(nav, partnerRequestPage, total, ADMIN_PAGE_SIZE, next => {
+      partnerRequestPage = next;
+      renderPartnerRequests();
+      box.scrollIntoView({ block:"start", behavior:"auto" });
+    });
   }
 
   async function reviewPartnerRequest(requestId, decision, button){
@@ -640,8 +659,14 @@
         .some(value => String(value).toLowerCase().includes(query));
     });
     setText("#adminStoreCount", stores.length);
+    const nav = $("#adminStorePagination");
+    const total = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(total / ADMIN_PAGE_SIZE));
+    adminStorePage = Math.min(Math.max(1, adminStorePage), totalPages);
+    const startIndex = (adminStorePage - 1) * ADMIN_PAGE_SIZE;
+    const pageRows = filtered.slice(startIndex, startIndex + ADMIN_PAGE_SIZE);
 
-    box.innerHTML = filtered.map(store => {
+    box.innerHTML = pageRows.map(store => {
       const isPartner = store.partnership_status === "partnered";
       const location = [store.city, store.district].filter(Boolean).join(" ") || "지역 미등록";
       return `
@@ -719,6 +744,12 @@
         if(error) return alert(error.message);
         await loadStores();
       };
+    });
+
+    renderPagination(nav, adminStorePage, total, ADMIN_PAGE_SIZE, next => {
+      adminStorePage = next;
+      renderStores();
+      box.scrollIntoView({ block:"start", behavior:"auto" });
     });
   }
 
@@ -885,7 +916,15 @@
       return;
     }
 
-    box.innerHTML = (data || []).map(row => `
+    const rows = Array.isArray(data) ? data : [];
+    const nav = $("#userPagination");
+    const total = rows.length;
+    const totalPages = Math.max(1, Math.ceil(total / ADMIN_PAGE_SIZE));
+    adminUserPage = Math.min(Math.max(1, adminUserPage), totalPages);
+    const startIndex = (adminUserPage - 1) * ADMIN_PAGE_SIZE;
+    const pageRows = rows.slice(startIndex, startIndex + ADMIN_PAGE_SIZE);
+
+    box.innerHTML = pageRows.map(row => `
       <article class="admin-user-row">
         <div class="admin-user-copy">
           <strong>${escapeHtml(row.nickname || row.username || "Member")}</strong>
@@ -922,6 +961,12 @@
       }finally{
         btn.disabled = false;
       }
+    });
+
+    renderPagination(nav, adminUserPage, total, ADMIN_PAGE_SIZE, next => {
+      adminUserPage = next;
+      loadUsers();
+      box.scrollIntoView({ block:"start", behavior:"auto" });
     });
   }
 

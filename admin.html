@@ -6,9 +6,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" />
   <meta name="mobile-web-app-capable" content="yes" />
   <title>BiteBoss Admin</title>
-  <link rel="stylesheet" href="./styles.css?v=75.85" />
-  <link rel="stylesheet" href="./admin.css?v=75.85" />
-  <script src="./app-config.js?v=75.85"></script>
+  <link rel="stylesheet" href="./styles.css?v=75.87" />
+  <link rel="stylesheet" href="./admin.css?v=75.87" />
+  <script src="./app-config.js?v=75.87"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="admin-app">
@@ -177,6 +177,7 @@
         </div>
         <div class="admin-list-toolbar"><input id="adminStoreSearch" class="input" type="search" placeholder="매장명 · 지역 검색" autocomplete="off" /></div>
         <div id="adminStoreList" class="store-list admin-store-list"></div>
+        <nav id="adminStorePagination" class="list-pagination hidden" aria-label="매장 목록 페이지"></nav>
       </section>
     </section>
 
@@ -188,6 +189,7 @@
         <button id="refreshPartnerRequests" class="secondary-btn" type="button">새로고침</button>
       </div>
       <div id="partnerRequestList" class="partner-request-list"></div>
+      <nav id="partnerRequestPagination" class="list-pagination hidden" aria-label="제휴 신청 페이지"></nav>
     </section>
 
     <section class="admin-page" id="admin-comments">
@@ -252,7 +254,7 @@
     </section>
 
     
-    <section class="admin-page" id="admin-users"><div class="admin-page-head"><div><span class="eyebrow">게임</span><h2>사용자</h2><p>회원 검색과 계정 상태를 확인합니다.</p></div></div><section class="admin-section-card"><div class="admin-list-toolbar"><input id="userSearch" class="input" type="search" placeholder="닉네임 검색" autocomplete="off" /></div><div id="userList" class="store-list admin-list-gap"></div></section></section>
+    <section class="admin-page" id="admin-users"><div class="admin-page-head"><div><span class="eyebrow">게임</span><h2>사용자</h2><p>회원 검색과 계정 상태를 확인합니다.</p></div></div><section class="admin-section-card"><div class="admin-list-toolbar"><input id="userSearch" class="input" type="search" placeholder="닉네임 검색" autocomplete="off" /></div><div id="userList" class="store-list admin-list-gap"></div><nav id="userPagination" class="list-pagination hidden" aria-label="사용자 페이지"></nav></section></section>
 
     <section class="admin-page" id="admin-gameops">
       <div class="admin-page-head"><div><span class="eyebrow">게임</span><h2>게임 운영</h2><p>점령과 크루의 현재 상태를 운영합니다.</p></div></div>
@@ -405,6 +407,6 @@
   </section>
 </div>
 
-<script src="./admin.js?v=75.85"></script>
+<script src="./admin.js?v=75.87"></script>
 </body>
 </html>
