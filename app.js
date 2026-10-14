@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.56";
+  const BITEBOSS_BUILD = "75.57";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1841,20 +1841,27 @@
 
     const reclaimAvailableAt = reclaim?.is_boss ? reclaim.available_at : null;
     const ownerStatusHtml = isBoss && bossExists ? `
-      <section class="owner-store-status" aria-label="점령 상태">
-        <div class="owner-store-status-main">
-          <div>
+      <section class="owner-store-status" aria-label="내 점령 상태">
+        <div class="owner-store-status-grid">
+          <article>
             <span>방어력</span>
             <strong>${bossDefense}</strong>
-          </div>
-          <small>${protectedNow
-            ? `보호 ${escapeHtml(formatRemaining(protectionUntil))} 남음`
-            : (nextDefenseAt
-              ? `다음 약화까지 ${escapeHtml(formatRemaining(nextDefenseAt))}`
-              : "점령 유지 중")}</small>
+            <small>${protectedNow
+              ? `보호 ${escapeHtml(formatRemaining(protectionUntil))} 남음`
+              : (nextDefenseAt
+                ? `다음 약화 ${escapeHtml(formatRemaining(nextDefenseAt))}`
+                : "점령 유지 중")}</small>
+          </article>
+          ${reclaimAvailableAt ? `<article class="owner-store-reclaim">
+            <span>재점령 가능까지</span>
+            <strong id="ownerReclaimCountdown" data-reclaim-at="${escapeAttr(reclaimAvailableAt)}">${escapeHtml(formatOwnStoreReclaim(reclaimAvailableAt))}</strong>
+            <small>${reclaim?.eligible ? "재방문 시 자동 재점령" : "시간 종료 후 재방문 시 자동 재점령"}</small>
+          </article>` : `<article class="owner-store-reclaim is-unavailable">
+            <span>재점령</span>
+            <strong>확인 중</strong>
+            <small>점령 상태를 불러오는 중입니다.</small>
+          </article>`}
         </div>
-        ${reclaimAvailableAt ? `<div class="owner-store-reclaim"><span>재점령</span><strong id="ownerReclaimCountdown" data-reclaim-at="${escapeAttr(reclaimAvailableAt)}">${escapeHtml(formatOwnStoreReclaim(reclaimAvailableAt))}</strong></div>` : ""}
-        <p>${reclaim?.eligible ? "지금 다시 방문하면 자동으로 재점령됩니다." : "24시간 후 다시 방문하면 자동으로 재점령됩니다."}</p>
       </section>
     ` : "";
 
@@ -1892,6 +1899,8 @@
               ${detailBadges.map(tag=>`<span class="store-status-tag ${tag.cls}">${tag.label}</span>`).join("")}
             </div>` : ""}
         </header>
+
+        ${ownerStatusHtml}
 
         ${Number.isFinite(Number(store.latitude)) && Number.isFinite(Number(store.longitude)) ? `
           <section class="store-detail-map-section" aria-label="매장 위치">
@@ -1938,7 +1947,7 @@
               </div>
             ` : ""}
           </section>
-        ` : ownerStatusHtml}
+        ` : ""}
 
         <section class="growth-compact">
           <div class="growth-compact-head">
@@ -6986,13 +6995,13 @@
 
   function formatOwnStoreReclaim(value){
     const diff = new Date(value).getTime() - Date.now();
-    if(!Number.isFinite(diff) || diff <= 0) return "재점령 가능";
+    if(!Number.isFinite(diff) || diff <= 0) return "지금 가능";
     const totalMinutes = Math.ceil(diff / 60000);
-    if(totalMinutes <= 1) return "곧 재점령 가능";
-    if(totalMinutes < 60) return `재점령 가능까지 ${totalMinutes}분`;
+    if(totalMinutes <= 1) return "곧 가능";
+    if(totalMinutes < 60) return `${totalMinutes}분`;
     const hours = Math.floor(totalMinutes / 60);
     const minutes = totalMinutes % 60;
-    return `재점령 가능까지 ${hours}시간${minutes ? ` ${minutes}분` : ""}`;
+    return `${hours}시간 ${minutes}분`;
   }
 
   function updateOwnerReclaimCountdown(){
