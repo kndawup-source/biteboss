@@ -15,7 +15,7 @@
           detectSessionInUrl:false,
           storageKey:"biteboss-store-auth"
         },
-        global:{ headers:{ "x-client-info":"biteboss-store-admin-web/76.0" } }
+        global:{ headers:{ "x-client-info":"biteboss-store-admin-web/76.1" } }
       })
     : null;
 

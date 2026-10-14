@@ -279,6 +279,16 @@ html::-webkit-scrollbar,body.user-app::-webkit-scrollbar,body.user-app *::-webki
 /* info pages */
 body.biteboss-info-page{min-height:100dvh;background:var(--bg);color:#111}.info-shell{width:min(100%,720px);margin:0 auto;padding:calc(28px + var(--safe-top)) 20px 48px}.info-head{margin-bottom:24px}.info-head h1{margin:8px 0 0;font-size:36px;letter-spacing:-.05em}.info-copy{display:grid;gap:14px}.info-copy section{padding:18px;border:0;border-radius:14px;background:var(--card)}.info-copy h2{margin:0 0 8px;font-size:16px}.info-copy p,.info-copy li{color:#6f6f69;font-size:13px;line-height:1.7}
 
+
+@media(min-width:681px){
+  body.user-app #page-home{
+    left:50%;
+    right:auto;
+    width:min(100%,var(--page));
+    transform:translateX(-50%);
+  }
+}
+
 @media(max-width:520px){
   .list-pagination{margin-top:14px}.pagination-btn{height:34px;min-width:54px;padding:0 10px}
 
