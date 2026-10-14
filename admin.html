@@ -6,9 +6,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" />
   <meta name="mobile-web-app-capable" content="yes" />
   <title>BiteBoss Admin</title>
-  <link rel="stylesheet" href="./styles.css?v=75.83" />
-  <link rel="stylesheet" href="./admin.css?v=75.83" />
-  <script src="./app-config.js?v=75.83"></script>
+  <link rel="stylesheet" href="./styles.css?v=75.85" />
+  <link rel="stylesheet" href="./admin.css?v=75.85" />
+  <script src="./app-config.js?v=75.85"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="admin-app">
@@ -50,7 +50,6 @@
 
     <nav class="admin-secondary-nav" aria-label="관리자 세부 메뉴">
       <button class="admin-section-nav active" data-admin="dashboard" data-admin-group="overview" type="button">현황</button>
-      <button class="admin-section-nav hidden" data-admin="performance" data-admin-group="overview" type="button">성과</button>
 
       <button class="admin-section-nav hidden" data-admin="stores" data-admin-group="stores" type="button">매장 관리</button>
       <button class="admin-section-nav hidden" data-admin="partner-requests" data-admin-group="stores" type="button">제휴 신청</button>
@@ -84,6 +83,56 @@
         <div><span>차단/이상</span><strong id="statSuspicious">0</strong></div>
       </section>
 
+      <section class="admin-dashboard-section admin-performance-inline">
+        <div class="section-head"><h3>성과</h3><span>기간별 사용자 행동 · 제휴 효과</span></div>
+        <section class="analytics-toolbar admin-section-card" aria-label="성과 기간 설정">
+        <div class="analytics-presets" id="analyticsPresets">
+        <button type="button" data-analytics-range="today">오늘</button>
+        <button type="button" data-analytics-range="7d" class="active">7일</button>
+        <button type="button" data-analytics-range="30d">30일</button>
+        <button type="button" data-analytics-range="this_month">이번 달</button>
+        <button type="button" data-analytics-range="last_month">지난달</button>
+        <button type="button" data-analytics-range="this_year">올해</button>
+        <button type="button" data-analytics-range="last_year">작년</button>
+        <button type="button" data-analytics-range="custom">직접설정</button>
+        </div>
+        <div class="analytics-custom hidden" id="analyticsCustomRange">
+        <input id="analyticsFrom" class="input" type="date" aria-label="시작일" />
+        <span>—</span>
+        <input id="analyticsTo" class="input" type="date" aria-label="종료일" />
+        <button id="analyticsApplyCustom" class="secondary-btn" type="button">적용</button>
+        </div>
+        <div class="analytics-compare-row">
+        <strong id="analyticsPeriodLabel">최근 7일</strong>
+        <select id="analyticsCompareMode" class="input" aria-label="비교 기준"><option value="previous">이전 기간 대비</option><option value="year">전년 동기 대비</option></select>
+        </div>
+        </section>
+
+        <section class="analytics-kpis" aria-label="핵심 성과">
+        <article><span>활성 사용자</span><strong id="analyticsActiveUsers">0</strong><small id="analyticsActiveUsersDelta">—</small></article>
+        <article><span>인증 방문</span><strong id="analyticsVisits">0</strong><small id="analyticsVisitsDelta">—</small></article>
+        <article><span>도전</span><strong id="analyticsChallenges">0</strong><small id="analyticsChallengesDelta">—</small></article>
+        <article><span>점령</span><strong id="analyticsCaptures">0</strong><small id="analyticsCapturesDelta">—</small></article>
+        <article><span>재방문율</span><strong id="analyticsRepeatRate">0%</strong><small id="analyticsRepeatRateDelta">—</small></article>
+        </section>
+
+        <section class="analytics-grid">
+        <article class="analytics-panel analytics-panel-wide">
+        <div class="section-head"><h3>인증 방문 추이</h3><span id="analyticsTrendMeta">기간별</span></div>
+        <div id="analyticsVisitChart" class="analytics-vbar-chart" aria-label="인증 방문 추이 그래프"></div>
+        </article>
+        <article class="analytics-panel">
+        <div class="section-head"><h3>제휴 효과</h3><span>매장당 평균 · 같은 기간</span></div>
+        <div id="analyticsPartnerChart" class="analytics-partner-chart"></div>
+        <p class="analytics-note">현재 제휴 매장과 미제휴 매장의 동일 기간 평균입니다.</p>
+        </article>
+        <article class="analytics-panel">
+        <div class="section-head"><h3>제휴 우위</h3><span>미제휴 대비</span></div>
+        <div id="analyticsPartnerLift" class="analytics-lift"></div>
+        </article>
+        </section>
+      </section>
+
       <section class="admin-dashboard-section admin-current-bosses">
         <div class="section-head"><h3>현재 보스</h3><span>실시간 점령 상태</span></div>
         <div id="bossList" class="store-list"></div>
@@ -95,56 +144,6 @@
       </section>
     </section>
 
-    <section class="admin-page" id="admin-performance">
-      <div class="admin-page-head simple-head"><div><span class="eyebrow">현황</span><h2>성과</h2><p>기간별 사용자 행동과 제휴 매장 성과를 비교합니다.</p></div></div>
-
-      <section class="analytics-toolbar admin-section-card" aria-label="성과 기간 설정">
-        <div class="analytics-presets" id="analyticsPresets">
-          <button type="button" data-analytics-range="today">오늘</button>
-          <button type="button" data-analytics-range="7d" class="active">7일</button>
-          <button type="button" data-analytics-range="30d">30일</button>
-          <button type="button" data-analytics-range="this_month">이번 달</button>
-          <button type="button" data-analytics-range="last_month">지난달</button>
-          <button type="button" data-analytics-range="this_year">올해</button>
-          <button type="button" data-analytics-range="last_year">작년</button>
-          <button type="button" data-analytics-range="custom">직접설정</button>
-        </div>
-        <div class="analytics-custom hidden" id="analyticsCustomRange">
-          <input id="analyticsFrom" class="input" type="date" aria-label="시작일" />
-          <span>—</span>
-          <input id="analyticsTo" class="input" type="date" aria-label="종료일" />
-          <button id="analyticsApplyCustom" class="secondary-btn" type="button">적용</button>
-        </div>
-        <div class="analytics-compare-row">
-          <strong id="analyticsPeriodLabel">최근 7일</strong>
-          <select id="analyticsCompareMode" class="input" aria-label="비교 기준"><option value="previous">이전 기간 대비</option><option value="year">전년 동기 대비</option></select>
-        </div>
-      </section>
-
-      <section class="analytics-kpis" aria-label="핵심 성과">
-        <article><span>활성 사용자</span><strong id="analyticsActiveUsers">0</strong><small id="analyticsActiveUsersDelta">—</small></article>
-        <article><span>인증 방문</span><strong id="analyticsVisits">0</strong><small id="analyticsVisitsDelta">—</small></article>
-        <article><span>도전</span><strong id="analyticsChallenges">0</strong><small id="analyticsChallengesDelta">—</small></article>
-        <article><span>점령</span><strong id="analyticsCaptures">0</strong><small id="analyticsCapturesDelta">—</small></article>
-        <article><span>재방문율</span><strong id="analyticsRepeatRate">0%</strong><small id="analyticsRepeatRateDelta">—</small></article>
-      </section>
-
-      <section class="analytics-grid">
-        <article class="analytics-panel analytics-panel-wide">
-          <div class="section-head"><h3>인증 방문 추이</h3><span id="analyticsTrendMeta">기간별</span></div>
-          <div id="analyticsVisitChart" class="analytics-vbar-chart" aria-label="인증 방문 추이 그래프"></div>
-        </article>
-        <article class="analytics-panel">
-          <div class="section-head"><h3>제휴 효과</h3><span>매장당 평균 · 같은 기간</span></div>
-          <div id="analyticsPartnerChart" class="analytics-partner-chart"></div>
-          <p class="analytics-note">현재 제휴 매장과 미제휴 매장의 동일 기간 평균입니다.</p>
-        </article>
-        <article class="analytics-panel">
-          <div class="section-head"><h3>제휴 우위</h3><span>미제휴 대비</span></div>
-          <div id="analyticsPartnerLift" class="analytics-lift"></div>
-        </article>
-      </section>
-    </section>
 
     <section class="admin-page" id="admin-stores">
       <div class="admin-page-head"><div><span class="eyebrow">매장</span><h2>매장 관리</h2><p>새 매장을 등록하고, 등록된 매장의 정보·사진·메뉴·혜택을 수정합니다.</p></div></div>
@@ -406,6 +405,6 @@
   </section>
 </div>
 
-<script src="./admin.js?v=75.83"></script>
+<script src="./admin.js?v=75.85"></script>
 </body>
 </html>

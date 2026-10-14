@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.82";
+  const BITEBOSS_BUILD = "75.85";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -2290,31 +2290,28 @@
 
   function storeCommentMarkup(comment){
     const nickname = String(comment.nickname || "사용자");
-    const meta = [
-      comment.crew_name ? String(comment.crew_name) : "",
-      formatCommentTime(comment.created_at),
-      comment.edited_at ? "수정됨" : ""
-    ].filter(Boolean).join(" · ");
+    const time = formatCommentTime(comment.created_at);
+    const edited = comment.edited_at ? " · 수정됨" : "";
 
-    return `
-      <article class="store-comment-row ${comment.is_pinned ? "is-pinned" : ""}" data-store-comment-id="${escapeAttr(comment.id)}">
+    return       `<article class="store-comment-row ${comment.is_pinned ? "is-pinned" : ""}" data-store-comment-id="${escapeAttr(comment.id)}">
         <button class="store-comment-profile" type="button" data-player-profile="${escapeAttr(comment.user_id || "")}" aria-label="${escapeAttr(nickname)} 프로필">
           ${bossAvatarMarkup(comment.avatar_url || "", nickname, "store-comment-avatar")}
         </button>
         <div class="store-comment-copy">
-          <div class="store-comment-name-line">
-            <button type="button" class="store-comment-name" data-player-profile="${escapeAttr(comment.user_id || "")}">${escapeHtml(nickname)}</button>
-            ${comment.is_boss ? `<span class="store-comment-badge">BOSS</span>` : ""}
-            ${comment.is_pinned ? `<span class="store-comment-pinned">고정</span>` : ""}
+          <div class="store-comment-topline">
+            <div class="store-comment-identity">
+              <button type="button" class="store-comment-name" data-player-profile="${escapeAttr(comment.user_id || "")}">${escapeHtml(nickname)}</button>
+              ${comment.is_boss ? `<span class="store-comment-badge">BOSS</span>` : ""}
+              ${comment.is_pinned ? `<span class="store-comment-pinned">고정</span>` : ""}
+              <time>${escapeHtml(time + edited)}</time>
+            </div>
+            <div class="store-comment-actions">
+              ${comment.is_mine ? `<button type="button" data-comment-edit>수정</button><button type="button" data-comment-delete>삭제</button>` : `<button type="button" data-comment-report>신고</button>`}
+            </div>
           </div>
           <p>${escapeHtml(comment.body || "")}</p>
-          <small>${escapeHtml(meta)}</small>
         </div>
-        <div class="store-comment-actions">
-          ${comment.is_mine ? `<button type="button" data-comment-edit>수정</button><button type="button" data-comment-delete>삭제</button>` : `<button type="button" data-comment-report>신고</button>`}
-        </div>
-      </article>
-    `;
+      </article>`;
   }
 
   function bindStoreCommentRows(root, storeId){
@@ -5849,7 +5846,7 @@
         ).trim();
       }
 
-      renderPlayerProfile(data);
+      renderPlayerProfile(data, userId);
     }catch(error){
       console.warn("BiteBoss player profile:", error);
       const body = $("#modalBody");
@@ -5859,7 +5856,7 @@
     }
   }
 
-  function renderPlayerProfile(data){
+  function renderPlayerProfile(data, userId){
     const player = data.player || {};
     const h2h = data.head_to_head || {};
     const recentAll = Array.isArray(data.recent_activity) ? data.recent_activity : [];
@@ -5941,6 +5938,15 @@
           </div>
           <div class="player-profile-history-list">${recentHtml}</div>
         </section>
+
+        <section class="player-profile-comments" data-player-comment-history="${escapeAttr(userId || "")}">
+          <div class="player-profile-section-head">
+            <span>작성한 한마디</span>
+            <strong data-player-comment-total>0건</strong>
+          </div>
+          <div class="player-profile-comment-list"><div class="app-state">한마디 기록을 불러오는 중…</div></div>
+          <nav class="list-pagination player-profile-comment-pagination hidden" aria-label="작성한 한마디 페이지"></nav>
+        </section>
       </div>
     `;
 
@@ -5956,6 +5962,57 @@
         }
       });
     });
+
+    loadPlayerCommentHistory(userId, 1);
+  }
+
+  async function loadPlayerCommentHistory(userId, page = 1){
+    const root = $(`[data-player-comment-history="${cssEscape(userId || "")}"]`);
+    if(!root || !userId) return;
+    const list = root.querySelector(".player-profile-comment-list");
+    const pagination = root.querySelector(".player-profile-comment-pagination");
+    if(list) list.innerHTML = `<div class="app-state">한마디 기록을 불러오는 중…</div>`;
+
+    const { data, error } = await sb.rpc("biteboss_player_comment_history_v7585", {
+      p_user_id:userId,
+      p_page:Math.max(1, Number(page || 1)),
+      p_page_size:5
+    });
+
+    if(error){
+      console.warn("BiteBoss player comment history:", error);
+      if(list) setRetryState(list, "한마디 기록을 불러오지 못했습니다.", () => loadPlayerCommentHistory(userId, page));
+      return;
+    }
+
+    const payload = data && typeof data === "object" ? data : {};
+    const items = Array.isArray(payload.items) ? payload.items : [];
+    const total = Math.max(0, Number(payload.total || 0));
+    const safePage = Math.max(1, Number(payload.page || page || 1));
+    const totalEl = root.querySelector("[data-player-comment-total]");
+    if(totalEl) totalEl.textContent = `${total.toLocaleString("ko-KR")}건`;
+
+    if(list){
+      list.innerHTML = items.length ? items.map(row => `
+        <button class="player-profile-comment-row" type="button" data-profile-comment-store="${escapeAttr(row.store_id || "")}">
+          <div class="player-profile-comment-meta">
+            <strong>${escapeHtml(row.store_name || "매장")}</strong>
+            <time>${escapeHtml(formatCommentTime(row.created_at))}${row.edited_at ? " · 수정됨" : ""}</time>
+          </div>
+          <p>${escapeHtml(row.body || "")}</p>
+        </button>
+      `).join("") : `<div class="app-state player-profile-empty">작성한 한마디가 없습니다.</div>`;
+    }
+
+    root.querySelectorAll("[data-profile-comment-store]").forEach(button => {
+      button.addEventListener("click", () => {
+        const storeId = button.dataset.profileCommentStore;
+        closeModal();
+        if(storeId) openStoreDetail(storeId, { source:"player_profile_comment", showStoreManagerCard:false });
+      });
+    });
+
+    renderPagination(pagination, safePage, total, 5, next => loadPlayerCommentHistory(userId, next));
   }
 
   async function openCurrentOrganizationDetail(){
