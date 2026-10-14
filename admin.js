@@ -15,7 +15,7 @@
           detectSessionInUrl:false,
           storageKey:"biteboss-admin-auth"
         },
-        global:{ headers:{ "x-client-info":"biteboss-admin-web/75.44" } }
+        global:{ headers:{ "x-client-info":"biteboss-admin-web/75.47" } }
       })
     : null;
 
@@ -202,6 +202,7 @@
 
     $$('[data-close-store-editor]').forEach(node => node.addEventListener('click', closeStoreEditor));
     $("#adminStoreEditForm")?.addEventListener("submit", saveAdminStoreInfo);
+    $("#resetStoreGpsBtn")?.addEventListener("click", resetEditingStoreGps);
     $("#adminPhotoForm")?.addEventListener("submit", addAdminStorePhoto);
     $("#adminMenuForm")?.addEventListener("submit", saveAdminMenu);
     $("#adminOfferForm")?.addEventListener("submit", saveAdminOffer);
@@ -220,69 +221,103 @@
     $("#adCampaignForm")?.addEventListener("submit", saveAdCampaign);
   }
 
+  async function getAdminCurrentCoordinates(){
+    let coords = null;
+    const nativeGeo = window.Capacitor?.Plugins?.Geolocation;
+
+    if(nativeGeo?.getCurrentPosition){
+      try{
+        const position = await nativeGeo.getCurrentPosition({
+          enableHighAccuracy:true,
+          timeout:12000,
+          maximumAge:0
+        });
+        coords = position?.coords || null;
+      }catch(error){
+        console.warn("Native geolocation failed, falling back to browser geolocation.", error);
+      }
+    }
+
+    if(!coords){
+      if(!navigator.geolocation) throw new Error("이 기기에서는 위치 정보를 사용할 수 없습니다.");
+      coords = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          position => resolve(position.coords),
+          error => reject(error),
+          { enableHighAccuracy:true, timeout:12000, maximumAge:0 }
+        );
+      });
+    }
+
+    const latitude = Number(coords?.latitude);
+    const longitude = Number(coords?.longitude);
+    const accuracy = Number(coords?.accuracy);
+    if(!Number.isFinite(latitude) || !Number.isFinite(longitude)){
+      throw new Error("GPS 좌표를 확인할 수 없습니다.");
+    }
+
+    return { latitude, longitude, accuracy };
+  }
+
+  function adminGeolocationErrorMessage(error){
+    if(error?.code === 1) return "위치 권한을 허용해 주세요.";
+    if(error?.code === 2) return "현재 위치를 확인할 수 없습니다.";
+    if(error?.code === 3) return "위치 확인 시간이 초과됐습니다.";
+    return error?.message || "위치 정보를 불러오지 못했습니다.";
+  }
+
+  function applyCoordinatesToForm(formSelector, coords){
+    const latInput = document.querySelector(`${formSelector} [name="latitude"]`);
+    const lngInput = document.querySelector(`${formSelector} [name="longitude"]`);
+    if(!latInput || !lngInput) return false;
+
+    latInput.value = coords.latitude.toFixed(7);
+    lngInput.value = coords.longitude.toFixed(7);
+    latInput.dispatchEvent(new Event("input", { bubbles:true }));
+    lngInput.dispatchEvent(new Event("input", { bubbles:true }));
+    return true;
+  }
+
   async function fillCurrentStoreLocation(){
     const button = $("#useCurrentLocationBtn");
     const status = $("#locationStatus");
-    const latInput = document.querySelector('#storeForm [name="latitude"]');
-    const lngInput = document.querySelector('#storeForm [name="longitude"]');
-
-    if(!latInput || !lngInput) return;
-
     if(button) button.disabled = true;
     if(status) status.textContent = "현재 위치 확인 중…";
 
     try{
-      let coords = null;
-
-      const nativeGeo = window.Capacitor?.Plugins?.Geolocation;
-      if(nativeGeo?.getCurrentPosition){
-        try{
-          const position = await nativeGeo.getCurrentPosition({
-            enableHighAccuracy:true,
-            timeout:12000,
-            maximumAge:0
-          });
-          coords = position?.coords || null;
-        }catch(error){
-          console.warn("Native geolocation failed, falling back to browser geolocation.", error);
-        }
-      }
-
-      if(!coords){
-        if(!navigator.geolocation) throw new Error("이 기기에서는 위치 정보를 사용할 수 없습니다.");
-        coords = await new Promise((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(
-            position => resolve(position.coords),
-            error => reject(error),
-            { enableHighAccuracy:true, timeout:12000, maximumAge:0 }
-          );
-        });
-      }
-
-      const latitude = Number(coords.latitude);
-      const longitude = Number(coords.longitude);
-      if(!Number.isFinite(latitude) || !Number.isFinite(longitude)){
-        throw new Error("GPS 좌표를 확인할 수 없습니다.");
-      }
-
-      latInput.value = latitude.toFixed(7);
-      lngInput.value = longitude.toFixed(7);
-      latInput.dispatchEvent(new Event("input", { bubbles:true }));
-      lngInput.dispatchEvent(new Event("input", { bubbles:true }));
-
-      const accuracy = Number(coords.accuracy);
+      const coords = await getAdminCurrentCoordinates();
+      if(!applyCoordinatesToForm("#storeForm", coords)) return;
       if(status){
-        status.textContent = Number.isFinite(accuracy)
-          ? `현재 위치 입력 완료 · 정확도 약 ${Math.round(accuracy)}m`
+        status.textContent = Number.isFinite(coords.accuracy)
+          ? `현재 위치 입력 완료 · 정확도 약 ${Math.round(coords.accuracy)}m`
           : "현재 위치 입력 완료";
       }
     }catch(error){
       console.error("BiteBoss admin geolocation failed:", error);
-      let message = error?.message || "위치 정보를 불러오지 못했습니다.";
-      if(error?.code === 1) message = "위치 권한을 허용해 주세요.";
-      if(error?.code === 2) message = "현재 위치를 확인할 수 없습니다.";
-      if(error?.code === 3) message = "위치 확인 시간이 초과됐습니다.";
-      if(status) status.textContent = message;
+      if(status) status.textContent = adminGeolocationErrorMessage(error);
+    }finally{
+      if(button) button.disabled = false;
+    }
+  }
+
+  async function resetEditingStoreGps(){
+    if(!editingStoreId) return;
+    const button = $("#resetStoreGpsBtn");
+    const status = $("#adminStoreGpsStatus");
+    if(button) button.disabled = true;
+    if(status) status.textContent = "현재 위치 확인 중…";
+
+    try{
+      const coords = await getAdminCurrentCoordinates();
+      if(!applyCoordinatesToForm("#adminStoreEditForm", coords)) return;
+      if(status){
+        status.textContent = Number.isFinite(coords.accuracy)
+          ? `GPS 재설정 준비 완료 · 정확도 약 ${Math.round(coords.accuracy)}m · 저장 버튼을 눌러 적용`
+          : "GPS 재설정 준비 완료 · 저장 버튼을 눌러 적용";
+      }
+    }catch(error){
+      console.error("BiteBoss admin store GPS reset failed:", error);
+      if(status) status.textContent = adminGeolocationErrorMessage(error);
     }finally{
       if(button) button.disabled = false;
     }
@@ -1014,6 +1049,14 @@
     const store = bundle.store || {};
     setText("#adminStoreEditorTitle", store.name || "매장 수정");
     setText("#adminStoreEditorMeta", `${partnershipLabel(store.partnership_status)} · ${store.partnership_status === "partnered" ? "QR 점령" : "GPS 자동점령"}`);
+    const currentLat = Number(store.latitude);
+    const currentLng = Number(store.longitude);
+    setText(
+      "#adminStoreGpsStatus",
+      Number.isFinite(currentLat) && Number.isFinite(currentLng)
+        ? `현재 좌표 ${currentLat.toFixed(6)}, ${currentLng.toFixed(6)} · 필요할 때만 재설정`
+        : "GPS 좌표가 없습니다 · 현재 위치로 재설정하세요."
+    );
 
     const form = $("#adminStoreEditForm");
     if(form){

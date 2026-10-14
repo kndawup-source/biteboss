@@ -1,0 +1,30 @@
+BiteBoss v75.47 — Super Admin Store GPS Reset
+
+Scope
+- Added GPS reset control to Super Admin > Store Management > Edit Store.
+- Reused the same high-accuracy geolocation acquisition path as new-store registration.
+- No database schema/RPC migration required for v75.47.
+
+Behavior
+1. Existing latitude/longitude are shown and preserved by default.
+2. "현재 위치로 GPS 재설정" requests a fresh high-accuracy position (maximumAge: 0, timeout: 12s).
+3. Capacitor Geolocation is preferred when available, then browser geolocation is used as fallback.
+4. Returned coordinates are staged in the edit form with 7 decimal places.
+5. Accuracy is displayed to the admin when available.
+6. Coordinates are NOT persisted on button press. "매장 정보 저장" must be pressed to update the store.
+7. Permission denied / unavailable / timeout have distinct Korean status messages.
+8. Existing manual latitude/longitude editing remains supported.
+
+Refactor
+- Extracted getAdminCurrentCoordinates(), adminGeolocationErrorMessage(), and applyCoordinatesToForm().
+- New-store registration and existing-store GPS reset now share one geolocation implementation.
+- Avoided duplicate temporary GPS handlers and CSS overrides.
+
+Validation
+- admin.js syntax: PASS (node --check)
+- app.js syntax: PASS
+- store-admin.js syntax: PASS
+- bootstrap.js syntax: PASS
+- service-worker.js syntax: PASS
+- build/cache version: 75.47
+- v75.46 own-store 24h reclaim migration remains included and unchanged.

@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.44";
+  const BITEBOSS_BUILD = "75.47";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1459,7 +1459,7 @@
         sb.rpc("biteboss_my_store_status", { p_store_id:storeId }),
         sb.rpc("biteboss_store_organization_status", { p_store_id:storeId }),
         sb.rpc("biteboss_store_offer_access", { p_store_id:storeId }),
-        playerSession?.authenticated && options?.showPartnerOwnerCard !== false
+        playerSession?.authenticated && options?.showStoreManagerCard !== false
           ? sb.rpc("biteboss_partner_request_status", { p_store_id:storeId })
           : Promise.resolve({ data:null, error:null }),
         sb.rpc("biteboss_store_public_growth_v63", { p_store_id:storeId, p_days:30 }),
@@ -1523,7 +1523,6 @@
       ? offerAccess.offers
       : (Array.isArray(data.offers) ? data.offers.filter(item => item.status === "active") : []);
     const isPartner = String(store.partnership_status || "unclaimed") === "partnered";
-    const showPartnerOwnerCard = options?.showPartnerOwnerCard !== false;
 
     const protectionUntil = game.protected_until || store.protected_until || null;
     const protectedNow = Boolean(game.protected ?? (protectionUntil && new Date(protectionUntil).getTime() > Date.now()));
@@ -1538,6 +1537,7 @@
     const myRole = String(game.my_role || "visitor");
     const isBoss = myRole === "boss";
     const isCrew = myRole === "crew";
+    const showStoreManagerCard = shouldShowStoreManagerCard({ isBoss, options });
     const roleCopy = isBoss ? "보스" : (isCrew ? "크루" : "방문자");
 
     const myLevel = Math.max(1, Number(game.my_level || summary?.level || 1));
@@ -1955,13 +1955,13 @@
           </div>
         </details>
 
-        ${showPartnerOwnerCard ? renderPartnerRequestCard(store, partnerRequest, isPartner) : ""}
+        ${showStoreManagerCard ? renderPartnerRequestCard(store, partnerRequest, isPartner) : ""}
 
         ${action ? `<div class="store-detail-bottom-action">${action}</div>` : ""}
       </div>
     `;
 
-    if(showPartnerOwnerCard){
+    if(showStoreManagerCard){
       $("#detailPartnerRequest")?.addEventListener("click", () => openPartnerRequestForm(store));
     }
     $("#shareBossCardBtn")?.addEventListener("click",()=>shareBossCard({
@@ -1980,6 +1980,13 @@
     });
   }
 
+
+
+  function shouldShowStoreManagerCard({ isBoss = false, options = {} } = {}){
+    // A player who currently owns this territory is in the Boss flow, not the store-owner claim flow.
+    // Explicitly hidden entry points (profile battle history, compact activity views, etc.) also stay hidden.
+    return !isBoss && options?.showStoreManagerCard !== false;
+  }
 
   function hasStoreManagerAccount(store = {}, request = {}){
     const truthyFlags = [
@@ -2330,7 +2337,7 @@
         }
         openStoreDetail(storeId, {
           source:fromProfileBattleLog ? "profile_battle" : "activity",
-          showPartnerOwnerCard:!fromProfileBattleLog
+          showStoreManagerCard:!fromProfileBattleLog
         });
       };
     });
@@ -2594,7 +2601,7 @@
       row.addEventListener("click", () => {
         openStoreDetail(storeId, {
           source:"profile_visit",
-          showPartnerOwnerCard:false
+          showStoreManagerCard:false
         });
       });
     });
@@ -3093,7 +3100,7 @@
         return;
       }
 
-      const { data, error } = await sb.rpc("biteboss_presence_ping", {
+      const { data, error } = await sb.rpc("biteboss_presence_ping_v7546", {
         p_store_id:nearest.store.id,
         p_lat:pos.coords.latitude,
         p_lng:pos.coords.longitude,
@@ -3984,6 +3991,10 @@
 
     if(outcome === "boss_visit"){
       return toast(`${storeName} 보스 활동이 갱신되었습니다. 이 매장의 방어력 감소가 초기화됩니다.`);
+    }
+
+    if(outcome === "boss_reclaim"){
+      return toast(`${storeName} 재점령 완료 · 24시간 재방문이 확인되어 점령 기록과 보호시간이 갱신되었습니다.`);
     }
 
     const myPower = Number(data?.challenger_power || 0);
@@ -5322,7 +5333,7 @@
         if(storeId){
           openStoreDetail(storeId, {
             source:"player_profile_battle",
-            showPartnerOwnerCard:false
+            showStoreManagerCard:false
           });
         }
       });

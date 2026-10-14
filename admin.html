@@ -6,9 +6,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" />
   <meta name="mobile-web-app-capable" content="yes" />
   <title>BiteBoss Admin</title>
-  <link rel="stylesheet" href="./styles.css?v=75.44" />
-  <link rel="stylesheet" href="./admin.css?v=75.44" />
-  <script src="./app-config.js?v=75.44"></script>
+  <link rel="stylesheet" href="./styles.css?v=75.47" />
+  <link rel="stylesheet" href="./admin.css?v=75.47" />
+  <script src="./app-config.js?v=75.47"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="admin-app">
@@ -290,6 +290,10 @@
           <label class="wide">주소<input name="address" class="input" /></label>
           <label>위도<input name="latitude" class="input" type="number" step="any" required /></label>
           <label>경도<input name="longitude" class="input" type="number" step="any" required /></label>
+          <div class="geo-tools geo-tools-editor wide">
+            <button id="resetStoreGpsBtn" class="secondary-btn" type="button">현재 위치로 GPS 재설정</button>
+            <span id="adminStoreGpsStatus" class="geo-status" aria-live="polite">기존 좌표 유지 또는 현재 위치로 재설정</span>
+          </div>
           <label>영업시간<input name="hours" class="input" placeholder="11:00 - 22:00" /></label>
           <label>전화번호<input name="phone" class="input" /></label>
           <label class="wide">공지<textarea name="notice" class="input"></textarea></label>
@@ -344,6 +348,6 @@
   </section>
 </div>
 
-<script src="./admin.js?v=75.44"></script>
+<script src="./admin.js?v=75.47"></script>
 </body>
 </html>
