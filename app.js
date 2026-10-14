@@ -227,6 +227,7 @@
   const storeRoleMap = new Map();
   const locallyOwnedStoreIds = new Map();
   let territoryMap = null;
+  let storeDetailMap = null;
   let territoryMapLayer = null;
   let territoryUserLayer = null;
   let territoryMapRows = [];
@@ -1881,6 +1882,16 @@
             </div>` : ""}
         </header>
 
+        ${Number.isFinite(Number(store.latitude)) && Number.isFinite(Number(store.longitude)) ? `
+          <section class="store-detail-map-section" aria-label="매장 위치">
+            <div class="store-detail-map-head">
+              <span>위치</span>
+              <small>${escapeHtml([place, distance].filter(Boolean).join(" · "))}</small>
+            </div>
+            <div id="storeDetailMap" class="store-detail-map" aria-label="${escapeAttr(store.name || "매장")} 지도"></div>
+          </section>
+        ` : ""}
+
         ${noticeHtml}
         ${featuredMenuHtml}
 
@@ -2004,6 +2015,8 @@
       </div>
     `;
 
+    renderStoreDetailMap(store);
+
     if(showStoreManagerCard){
       $("#detailPartnerRequest")?.addEventListener("click", () => openPartnerRequestForm(store));
     }
@@ -2023,6 +2036,55 @@
     $$("[data-benefit-offer]", body).forEach(button => {
       button.addEventListener("click", () => createBenefitPass(button.dataset.benefitOffer));
     });
+  }
+
+
+  function destroyStoreDetailMap(){
+    if(!storeDetailMap) return;
+    try{ storeDetailMap.remove(); }catch(_error){}
+    storeDetailMap = null;
+  }
+
+  function renderStoreDetailMap(store = {}){
+    destroyStoreDetailMap();
+
+    const mapEl = $("#storeDetailMap");
+    if(!mapEl || typeof L === "undefined") return;
+
+    const lat = Number(store.latitude);
+    const lng = Number(store.longitude);
+    if(!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+    storeDetailMap = L.map(mapEl, {
+      zoomControl:true,
+      attributionControl:true,
+      preferCanvas:true,
+      scrollWheelZoom:false
+    });
+
+    L.tileLayer(
+      "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      {
+        maxZoom:19,
+        subdomains:"abc",
+        attribution:'&copy; OpenStreetMap contributors'
+      }
+    ).addTo(storeDetailMap);
+
+    L.circleMarker([lat,lng], {
+      radius:8,
+      weight:3,
+      color:"#ffffff",
+      fillColor:"#111111",
+      fillOpacity:1
+    }).addTo(storeDetailMap).bindTooltip(String(store.name || "매장"), {
+      permanent:false,
+      direction:"top",
+      offset:[0,-7]
+    });
+
+    storeDetailMap.setView([lat,lng],17,{animate:false});
+    window.requestAnimationFrame(() => storeDetailMap?.invalidateSize());
   }
 
 
@@ -7030,6 +7092,7 @@
 
   function closeModal(){
     stopScanner();
+    destroyStoreDetailMap();
     storeReclaimTimer = clearIntervalRef(storeReclaimTimer);
 
     const modal = $("#modal");
