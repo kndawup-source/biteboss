@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.59";
+  const BITEBOSS_BUILD = "75.61";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1405,8 +1405,16 @@
 
     let status = "";
     if(ownedByMe){
-      // Ownership is expressed by ordering and the split avatar, not repeated copy.
-      status = protectedNow ? `보호 ${formatRemaining(protectionUntil)} 남음` : "";
+      if(presence?.status === "tracking" && String(presence?.mode || "") === "reclaim"){
+        status = `자동 재점령 확인 중 · ${formatPresenceSeconds(remainingSeconds)} 남음`;
+      }else if(presence?.status === "outside"){
+        status = `${Math.round(Number(presence.distance_m || 0))}m · ${Math.max(1, Number(config.gps_radius_m || 50))}m 안에서 재점령 확인`;
+      }else if(presence?.status === "low_accuracy"){
+        status = "재점령 GPS 정확도 확인 중";
+      }else{
+        // Ownership is expressed by ordering and the split avatar, not repeated copy.
+        status = protectedNow ? `보호 ${formatRemaining(protectionUntil)} 남음` : "";
+      }
     }else if(bossExists && protectedNow){
       status = `보호 ${formatRemaining(protectionUntil)} 남음`;
     }else if(presence?.status === "tracking"){
@@ -1618,6 +1626,60 @@
         : "현재 점령 상태를 확인할 수 없습니다.";
     }
     startOwnerReclaimCountdown();
+  }
+
+  function syncOwnerReclaimPresence(storeId, state = {}){
+    if(String(activeStoreDetailId || "") !== String(storeId || "")) return;
+    const card = $(".owner-store-reclaim");
+    if(!card) return;
+    const label = card.querySelector("span");
+    const value = card.querySelector("strong");
+    const note = card.querySelector("small");
+    if(!value) return;
+
+    const status = String(state?.status || "");
+    const radius = Math.max(1, Number(config.gps_radius_m || 50));
+    const remaining = Math.max(0, Number(state?.remaining_seconds ?? config.gps_dwell_seconds ?? 120));
+
+    if(status === "tracking" && String(state?.mode || "") === "reclaim"){
+      if(label) label.textContent = "재점령 확인";
+      value.textContent = formatPresenceSeconds(remaining);
+      delete value.dataset.reclaimAt;
+      if(note) note.textContent = "현재 위치를 유지하면 자동 재점령됩니다.";
+      card.classList.remove("is-unavailable");
+      return;
+    }
+
+    if(status === "outside"){
+      if(label) label.textContent = "재점령 확인";
+      value.textContent = `${radius}m 이내`;
+      delete value.dataset.reclaimAt;
+      if(note) note.textContent = "매장 위치 안으로 들어오면 자동 확인이 시작됩니다.";
+      return;
+    }
+
+    if(status === "low_accuracy"){
+      if(label) label.textContent = "재점령 확인";
+      value.textContent = "GPS 확인 중";
+      delete value.dataset.reclaimAt;
+      if(note) note.textContent = "위치 정확도가 안정되면 자동으로 계속 진행됩니다.";
+    }
+  }
+
+  function applyOptimisticReclaimCompletion(storeId, reclaimedAt){
+    const key = String(storeId || "").trim();
+    if(!key) return;
+    const base = new Date(reclaimedAt || Date.now()).getTime();
+    const cooldownMinutes = Math.max(1, Number(config.reclaim_cooldown_minutes || 1440));
+    const availableAt = new Date((Number.isFinite(base) ? base : Date.now()) + cooldownMinutes * 60000).toISOString();
+    const data = {
+      is_boss:true,
+      eligible:false,
+      available_at:availableAt,
+      remaining_seconds:cooldownMinutes * 60
+    };
+    storeReclaimCache.set(key, { data, fetchedAt:Date.now() });
+    if(String(activeStoreDetailId || "") === key) applyOwnerReclaimState(data);
   }
 
   function invalidateStoreReclaimState(storeId){
@@ -3264,13 +3326,23 @@
           if(!activeStore || isMyBossStore(activeStore)) closeTakeoverUi();
           else syncTakeoverUi(activeStore,{status:"low_accuracy",remaining_seconds:currentTakeoverVisualRemaining(),required_seconds:takeoverRequired});
         }
+        const activeOwned = candidates.find(store => isMyBossStore(store) && String(store.id) === String(activeStoreDetailId || ""));
+        if(activeOwned){
+          syncOwnerReclaimPresence(activeOwned.id, {
+            status:"low_accuracy",
+            required_seconds:Number(config.gps_dwell_seconds || 120),
+            remaining_seconds:Number(config.gps_dwell_seconds || 120)
+          });
+        }
         renderStores();
         return;
       }
 
-      const nearest = candidates
+      const radius = Math.max(1, Number(config.gps_radius_m || 50));
+      const distanceRows = candidates
         .map(store => ({
           store,
+          ownedByMe:isMyBossStore(store),
           distance:haversineMeters(
             pos.coords.latitude,
             pos.coords.longitude,
@@ -3278,22 +3350,36 @@
             Number(store.longitude)
           )
         }))
+        .sort((a,b) => a.distance - b.distance);
+
+      // If one of my territories is physically inside the same server capture radius,
+      // prioritize it so a nearby unrelated store cannot steal the presence clock.
+      // Owned stores outside the radius never block a valid nearby challenge target.
+      const reclaimTarget = distanceRows
+        .filter(row => row.ownedByMe && row.distance <= radius)
         .sort((a,b) => a.distance - b.distance)[0];
+      const nearest = reclaimTarget || distanceRows[0];
 
       if(!nearest) return;
 
-      const radius = Math.max(1, Number(config.gps_radius_m || 50));
-      const ownedByMe=isMyBossStore(nearest.store);
+      const ownedByMe=nearest.ownedByMe;
       if(ownedByMe && takeoverUi?.storeId===String(nearest.store.id)) closeTakeoverUi();
 
-      if(nearest.distance > radius + Math.max(0, accuracy || 0)){
+      if(nearest.distance > radius){
         presenceState.set(String(nearest.store.id), {
           status:"outside",
           distance_m:nearest.distance,
           required_seconds:Number(config.gps_dwell_seconds || 120),
           remaining_seconds:Number(config.gps_dwell_seconds || 120)
         });
-        if(!ownedByMe && takeoverUi?.storeId===String(nearest.store.id)){
+        if(ownedByMe){
+          syncOwnerReclaimPresence(nearest.store.id, {
+            status:"outside",
+            distance_m:nearest.distance,
+            required_seconds:Number(config.gps_dwell_seconds || 120),
+            remaining_seconds:Number(config.gps_dwell_seconds || 120)
+          });
+        }else if(takeoverUi?.storeId===String(nearest.store.id)){
           syncTakeoverUi(nearest.store,{status:"hold",reason:"OUTSIDE",remaining_seconds:currentTakeoverVisualRemaining(),required_seconds:takeoverRequired});
         }
         renderStores();
@@ -3337,12 +3423,26 @@
       if(!data?.eligible){
         presenceBlockedReason = String(data?.reason || "");
         if(presenceBlockedReason === "MEMBER_LOGIN_REQUIRED") stopPresenceTracking();
-        presenceState.set(String(nearest.store.id), {
+        const blockedPresence = {
           status:data?.status || "blocked",
+          mode:ownedByMe ? "reclaim" : String(takeoverSession?.mode || takeoverModeFromStore(nearest.store)),
           required_seconds:Number(data?.required_seconds || config.gps_dwell_seconds || 120),
           remaining_seconds:Number(data?.remaining_seconds || config.gps_dwell_seconds || 120),
           distance_m:Number(data?.distance_m || nearest.distance)
-        });
+        };
+        presenceState.set(String(nearest.store.id), blockedPresence);
+        if(ownedByMe && String(data?.reason || "") === "OWN_STORE_RECLAIM_COOLDOWN"){
+          const reclaimData = {
+            is_boss:true,
+            eligible:false,
+            available_at:data?.reclaim_available_at || null,
+            remaining_seconds:Number(data?.reclaim_remaining_seconds || 0)
+          };
+          storeReclaimCache.set(String(nearest.store.id), { data:reclaimData, fetchedAt:Date.now() });
+          if(String(activeStoreDetailId || "") === String(nearest.store.id)) applyOwnerReclaimState(reclaimData);
+        }else if(ownedByMe){
+          syncOwnerReclaimPresence(nearest.store.id, blockedPresence);
+        }
         renderStores();
         return;
       }
@@ -3350,7 +3450,7 @@
       presenceBlockedReason = "";
       const presenceClock = {
         status:String(data?.status || "tracking"),
-        mode:String(takeoverSession?.mode || takeoverModeFromStore(nearest.store)),
+        mode:String(data?.mode || takeoverSession?.mode || (ownedByMe ? "reclaim" : takeoverModeFromStore(nearest.store))),
         required_seconds:Number(data?.required_seconds || config.gps_dwell_seconds || 120),
         remaining_seconds:Number(data?.remaining_seconds ?? data?.required_seconds ?? config.gps_dwell_seconds ?? 120),
         elapsed_seconds:Number(data?.elapsed_seconds || 0),
@@ -3359,14 +3459,20 @@
 
       // Single authoritative clock: the countdown the user sees is the same
       // server presence/dwell clock that can actually complete the capture.
-      if(!ownedByMe && !takeoverCancelledLocally && !["claimed","crew","boss_visit"].includes(presenceClock.status)){
+      if(ownedByMe){
+        syncOwnerReclaimPresence(nearest.store.id, presenceClock);
+      }else if(!takeoverCancelledLocally && !["claimed","crew","boss_visit","boss_reclaim"].includes(presenceClock.status)){
         syncTakeoverUi(nearest.store,presenceClock);
       }
       presenceState.set(String(nearest.store.id), presenceClock);
 
-      if(["claimed","crew","boss_visit"].includes(String(data?.status || ""))){
+      if(["claimed","crew","boss_visit","boss_reclaim"].includes(String(data?.status || ""))){
         const outcomeStatus=String(data?.status || "");
-        if(outcomeStatus === "claimed" || outcomeStatus === "boss_visit") markStoreOwnedLocally(nearest.store);
+        const outcome=String(data?.outcome || "");
+        if(outcomeStatus === "claimed" || outcomeStatus === "boss_visit" || outcomeStatus === "boss_reclaim") markStoreOwnedLocally(nearest.store);
+        if(outcome === "boss_reclaim" || outcomeStatus === "boss_reclaim"){
+          applyOptimisticReclaimCompletion(nearest.store.id, data?.reclaimed_at);
+        }
         presenceState.delete(String(nearest.store.id));
         if(takeoverUi?.storeId===String(nearest.store.id)){
           const count=$("#takeoverCount");
