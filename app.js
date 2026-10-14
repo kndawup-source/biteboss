@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "75.61";
+  const BITEBOSS_BUILD = "75.62";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -3352,13 +3352,29 @@
         }))
         .sort((a,b) => a.distance - b.distance);
 
-      // If one of my territories is physically inside the same server capture radius,
-      // prioritize it so a nearby unrelated store cannot steal the presence clock.
-      // Owned stores outside the radius never block a valid nearby challenge target.
-      const reclaimTarget = distanceRows
+      // Only an actually due reclaim should outrank a normal nearby challenge.
+      // Resolve current-Boss reclaim state from the authoritative server (cached for 60s)
+      // so an owned store still in its 24h cooldown cannot block another valid target.
+      const ownedInRadius = distanceRows
         .filter(row => row.ownedByMe && row.distance <= radius)
+        .slice(0,5);
+
+      if(ownedInRadius.length){
+        await Promise.all(ownedInRadius.map(async row => {
+          const cached = getCachedStoreReclaimState(row.store.id);
+          let reclaim = cached?.data || null;
+          if(!cached?.fresh){
+            reclaim = await refreshOwnStoreReclaimState(row.store.id) || reclaim;
+          }
+          row.reclaim = reclaim;
+        }));
+      }
+
+      const reclaimTarget = ownedInRadius
+        .filter(row => row.reclaim?.is_boss !== false && (row.reclaim?.eligible === true || Number(row.reclaim?.remaining_seconds || 0) <= 0))
         .sort((a,b) => a.distance - b.distance)[0];
-      const nearest = reclaimTarget || distanceRows[0];
+      const normalTarget = distanceRows.find(row => !row.ownedByMe && row.distance <= radius);
+      const nearest = reclaimTarget || normalTarget || distanceRows[0];
 
       if(!nearest) return;
 
