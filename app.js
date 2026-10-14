@@ -1533,11 +1533,40 @@
         </div>
       </section>` : "";
 
-    const menuHtml = menu.length ? `
+    const managerManagedStore = hasStoreManagerAccount(store, partnerRequest) || isPartner;
+    const prioritizedMenu = [...menu].sort((a,b) => Number(Boolean(b?.is_signature)) - Number(Boolean(a?.is_signature)));
+    const featuredMenu = prioritizedMenu.slice(0,3);
+    const remainingMenu = prioritizedMenu.slice(3);
+
+    const noticeHtml = managerManagedStore && store.notice ? `
+      <section class="store-managed-notice" aria-label="매장 공지">
+        <span>공지</span>
+        <strong>${escapeHtml(store.notice)}</strong>
+      </section>` : "";
+
+    const featuredMenuHtml = managerManagedStore && featuredMenu.length ? `
+      <section class="store-managed-menu" aria-label="대표 메뉴">
+        <div class="store-managed-section-head">
+          <span>메뉴</span>
+          <small>매장 관리자 등록</small>
+        </div>
+        <div class="store-detail-menu featured-menu-list">
+          ${featuredMenu.map(item => `
+            <article>
+              <div>
+                <strong>${escapeHtml(item.name)}</strong>
+                ${item.description ? `<p>${escapeHtml(item.description)}</p>` : ""}
+              </div>
+              <span>${item.price != null && item.price !== "" ? `${Number(item.price).toLocaleString("ko-KR")}원` : "-"}${item.is_signature ? `<small>대표</small>` : ""}</span>
+            </article>`).join("")}
+        </div>
+      </section>` : "";
+
+    const menuHtml = (!managerManagedStore ? menu : remainingMenu).length ? `
       <section class="store-detail-section">
-        <h4>메뉴</h4>
+        <h4>${managerManagedStore ? "메뉴 더보기" : "메뉴"}</h4>
         <div class="store-detail-menu">
-          ${menu.map(item => `
+          ${(!managerManagedStore ? menu : remainingMenu).map(item => `
             <article>
               <div>
                 <strong>${escapeHtml(item.name)}</strong>
@@ -1741,6 +1770,9 @@
             </div>` : ""}
         </header>
 
+        ${noticeHtml}
+        ${featuredMenuHtml}
+
         ${bossExists && !isBoss ? `
           <section class="boss-focus" aria-label="보스 정보">
             <div class="boss-focus-head">
@@ -1842,12 +1874,12 @@
               ${impactShares ? `<p class="detail-note">최근 30일 공유 ${impactShares}회</p>` : ""}
             </section>
 
-            ${(store.hours || store.phone || store.notice) ? `
+            ${(store.hours || store.phone || (!managerManagedStore && store.notice)) ? `
               <section class="store-detail-section store-detail-info">
                 <h4>매장 정보</h4>
                 ${store.hours ? `<div><span>영업시간</span><strong>${escapeHtml(store.hours)}</strong></div>` : ""}
                 ${store.phone ? `<div><span>전화</span><strong>${escapeHtml(store.phone)}</strong></div>` : ""}
-                ${store.notice ? `<div><span>안내</span><strong>${escapeHtml(store.notice)}</strong></div>` : ""}
+                ${!managerManagedStore && store.notice ? `<div><span>안내</span><strong>${escapeHtml(store.notice)}</strong></div>` : ""}
               </section>` : ""}
 
             ${gallery}
