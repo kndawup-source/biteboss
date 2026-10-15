@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "80.9";
+  const BITEBOSS_BUILD = "80.9.1";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -3775,7 +3775,7 @@
       ).trim();
       const partnerVisual = partnerImage
         ? `<span class="partner-banner-thumb" aria-hidden="true"><img src="${escapeAttr(partnerImage)}" alt="" loading="lazy" /></span>`
-        : `<span class="partner-banner-thumb partner-banner-fallback" aria-hidden="true">${escapeHtml(storeInitial(partnerBannerStore.name || "P"))}</span>`;
+        : `<span class="partner-banner-thumb partner-banner-fallback" aria-hidden="true">${escapeHtml(String(partnerBannerStore.name || "P").trim().charAt(0) || "P")}</span>`;
       items.push(`<button class="game-pulse-item is-partner-banner" type="button" data-pulse-store="${escapeAttr(partnerBannerStore.id)}" data-pulse-name="${escapeAttr(partnerBannerStore.name || "")}">${partnerVisual}<strong>${escapeHtml(partnerBannerStore.name || "제휴 매장")}</strong><small>${escapeHtml(partnerCopy)}</small></button>`);
     }
     if(retakes[0]){
