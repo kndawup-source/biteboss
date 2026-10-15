@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "79.3";
+  const BITEBOSS_BUILD = "79.4";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1623,7 +1623,6 @@
 
 
     const cardMode = takeoverModeFromStore(store);
-    return `
     const occupiedCard = Boolean(
       store?.current_boss_user_id || store?.boss_user_id ||
       store?.current_boss_nickname || store?.boss_nickname ||
@@ -1631,6 +1630,8 @@
       store?.current_boss_avatar_url || store?.boss_avatar_url ||
       store?.boss_organization_avatar_url || store?.current_boss_organization_avatar_url
     );
+
+    return `
       <article class="store-card${occupiedCard ? " is-occupied" : ""} store-card-open challenge-card mode-${escapeAttr(cardMode)} ${isPartner ? "is-partner-store" : ""}" data-store-detail="${escapeAttr(store.id)}" role="button" tabindex="0" aria-label="${escapeAttr(store.name)} 매장 정보 보기">
         <div class="store-card-main">
           ${occupiedStoreAvatarMarkup(store, "store-card-photo")}
