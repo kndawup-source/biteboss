@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.14";
+  const BITEBOSS_BUILD = "81.15";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -2424,15 +2424,7 @@
           ownerDetails.scrollIntoView({ behavior:"smooth", block:"start" });
         });
       });
-      $("#detailPartnerRequest")?.addEventListener("click", () => {
-        const modalScroll = body.closest(".modal-body") || body;
-        if(typeof modalScroll.scrollTo === "function"){
-          modalScroll.scrollTo({ top:0, behavior:"smooth" });
-        }else{
-          body.scrollIntoView({ behavior:"smooth", block:"start" });
-        }
-        window.setTimeout(() => openPartnerRequestForm(store), 220);
-      });
+      $("#detailPartnerRequest")?.addEventListener("click", () => openPartnerRequestForm(store));
       $("#detailPartnerAdmin")?.addEventListener("click", () => { location.href = "./store-admin.html"; });
     }
     $("#shareBossCardBtn")?.addEventListener("click",()=>shareBossCard({
@@ -2884,7 +2876,7 @@
         <label>메모<textarea class="input partner-request-note" name="message" maxlength="300" placeholder="확인에 필요한 내용을 적어주세요."></textarea></label>
         <button class="primary-btn" type="submit">인증 요청</button>
         <p id="partnerRequestStatus" class="inline-status"></p>
-      </form>`);
+      </form>`, {type:"partner-request"});
     $("#partnerRequestForm")?.addEventListener("submit", event => submitPartnerRequest(event, store.id));
   }
 
@@ -8160,13 +8152,14 @@
     if(!modal) return;
 
     modalReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const detailTypes = new Set(["detail-sheet", "store-detail", "player-profile"]);
+    const detailTypes = new Set(["detail-sheet", "store-detail", "player-profile", "partner-request"]);
     const isDetailSheet = detailTypes.has(modalType);
-    modal.classList.remove("modal-detail-sheet", "modal-compact", "store-detail-modal", "player-profile-modal", "notice-modal", "victory-modal");
+    modal.classList.remove("modal-detail-sheet", "modal-compact", "store-detail-modal", "player-profile-modal", "partner-request-modal", "notice-modal", "victory-modal");
     modal.classList.toggle("modal-detail-sheet", isDetailSheet);
     modal.classList.toggle("modal-compact", !isDetailSheet);
     modal.classList.toggle("store-detail-modal", modalType === "store-detail");
     modal.classList.toggle("player-profile-modal", modalType === "player-profile");
+    modal.classList.toggle("partner-request-modal", modalType === "partner-request");
     modal.classList.toggle("notice-modal", modalType === "notice");
     modal.classList.toggle("victory-modal", modalType === "victory");
 
@@ -8197,7 +8190,7 @@
 
     const modal = $("#modal");
     modal?.classList.add("hidden");
-    modal?.classList.remove("modal-detail-sheet", "modal-compact", "store-detail-modal", "player-profile-modal", "notice-modal", "victory-modal");
+    modal?.classList.remove("modal-detail-sheet", "modal-compact", "store-detail-modal", "player-profile-modal", "partner-request-modal", "notice-modal", "victory-modal");
     unlockModalScroll();
     const returnFocus = modalReturnFocus;
     modalReturnFocus = null;
