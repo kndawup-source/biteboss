@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "77.0";
+  const BITEBOSS_BUILD = "77.2";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -5967,7 +5967,7 @@
           <div><span>레벨</span><strong>Lv ${Number(player.level || 1)}</strong></div>
           <div><span>XP</span><strong>${Number(player.xp || 0).toLocaleString("ko-KR")}</strong></div>
           <div><span>보스</span><strong>${Number(player.boss_count || 0)}</strong></div>
-          <div><span>크루</span><strong>${Number(player.crew_count || 0)}</strong></div>
+          <div><span>방문</span><strong>${Number(player.valid_visits || 0).toLocaleString("ko-KR")}</strong></div>
         </section>
 
         <section class="player-profile-record">
