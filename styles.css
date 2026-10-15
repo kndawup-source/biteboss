@@ -380,7 +380,7 @@ body.biteboss-info-page{min-height:100dvh;background:var(--bg);color:#111}.info-
 .store-comment-login{width:100%;margin:0 0 7px}
 .store-comment-form-meta{display:flex;justify-content:space-between;gap:12px;min-height:15px;margin-top:4px;color:#97979c;font-size:9px}
 .store-comment-form-meta b{font-weight:800;color:inherit}
-.store-comment-list{border-top:0}
+.store-comment-list{border-top:0;}
 .store-comment-row{display:grid;grid-template-columns:38px minmax(0,1fr);gap:9px;align-items:start;padding:9px 0;border-bottom:1px solid #ececef}
 .store-comment-row.is-pinned{border-top:1px solid #111}
 .store-comment-profile,.store-comment-name,.store-comment-actions button{appearance:none;border:0;background:transparent;color:inherit;font:inherit;padding:0;cursor:pointer}
