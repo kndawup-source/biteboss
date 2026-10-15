@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.5";
+  const BITEBOSS_BUILD = "81.6";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -2813,28 +2813,29 @@
     const hasActivity = visits + users + repeats + challengers > 0;
 
     return `
-      <section class="store-owner-conversion ${hasActivity ? "has-activity" : "is-empty"}">
-        <div class="store-owner-conversion-head">
+      <details class="store-owner-conversion ${hasActivity ? "has-activity" : "is-empty"}">
+        <summary class="store-owner-summary">
           <div>
-            <span class="store-owner-kicker">최근 30일</span>
-            <strong>${hasActivity ? "이미 BiteBoss 사용자들이 이 매장에서 활동하고 있습니다." : "이 매장의 관리자이신가요?"}</strong>
+            <span class="store-owner-kicker">${hasActivity ? "최근 30일" : "매장 관리자"}</span>
+            <strong>${hasActivity ? `방문 ${visits.toLocaleString("ko-KR")} · 도전 ${challengers.toLocaleString("ko-KR")}` : "이 매장의 관리자이신가요?"}</strong>
           </div>
-          <b>미제휴</b>
+          <b aria-hidden="true">+</b>
+        </summary>
+        <div class="store-owner-body">
+          <strong>${hasActivity ? "이미 BiteBoss 사용자들이 이 매장에서 활동하고 있습니다." : "내 매장을 직접 관리하세요."}</strong>
+          ${hasActivity ? `
+            <div class="store-owner-stats" aria-label="최근 30일 BiteBoss 활동">
+              <article><span>방문</span><strong>${visits.toLocaleString("ko-KR")}</strong></article>
+              <article><span>사용자</span><strong>${users.toLocaleString("ko-KR")}</strong></article>
+              <article><span>재방문</span><strong>${repeats.toLocaleString("ko-KR")}</strong></article>
+              <article><span>도전</span><strong>${challengers.toLocaleString("ko-KR")}</strong></article>
+            </div>
+            ${shares ? `<p class="store-owner-share">공유 ${shares.toLocaleString("ko-KR")}회</p>` : ""}
+          ` : ""}
+          <p>매장을 인증하면 방문·도전 현황과 매장 정보를 확인하고 혜택을 직접 관리할 수 있습니다.</p>
+          <button id="detailPartnerRequest" class="claim-store-btn" type="button">${status === "rejected" ? "다시 인증 요청" : "이 매장 관리하기"}</button>
         </div>
-        ${hasActivity ? `
-          <div class="store-owner-stats" aria-label="최근 30일 BiteBoss 활동">
-            <article><span>방문</span><strong>${visits.toLocaleString("ko-KR")}</strong></article>
-            <article><span>사용자</span><strong>${users.toLocaleString("ko-KR")}</strong></article>
-            <article><span>재방문</span><strong>${repeats.toLocaleString("ko-KR")}</strong></article>
-            <article><span>도전</span><strong>${challengers.toLocaleString("ko-KR")}</strong></article>
-          </div>
-          ${shares ? `<p class="store-owner-share">공유 ${shares.toLocaleString("ko-KR")}회</p>` : ""}
-        ` : `<p>매장을 인증하면 방문·도전 현황과 매장 정보를 확인하고 혜택을 직접 관리할 수 있습니다.</p>`}
-        <div class="store-owner-cta">
-          ${hasActivity ? `<p>매장을 인증하면 이 활동을 직접 확인하고 혜택을 운영할 수 있습니다.</p>` : ""}
-          <button id="detailPartnerRequest" class="primary-btn claim-store-btn" type="button">${status === "rejected" ? "다시 인증 요청" : "이 매장 관리하기"}</button>
-        </div>
-      </section>`;
+      </details>`;
   }
 
   function openPartnerRequestForm(store){
