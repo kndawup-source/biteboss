@@ -72,9 +72,12 @@ body.user-app #page-home{position:fixed;inset:0;height:auto;min-height:0;padding
 .boss-home-hook{position:relative;z-index:3;left:auto;right:auto;bottom:auto;max-width:560px;margin:auto 22px 16px;color:#fff;text-shadow:none;pointer-events:none;font-size:clamp(40px,9.2vw,62px);line-height:.91;font-weight:870;letter-spacing:-.075em;text-wrap:balance}
 .boss-home-hook.hidden{display:none!important}
 .boss-home-actions{position:relative;z-index:3;left:auto;right:auto;bottom:auto;display:grid;grid-template-columns:1fr;gap:10px;margin:0 20px max(16px,var(--safe-bottom));padding:0;border:0;outline:0;box-shadow:none}
-.boss-home-action{width:100%;height:56px;padding:0 20px;border:0;border-radius:20px;display:flex;align-items:center;background:rgba(255,255,255,.78);color:#111;text-align:left;box-shadow:none;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);outline:0}
-.boss-home-action.primary{background:rgba(10,10,12,.82);color:#fff;border:0;box-shadow:none}
-.boss-home-action-label{font-size:17px;line-height:1;font-weight:840;letter-spacing:-.03em}
+.boss-home-action{position:relative;isolation:isolate;overflow:hidden;width:100%;height:56px;padding:0 20px;border:1px solid rgba(255,255,255,.46);border-radius:20px;display:flex;align-items:center;background:linear-gradient(135deg,rgba(255,255,255,.76),rgba(255,255,255,.58));color:#111;text-align:left;box-shadow:inset 0 1px 0 rgba(255,255,255,.68),0 8px 24px rgba(0,0,0,.08);backdrop-filter:blur(18px) saturate(145%);-webkit-backdrop-filter:blur(18px) saturate(145%);outline:0}
+.boss-home-action::before{content:"";position:absolute;z-index:-1;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.18),rgba(255,255,255,0) 58%);pointer-events:none}
+.boss-home-action.primary{background:linear-gradient(135deg,rgba(12,12,14,.82),rgba(12,12,14,.68));color:#fff;border-color:rgba(255,255,255,.16);box-shadow:inset 0 1px 0 rgba(255,255,255,.13),0 8px 24px rgba(0,0,0,.14)}
+.boss-home-action.primary::before{background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,0) 62%)}
+.boss-home-action:active{transform:translateY(1px)}
+.boss-home-action-label{position:relative;z-index:1;font-size:17px;line-height:1;font-weight:840;letter-spacing:-.03em}
 .boss-home-runtime{position:absolute!important;width:1px!important;height:1px!important;overflow:hidden!important;clip:rect(0 0 0 0)!important;clip-path:inset(50%)!important;white-space:nowrap!important}
 
 /* common surfaces */
