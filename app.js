@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.30";
+  const BITEBOSS_BUILD = "81.31";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1797,7 +1797,7 @@
         sb.rpc("biteboss_my_store_status", { p_store_id:storeId }),
         sb.rpc("biteboss_store_organization_status", { p_store_id:storeId }),
         sb.rpc("biteboss_store_offer_access", { p_store_id:storeId }),
-        playerSession?.authenticated && options?.showStoreManagerCard !== false
+        playerSession?.authenticated
           ? sb.rpc("biteboss_partner_request_status", { p_store_id:storeId })
           : Promise.resolve({ data:null, error:null }),
         sb.rpc("biteboss_store_public_growth_v63", { p_store_id:storeId, p_days:30 }),
@@ -2036,7 +2036,7 @@
     const myRole = String(game.my_role || "visitor");
     const isBoss = myRole === "boss";
     const isCrew = myRole === "crew";
-    const showStoreManagerCard = shouldShowStoreManagerCard({ isBoss, options });
+    const showStoreManagerCard = true;
     const myPower = Math.max(0, Number(game.my_power ?? 0));
     const storeBonus = Math.max(0, Number(game.my_store_bonus ?? growth.store_bonus ?? 0));
     const validVisits = Math.max(0, Number(game.my_valid_visits ?? growth.valid_visits ?? 0));
@@ -2864,11 +2864,6 @@
   }
 
 
-  function shouldShowStoreManagerCard({ isBoss = false, options = {} } = {}){
-    // A player who currently owns this territory is in the Boss flow, not the store-owner claim flow.
-    // Explicitly hidden entry points (profile battle history, compact activity views, etc.) also stay hidden.
-    return !isBoss && options?.showStoreManagerCard !== false;
-  }
 
   function smoothScrollModalCard(modalCard, targetTop){
     if(!modalCard) return Promise.resolve();
@@ -3308,8 +3303,7 @@
           event?.stopPropagation?.();
         }
         openStoreDetail(storeId, {
-          source:fromProfileBattleLog ? "profile_battle" : "activity",
-          showStoreManagerCard:!fromProfileBattleLog
+          source:fromProfileBattleLog ? "profile_battle" : "activity"
         });
       };
     });
@@ -3583,8 +3577,7 @@
 
       row.addEventListener("click", () => {
         openStoreDetail(storeId, {
-          source:"profile_visit",
-          showStoreManagerCard:false
+          source:"profile_visit"
         });
       });
     });
@@ -4306,7 +4299,7 @@
           loadMyOrganization()
         ]);
         if(String(activeStoreDetailId || "") === String(nearest.store.id))
-          await openStoreDetail(nearest.store.id, { preserveModal:true, showStoreManagerCard:false });
+          await openStoreDetail(nearest.store.id, { preserveModal:true });
         return;
       }
 
@@ -6642,8 +6635,7 @@
         closeModal();
         if(storeId){
           openStoreDetail(storeId, {
-            source:"player_profile_battle",
-            showStoreManagerCard:false
+            source:"player_profile_battle"
           });
         }
       });
@@ -6713,7 +6705,7 @@
     list.querySelectorAll("[data-profile-comment-store]").forEach(button => {
       button.addEventListener("click", () => {
         const storeId = button.dataset.profileCommentStore;
-        if(storeId) openStoreDetail(storeId, { source:"my_profile_comment", showStoreManagerCard:false });
+        if(storeId) openStoreDetail(storeId, { source:"my_profile_comment" });
       });
     });
 
