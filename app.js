@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "76.9";
+  const BITEBOSS_BUILD = "77.0";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1005,9 +1005,10 @@
 
     const autoImportEnabled = config.auto_store_import_enabled !== false &&
       String(config.auto_store_import_enabled).toLowerCase() !== "false";
-    const autoImportMinCount = Math.max(1, Number(config.auto_store_import_min_count || 10));
-
-    if(lastPosition && autoImportEnabled && stores.length < autoImportMinCount){
+    // Auto discovery is coverage-driven, not count-driven.
+    // Even when BiteBoss already has many stores nearby, Kakao may expose
+    // additional restaurants/cafes that have not been imported yet.
+    if(lastPosition && autoImportEnabled){
       const sync = await syncNearbyAutoStores(lastPosition);
 
       if(sync?.ok){

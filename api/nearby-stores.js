@@ -22,9 +22,6 @@ const SYNC_TTL_MINUTES = 120;
 const KAKAO_PAGE_SIZE = 15;
 const KAKAO_MAX_PAGES = 3;
 
-// If the DB still has fewer than this many stores around the user,
-// bypass the recent-sync cache and try Kakao again.
-const MIN_NEARBY_STORE_COUNT = 10;
 
 module.exports = async function handler(req, res){
   if(req.method !== "GET"){
@@ -63,18 +60,15 @@ module.exports = async function handler(req, res){
   const cellKey = makeCellKey(lat, lng, radius);
 
   try{
-    // Read current DB state first.
-    // This prevents a stale recent-sync record from keeping an
-    // under-populated area permanently empty.
+    // Discovery is cell/TTL based, never store-count based.
+    // A populated BiteBoss area can still contain Kakao places that have
+    // never been imported, so an existing-store threshold must not block
+    // discovery. The cell cache alone prevents repeated API work.
     const existingNearby = await getExistingNearbyStores(env, lat, lng, radius);
     const existingCount = Array.isArray(existingNearby) ? existingNearby.length : 0;
-
     const recent = await getRecentSync(env, cellKey);
-    const canUseRecentCache =
-      recent &&
-      existingCount >= MIN_NEARBY_STORE_COUNT;
 
-    if(canUseRecentCache){
+    if(recent){
       return res.status(200).json({
         ok:true,
         imported:0,
