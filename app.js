@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.16";
+  const BITEBOSS_BUILD = "81.18";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -2420,11 +2420,14 @@
       const ownerDetails = body.querySelector("details.store-owner-conversion");
       ownerDetails?.addEventListener("toggle", () => {
         if(!ownerDetails.open) return;
-        requestAnimationFrame(() => {
-          ownerDetails.scrollIntoView({ behavior:"smooth", block:"start" });
-        });
+        requestAnimationFrame(() => smoothScrollToStoreOwner(ownerDetails));
       });
-      $("#detailPartnerRequest")?.addEventListener("click", () => openPartnerRequestForm(store));
+      $("#detailPartnerRequest")?.addEventListener("click", () => {
+        smoothScrollToStoreOwner(
+          body.querySelector(".store-owner-conversion"),
+          () => openPartnerRequestForm(store)
+        );
+      });
       $("#detailPartnerAdmin")?.addEventListener("click", () => { location.href = "./store-admin.html"; });
     }
     $("#shareBossCardBtn")?.addEventListener("click",()=>shareBossCard({
@@ -2773,6 +2776,31 @@
     return !isBoss && options?.showStoreManagerCard !== false;
   }
 
+  function smoothScrollToStoreOwner(ownerSection, afterScroll){
+    if(!ownerSection){
+      afterScroll?.();
+      return;
+    }
+
+    const modalCard = ownerSection.closest(".modal-card");
+    let completed = false;
+    const complete = () => {
+      if(completed) return;
+      completed = true;
+      modalCard?.removeEventListener("scrollend", complete);
+      afterScroll?.();
+    };
+
+    ownerSection.scrollIntoView({ behavior:"smooth", block:"start" });
+
+    if(!afterScroll) return;
+    if("onscrollend" in window && modalCard){
+      modalCard.addEventListener("scrollend", complete, { once:true });
+    }else{
+      window.setTimeout(complete, 320);
+    }
+  }
+
   function hasStoreManagerAccount(store = {}, request = {}){
     const truthyFlags = [
       store.has_store_admin, store.store_admin_exists, store.manager_exists, store.has_manager,
@@ -2877,13 +2905,7 @@
         <button class="primary-btn" type="submit">인증 요청</button>
         <p id="partnerRequestStatus" class="inline-status"></p>
       </form>`, {type:"partner-request"});
-    const partnerRequestForm = $("#partnerRequestForm");
-    const partnerRequestModal = $("#modal");
-    const partnerRequestBody = $("#modalBody");
-    resetModalToTop(partnerRequestModal, partnerRequestBody);
-    window.requestAnimationFrame(() => resetModalToTop(partnerRequestModal, partnerRequestBody));
-    window.setTimeout(() => resetModalToTop(partnerRequestModal, partnerRequestBody), 160);
-    partnerRequestForm?.addEventListener("submit", event => submitPartnerRequest(event, store.id));
+    $("#partnerRequestForm")?.addEventListener("submit", event => submitPartnerRequest(event, store.id));
   }
 
   async function submitPartnerRequest(event, storeId){
@@ -8150,12 +8172,6 @@
     window.scrollTo(0, modalScrollY);
   }
 
-  function resetModalToTop(modal, bodyEl){
-    const modalCard = modal?.querySelector(".modal-card");
-    if(modalCard) modalCard.scrollTop = 0;
-    if(bodyEl) bodyEl.scrollTop = 0;
-  }
-
   function openModal(title, body, options = {}){
     stopScanner();
 
@@ -8178,21 +8194,18 @@
     setText("#modalTitle", title);
 
     const bodyEl = $("#modalBody");
-    if(bodyEl) bodyEl.innerHTML = body;
+    if(bodyEl){
+      bodyEl.innerHTML = body;
+      bodyEl.scrollTop = 0;
+    }
 
-    resetModalToTop(modal, bodyEl);
     lockModalScroll();
     modal.classList.remove("hidden");
-    resetModalToTop(modal, bodyEl);
-
+    const modalCard = modal.querySelector(".modal-card");
+    if(modalCard) modalCard.scrollTop = 0;
     window.requestAnimationFrame(() => {
-      resetModalToTop(modal, bodyEl);
-      window.requestAnimationFrame(() => {
-        resetModalToTop(modal, bodyEl);
-        $("#modalClose")?.focus({preventScroll:true});
-      });
+      $("#modalClose")?.focus({preventScroll:true});
     });
-    window.setTimeout(() => resetModalToTop(modal, bodyEl), 120);
   }
 
   function closeModal(){
