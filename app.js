@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "77.2";
+  const BITEBOSS_BUILD = "77.3";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1954,7 +1954,7 @@
     const arenaHtml = `
       <section class="store-arena" aria-label="Store arena">
         <div class="store-arena-head">
-          <span>점령 현황</span>
+          <span>현재 점령</span>
           <strong>이 매장을 차지하고 있는 보스</strong>
         </div>
         <div class="store-arena-grid">
@@ -1988,7 +1988,7 @@
       <section class="public-impact ${isPartner ? "is-partner" : ""}">
         <div class="public-impact-head">
           <div>
-            <span>30일 매장 활동</span>
+            <span>최근 30일 기록</span>
             <strong>${isPartner ? "BiteBoss 활동 현황" : "이 매장에서도 이미 게임이 진행 중입니다."}</strong>
           </div>
           ${isPartner ? `<b>제휴</b>` : `<b>미제휴</b>`}
@@ -2134,7 +2134,7 @@
               </section>` : ""}
 
             <section class="store-detail-subsection">
-              <div class="subsection-title">점령 현황</div>
+              <div class="subsection-title">현재 점령</div>
               <div class="store-more-stats arena-mini">
                 <div><span>최장 점령</span><strong>${escapeHtml(arenaLongestBoss)}</strong><small>${arenaLongestHours ? `${arenaLongestHours.toFixed(arenaLongestHours < 10 ? 1 : 0)}시간` : "—"}</small></div>
                 <div><span>오늘 도전자</span><strong>${arenaTodayChallengers}</strong></div>
@@ -2145,7 +2145,7 @@
             </section>
 
             <section class="store-detail-subsection">
-              <div class="subsection-title">30일 매장 활동</div>
+              <div class="subsection-title">최근 30일 기록</div>
               <div class="store-more-stats">
                 <div><span>방문</span><strong>${impactVisits}</strong></div>
                 <div><span>사용자</span><strong>${impactUnique}</strong></div>
