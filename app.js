@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.0";
+  const BITEBOSS_BUILD = "81.1";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -117,6 +117,7 @@
   }
   let homeSplashRequestId = 0;
   const HOME_SPLASH_CACHE_KEY = "biteboss:home-splash-url";
+  const PARTNER_BANNERS_CACHE_KEY = "biteboss-partner-banners-v81";
 
   const config = {
     protect_minutes:60,
@@ -159,6 +160,9 @@
     new_player_protection_claims:5,
     season_days:30
   };
+
+  // Warm-start campaign data so the store banner can paint without waiting for Supabase.
+  config.partner_banners = readCachedPartnerBanners();
 
   const RUNTIME = Object.freeze({
     foregroundRefreshMinMs:30000,
@@ -328,6 +332,10 @@
     ]);
 
     lastPosition = await initialPositionPromise;
+    if(lastPosition?.coords){
+      gamePulseLoadedAt = 0;
+      if($("#page-stores")?.classList.contains("active")) void loadGamePulse(true);
+    }
     await loadStores();
     if(lastPosition?.coords){
       nearbyLastRefreshPosition = lastPosition;
@@ -611,6 +619,7 @@
     if(tab === "stores"){
       const storeList = $("#storeList");
       if(storeList && !storeList.children.length) renderStores();
+      paintImmediatePartnerBanner();
       void loadGamePulse();
     }
     if(tab === "rank"){
@@ -696,6 +705,21 @@
     await syncAuthNickname(profile?.nickname);
   }
 
+  function readCachedPartnerBanners(){
+    try{
+      const parsed = JSON.parse(localStorage.getItem(PARTNER_BANNERS_CACHE_KEY) || "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    }catch{
+      return [];
+    }
+  }
+
+  function cachePartnerBanners(rows){
+    try{
+      if(Array.isArray(rows)) localStorage.setItem(PARTNER_BANNERS_CACHE_KEY, JSON.stringify(rows));
+    }catch{}
+  }
+
   async function loadConfig(){
     const { data, error } = await sb
       .from("biteboss_app_config")
@@ -710,6 +734,10 @@
     Object.keys(config).forEach(key => {
       if(Object.prototype.hasOwnProperty.call(rows, key)) config[key] = rows[key];
     });
+    if(Array.isArray(rows.partner_banners)){
+      config.partner_banners = rows.partner_banners;
+      cachePartnerBanners(config.partner_banners);
+    }
 
     // v81 canonical banner payload. Legacy keys are read only as a temporary
     // compatibility source; the public renderer itself uses one payload only.
@@ -718,10 +746,9 @@
       const copies = rows.partner_banner_copy && typeof rows.partner_banner_copy === "object" ? rows.partner_banner_copy : {};
       const distances = rows.partner_banner_distance_km && typeof rows.partner_banner_distance_km === "object" ? rows.partner_banner_distance_km : {};
       const priorities = rows.partner_banner_priority && typeof rows.partner_banner_priority === "object" ? rows.partner_banner_priority : {};
-      const cached = Array.isArray(rows.partner_banner_store_cache) ? rows.partner_banner_store_cache : [];
-      config.partner_banners = cached
-        .filter(store => ids.includes(String(store?.id || "")))
-        .map(store => ({
+      const legacyCandidates = stores.filter(store => ids.includes(String(store?.id || "")));
+      if(legacyCandidates.length){
+        config.partner_banners = legacyCandidates.map(store => ({
           id:String(store.id),
           name:String(store.name || ""),
           photo_url:String(store.photo_url || ""),
@@ -733,6 +760,8 @@
           distance_km:distances[String(store.id)] ?? 5,
           priority:Number(priorities[String(store.id)] || 3)
         }));
+        cachePartnerBanners(config.partner_banners);
+      }
     }
   }
 
@@ -957,8 +986,13 @@
     try{
       nearbyWatchId = navigator.geolocation.watchPosition(
         position => {
+          const hadLocation = Boolean(lastPosition?.coords);
           lastPosition = position;
           updateStoreDetailUserLocation(position);
+          if(!hadLocation && $("#page-stores")?.classList.contains("active")){
+            gamePulseLoadedAt = 0;
+            void loadGamePulse(true);
+          }
           void refreshStoresForPosition(position);
         },
         error => {
@@ -3682,8 +3716,17 @@
 
   function currentPartnerBanner(){
     const banners = Array.isArray(config.partner_banners) ? config.partner_banners : [];
+    const hasLocation = Boolean(
+      lastPosition?.coords &&
+      Number.isFinite(Number(lastPosition.coords.latitude)) &&
+      Number.isFinite(Number(lastPosition.coords.longitude))
+    );
     const eligible = banners.filter(banner => {
       if(!banner?.id || String(banner.status || "active") !== "active") return false;
+      // The banner must paint immediately when the Stores tab opens.
+      // Distance becomes enforceable only after GPS is available; before that, do not
+      // incorrectly treat "location not ready" as "store is out of range".
+      if(!hasLocation) return true;
       const rawLimit = banner.distance_km ?? 5;
       const limitKm = rawLimit === "all" ? Infinity : Math.max(0, Number(rawLimit));
       if(!Number.isFinite(limitKm)) return true;
