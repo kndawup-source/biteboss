@@ -406,7 +406,7 @@ body.biteboss-info-page{min-height:100dvh;background:var(--bg);color:#111}.info-
 .occupied-store-half{display:block;min-width:0;min-height:100%;overflow:hidden;border-radius:0!important}
 .occupied-store-half img{display:block;width:100%;height:100%;object-fit:cover;border-radius:0!important}
 .occupied-store-half-store{border-right:0}
-.occupied-store-initial{display:grid;width:100%;height:100%;place-items:center;border-radius:0;background:#e4e4e6;color:#111;font-family:var(--font);font-size:18px;font-weight:950;line-height:1;letter-spacing:-.06em;-webkit-text-stroke:.35px currentColor}
+.occupied-store-initial{display:grid;width:100%;height:100%;place-items:center;border-radius:0;background:#e4e4e6;color:#111;font-family:var(--font);font-size:16px;font-weight:900;line-height:1;letter-spacing:0}
 
 @media(max-width:390px){.takeover-count{font-size:clamp(72px,20.5vw,92px)}.takeover-count-meta{font-size:8px}}
 
