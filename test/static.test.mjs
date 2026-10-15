@@ -137,6 +137,16 @@ test('guest account flow uses one login modal path and hides crew creation until
 });
 
 
+
+test('failed capture outcomes are persisted server-side before battle views refresh', () => {
+  assert.match(app, /async function ensureFailedChallengeRecorded\(/);
+  assert.match(app, /biteboss_record_failed_challenge_v8128/);
+  const presence = blockBetween(app, 'if(["claimed","crew","boss_visit","boss_reclaim"].includes', 'function updateStoreListReclaimCountdowns');
+  assert.match(presence, /await ensureFailedChallengeRecorded\(data, nearest\.store\.id\)/);
+  const qr = blockBetween(app, 'async function claimByQrToken', 'function showChallengeOutcome');
+  assert.match(qr, /await ensureFailedChallengeRecorded\(data, data\?\.store_id \|\| ""\)/);
+});
+
 test('player battle record reconciles aggregate and activity for both wins and losses', () => {
   const record = blockBetween(app, 'function isBattleChallenger', 'function renderPlayerProfile');
   assert.match(record, /\["boss_win","claimed","challenger_win","win","victory"\]/);
