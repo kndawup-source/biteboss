@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.18";
+  const BITEBOSS_BUILD = "81.19";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -2783,22 +2783,36 @@
     }
 
     const modalCard = ownerSection.closest(".modal-card");
+    if(!modalCard){
+      ownerSection.scrollIntoView({ behavior:"smooth", block:"start" });
+      afterScroll?.();
+      return;
+    }
+
+    const targetTop = Math.max(
+      0,
+      modalCard.scrollTop + ownerSection.getBoundingClientRect().top - modalCard.getBoundingClientRect().top
+    );
+    const needsScroll = Math.abs(modalCard.scrollTop - targetTop) > 2;
+
+    if(!needsScroll){
+      afterScroll?.();
+      return;
+    }
+
     let completed = false;
+    let fallbackTimer = 0;
     const complete = () => {
       if(completed) return;
       completed = true;
-      modalCard?.removeEventListener("scrollend", complete);
+      if(fallbackTimer) window.clearTimeout(fallbackTimer);
+      modalCard.removeEventListener("scrollend", complete);
       afterScroll?.();
     };
 
-    ownerSection.scrollIntoView({ behavior:"smooth", block:"start" });
-
-    if(!afterScroll) return;
-    if("onscrollend" in window && modalCard){
-      modalCard.addEventListener("scrollend", complete, { once:true });
-    }else{
-      window.setTimeout(complete, 320);
-    }
+    modalCard.addEventListener("scrollend", complete, { once:true });
+    modalCard.scrollTo({ top:targetTop, behavior:"smooth" });
+    if(afterScroll) fallbackTimer = window.setTimeout(complete, 650);
   }
 
   function hasStoreManagerAccount(store = {}, request = {}){
