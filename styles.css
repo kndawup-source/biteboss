@@ -103,7 +103,7 @@ body.user-app #page-home{position:fixed;inset:0;height:auto;min-height:0;padding
 .store-card-photo{width:54px;height:54px;min-width:54px;flex:0 0 54px;border-radius:50%;object-fit:cover;background:#e3e3e5;overflow:hidden;position:relative}
 .store-avatar{width:52px;height:52px;flex:0 0 52px;border-radius:50%;object-fit:cover;background:#e3e3e5;overflow:hidden;position:relative}
 .store-card-photo>img,.store-avatar>img{width:100%;height:100%;object-fit:cover}
-.store-card-copy{min-width:0}.store-card-name,.store-card.is-occupied .store-card-name{display:block;margin:0;color:#111;font-size:13px;line-height:1.16;font-weight:900;letter-spacing:-.022em;word-break:keep-all;overflow-wrap:normal}
+.store-card-copy{min-width:0}.store-card-name{display:block;margin:0;color:#111;font-size:13px;line-height:1.16;font-weight:900;letter-spacing:-.022em;word-break:keep-all;overflow-wrap:normal}
 .store-card-meta{margin-top:3px;color:#8f8f95;font-size:9px;line-height:1.35}
 .store-card-status{margin-top:3px;color:#66666c;font-size:9px;line-height:1.3;font-weight:700}
 .store-card-title-row{display:grid;gap:5px;min-width:0}.store-status-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:0}
@@ -138,7 +138,7 @@ body.user-app #page-home{position:fixed;inset:0;height:auto;min-height:0;padding
 .store-avatar-fallback,.boss-avatar-fallback{
   display:grid;place-items:center;background:#e0e0e2;color:#111;line-height:1;
 }
-.store-avatar-fallback{position:relative;font-size:14px;font-weight:830;letter-spacing:0}
+.store-avatar-fallback{position:relative;font-size:14px;font-weight:900;letter-spacing:0}
 .store-avatar-initial{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;width:100%;height:100%;margin:0;padding:0;line-height:1;text-align:center;letter-spacing:0}
 .boss-avatar-fallback{font-size:17px;font-weight:800}
 
@@ -406,6 +406,6 @@ body.biteboss-info-page{min-height:100dvh;background:var(--bg);color:#111}.info-
 .occupied-store-half{display:block;min-width:0;min-height:100%;overflow:hidden;border-radius:0!important}
 .occupied-store-half img{display:block;width:100%;height:100%;object-fit:cover;border-radius:0!important}
 .occupied-store-half-store{border-right:0}
-.occupied-store-initial{display:grid;width:100%;height:100%;place-items:center;border-radius:0;background:#e4e4e6;color:#111;font:830 18px/1 var(--font)}
+.occupied-store-initial{display:grid;width:100%;height:100%;place-items:center;border-radius:0;background:#e4e4e6;color:#111;font:900 18px/1 var(--font)}
 
 @media(max-width:390px){.takeover-count{font-size:clamp(72px,20.5vw,92px)}.takeover-count-meta{font-size:8px}}
