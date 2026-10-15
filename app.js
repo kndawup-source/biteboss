@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.13";
+  const BITEBOSS_BUILD = "81.14";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -2424,7 +2424,15 @@
           ownerDetails.scrollIntoView({ behavior:"smooth", block:"start" });
         });
       });
-      $("#detailPartnerRequest")?.addEventListener("click", () => openPartnerRequestForm(store));
+      $("#detailPartnerRequest")?.addEventListener("click", () => {
+        const modalScroll = body.closest(".modal-body") || body;
+        if(typeof modalScroll.scrollTo === "function"){
+          modalScroll.scrollTo({ top:0, behavior:"smooth" });
+        }else{
+          body.scrollIntoView({ behavior:"smooth", block:"start" });
+        }
+        window.setTimeout(() => openPartnerRequestForm(store), 220);
+      });
       $("#detailPartnerAdmin")?.addEventListener("click", () => { location.href = "./store-admin.html"; });
     }
     $("#shareBossCardBtn")?.addEventListener("click",()=>shareBossCard({
