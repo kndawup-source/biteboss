@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "78.8";
+  const BITEBOSS_BUILD = "78.9";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -605,8 +605,7 @@
     }
     if(tab === "stores"){
       const storeList = $("#storeList");
-      if(storeList) storeList.replaceChildren();
-      renderStores();
+      if(storeList && !storeList.children.length) renderStores();
       void loadGamePulse();
     }
     if(tab === "rank"){
@@ -1017,17 +1016,20 @@
     stores = Array.isArray(result.data) ? result.data : [];
     stores.sort(compareNearbyStores);
 
-    // First paint must not wait for role enrichment or Kakao auto discovery.
-    // The RPC result is already enough to show the nearby list immediately.
+    // Fast first paint: show the nearby RPC result immediately.
     renderStores(stores, { resetPage:true });
     renderHomeNearbyBosses();
 
-    const roleTask = loadStoreRoles(stores).catch(error => {
-      console.warn("BiteBoss store roles:", error);
-    });
-
     const autoImportEnabled = config.auto_store_import_enabled !== false &&
       String(config.auto_store_import_enabled).toLowerCase() !== "false";
+
+    const roleTask = loadStoreRoles(stores)
+      .then(() => {
+        stores.sort(compareNearbyStores);
+        renderStores(stores, { patch:true });
+        void loadGamePulse(false);
+      })
+      .catch(error => console.warn("BiteBoss store roles:", error));
 
     const importTask = (lastPosition && autoImportEnabled)
       ? syncNearbyAutoStores(lastPosition).catch(error => {
@@ -1036,13 +1038,6 @@
         })
       : Promise.resolve(null);
 
-    // Role state is lightweight and can enrich the already-visible list independently.
-    await roleTask;
-    stores.sort(compareNearbyStores);
-    renderStores(stores);
-    void loadGamePulse(false);
-
-    // Discovery can be the slowest request. Keep it off the critical render path.
     const sync = await importTask;
     if(sync?.ok && lastPosition){
       const refreshed = await sb.rpc("biteboss_nearby_stores_v631", {
@@ -1053,15 +1048,25 @@
       });
 
       if(!refreshed.error){
-        stores = Array.isArray(refreshed.data) ? refreshed.data : stores;
+        const nextStores = Array.isArray(refreshed.data) ? refreshed.data : stores;
+        const beforeIds = stores.map(store => String(store.id)).join("|");
+        const afterIds = nextStores.map(store => String(store.id)).join("|");
+        stores = nextStores;
         await loadStoreRoles(stores);
         stores.sort(compareNearbyStores);
-        renderStores(stores);
+
+        if(beforeIds === afterIds){
+          renderStores(stores, { patch:true });
+        }else{
+          renderStores(stores, { resetPage:true });
+        }
         renderHomeNearbyBosses();
       }else{
         console.warn("BiteBoss nearby refresh:", refreshed.error);
       }
     }
+
+    await roleTask;
   }
 
   function autoImportAttemptKey(pos, radius){
@@ -1284,6 +1289,80 @@
     }
   }
 
+  function storeRenderSignature(store){
+    if(!store) return "";
+    const role = storeRoleMap.get(String(store.id)) || {};
+    return JSON.stringify([
+      store.id,
+      store.name,
+      store.photo_url,
+      store.current_boss_user_id,
+      store.boss_user_id,
+      store.current_boss_nickname,
+      store.boss_nickname,
+      store.current_boss_avatar_url,
+      store.boss_avatar_url,
+      store.boss_organization_id,
+      store.current_boss_organization_id,
+      store.boss_organization_avatar_url,
+      store.current_boss_organization_avatar_url,
+      store.distance_m,
+      store.distance,
+      store.challenges_24h,
+      store.is_hot,
+      role.my_role,
+      role.is_my_boss_store,
+      role.can_retake
+    ]);
+  }
+
+  function bindStoreCard(card){
+    if(!card || card.dataset.bound === "1") return;
+    card.dataset.bound = "1";
+    const open = () => openStoreDetail(card.dataset.storeDetail);
+    card.addEventListener("click", open);
+    card.addEventListener("keydown", event => {
+      if(event.key === "Enter" || event.key === " "){
+        event.preventDefault();
+        open();
+      }
+    });
+    card.querySelectorAll("[data-scan-store]").forEach(btn => {
+      btn.onclick = event => {
+        event.stopPropagation();
+        scanPrompt();
+      };
+    });
+  }
+
+  function patchVisibleStoreCards(rows){
+    const box = $("#storeList");
+    if(!box) return false;
+    const cards = [...box.querySelectorAll("[data-store-detail]")];
+    if(cards.length !== rows.length) return false;
+
+    let changed = false;
+    rows.forEach((store,index) => {
+      const card = cards[index];
+      if(String(card?.dataset?.storeDetail || "") !== String(store?.id || "")){
+        changed = true;
+        return;
+      }
+      const signature = storeRenderSignature(store);
+      if(card.dataset.renderSignature === signature) return;
+
+      const template = document.createElement("template");
+      template.innerHTML = storeCard(store).trim();
+      const next = template.content.firstElementChild;
+      if(!next) return;
+      next.dataset.renderSignature = signature;
+      card.replaceWith(next);
+      bindStoreCard(next);
+      changed = true;
+    });
+    return changed;
+  }
+
   function renderStores(list = stores, options = {}){
     const box = $("#storeList");
     if(!box) return;
@@ -1293,8 +1372,17 @@
     const view = pageSlice(storeViewRows, storePage, STORE_PAGE_SIZE);
     storePage = view.page;
 
-    box.innerHTML = view.rows.map(storeCard).join("") ||
-      `<div class="app-state">검색 결과가 없습니다.</div>`;
+    const canPatch = options.patch === true && box.children.length > 0;
+    if(!canPatch || !patchVisibleStoreCards(view.rows)){
+      box.innerHTML = view.rows.map(store => {
+        const html = storeCard(store);
+        return html.replace(
+          /(<[^>]+data-store-detail="[^"]+")/,
+          `$1 data-render-signature="${escapeAttr(storeRenderSignature(store))}"`
+        );
+      }).join("") || `<div class="app-state">검색 결과가 없습니다.</div>`;
+      $$("#storeList [data-store-detail]").forEach(bindStoreCard);
+    }
 
     updateChallengeCommand(storeViewRows);
     renderPagination("#storePagination", storePage, storeViewRows.length, STORE_PAGE_SIZE, nextPage => {
@@ -1306,26 +1394,9 @@
 
     const loginNotice = $("#storesLoginNotice");
     loginNotice?.classList.toggle("hidden", presenceBlockedReason !== "MEMBER_LOGIN_REQUIRED");
-
-    $$("#storeList [data-store-detail]").forEach(card => {
-      const open = () => openStoreDetail(card.dataset.storeDetail);
-      card.addEventListener("click", open);
-      card.addEventListener("keydown", event => {
-        if(event.key === "Enter" || event.key === " "){
-          event.preventDefault();
-          open();
-        }
-      });
-    });
-
-    $$("#storeList [data-scan-store]").forEach(btn => {
-      btn.onclick = event => {
-        event.stopPropagation();
-        scanPrompt();
-      };
-    });
     startStoreListReclaimCountdowns();
   }
+
 
   async function searchStores(){
     const input = $("#storeSearch");
@@ -1428,6 +1499,17 @@
     return `<span class="${escapeAttr(className)} store-avatar-fallback" aria-hidden="true"><span class="store-avatar-initial">${escapeHtml(initial)}</span></span>`;
   }
 
+  const occupiedAvatarPreloads = new Set();
+  function preloadOccupiedAvatar(url){
+    const src = String(url || "").trim();
+    if(!src || occupiedAvatarPreloads.has(src)) return;
+    occupiedAvatarPreloads.add(src);
+    const image = new Image();
+    image.decoding = "async";
+    image.fetchPriority = "high";
+    image.src = src;
+  }
+
   function occupiedStoreAvatarMarkup(store, className = "store-card-photo"){
     const photoUrl = String(store?.photo_url || "").trim();
     const storeName = String(store?.name || "매장").trim();
@@ -1452,6 +1534,7 @@
       return storeAvatarMarkup(photoUrl, storeName, className);
     }
 
+    preloadOccupiedAvatar(occupierUrl);
     const storeSide = photoUrl
       ? `<img src="${escapeAttr(photoUrl)}" alt="" loading="eager" fetchpriority="high" decoding="async" />`
       : `<span class="occupied-store-initial" aria-hidden="true">${escapeHtml(Array.from(storeName)[0] || "B")}</span>`;
