@@ -9,7 +9,7 @@
   <meta property="og:title" content="BiteBoss" />
   <meta property="og:description" content="주변 매장을 발견하고 도전해 보스를 차지하세요." />
   <meta property="og:type" content="website" />
-  <meta name="biteboss-build" content="77.6" />
+  <meta name="biteboss-build" content="78.0" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -21,8 +21,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet" />
-  <link rel="manifest" href="./manifest.webmanifest?v=77.0" />
-  <link rel="stylesheet" href="./styles.css?v=77.0" />
+  <link rel="manifest" href="./manifest.webmanifest?v=78.0" />
+  <link rel="stylesheet" href="./styles.css?v=78.0" />
 </head>
 <body class="user-app home-active">
 <div id="app" class="app-shell">
@@ -228,8 +228,9 @@
     </div>
     <div class="takeover-count-wrap">
       <div class="takeover-count-meta" aria-hidden="true"><span>TIME REMAINING</span><span>SEC</span></div>
-      <div id="takeoverCount" class="takeover-count">00:20</div>
-      <div class="takeover-count-rule" aria-hidden="true"></div>
+      <div id="takeoverCount" class="takeover-count" aria-label="00:20">
+        <span class="takeover-minutes">00</span><span class="takeover-colon" aria-hidden="true">:</span><span class="takeover-seconds">20</span>
+      </div>
     </div>
     <div class="takeover-bottom">
       <div class="takeover-bottom-grid">
@@ -253,6 +254,6 @@
   </div>
 </div>
 
-<script src="./bootstrap.js?v=77.0"></script>
+<script src="./bootstrap.js?v=78.0"></script>
 </body>
 </html>

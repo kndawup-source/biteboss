@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "77.6";
+  const BITEBOSS_BUILD = "78.0";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1398,6 +1398,40 @@
     return `<span class="${escapeAttr(className)} store-avatar-fallback" aria-hidden="true"><span class="store-avatar-initial">${escapeHtml(initial)}</span></span>`;
   }
 
+  function occupiedStoreAvatarMarkup(store, className = "store-card-photo"){
+    const photoUrl = String(store?.photo_url || "").trim();
+    const storeName = String(store?.name || "매장").trim();
+    const occupierUrl = String(
+      store?.current_boss_avatar_url
+      || store?.boss_avatar_url
+      || store?.boss_organization_avatar_url
+      || store?.current_boss_organization_avatar_url
+      || ""
+    ).trim();
+    const occupied = Boolean(
+      occupierUrl
+      || store?.current_boss_user_id
+      || store?.boss_user_id
+      || store?.current_boss_nickname
+      || store?.boss_nickname
+      || store?.boss_organization_id
+      || store?.current_boss_organization_id
+    );
+
+    if(!occupied || !occupierUrl){
+      return storeAvatarMarkup(photoUrl, storeName, className);
+    }
+
+    const storeSide = photoUrl
+      ? `<img src="${escapeAttr(photoUrl)}" alt="" loading="lazy" decoding="async" />`
+      : `<span class="occupied-store-initial" aria-hidden="true">${escapeHtml(Array.from(storeName)[0] || "B")}</span>`;
+
+    return `<span class="${escapeAttr(className)} occupied-store-avatar" role="img" aria-label="${escapeAttr(storeName)} 점령 매장">
+      <span class="occupied-store-half occupied-store-half-store">${storeSide}</span>
+      <span class="occupied-store-half occupied-store-half-boss"><img src="${escapeAttr(occupierUrl)}" alt="" loading="lazy" decoding="async" /></span>
+    </span>`;
+  }
+
   function bossAvatarMarkup(avatarUrl, nickname, className = "boss-avatar"){
     const url = String(avatarUrl || "").trim();
     const name = String(nickname || "보스").trim();
@@ -1461,7 +1495,7 @@
     if(!ownedByMe && isPartner){
       action = `<button class="store-list-action is-primary" data-scan-store="${escapeAttr(store.id)}" type="button">QR 도전</button>`;
     }else if(!ownedByMe && presence?.status === "tracking"){
-      action = `<span class="store-list-action is-live" aria-live="polite">${formatPresenceSeconds(remainingSeconds)}</span>`;
+      action = `<span class="store-list-action is-live" aria-live="polite">${formatPresenceSeconds(remainingSeconds)} 남음</span>`;
     }
 
     const badges = [
@@ -1474,7 +1508,7 @@
     return `
       <article class="store-card store-card-open challenge-card mode-${escapeAttr(cardMode)} ${isPartner ? "is-partner-store" : ""}" data-store-detail="${escapeAttr(store.id)}" role="button" tabindex="0" aria-label="${escapeAttr(store.name)} 매장 정보 보기">
         <div class="store-card-main">
-          ${storeAvatarMarkup(store.photo_url, store.name, "store-card-photo")}
+          ${occupiedStoreAvatarMarkup(store, "store-card-photo")}
           <div class="store-card-copy">
             <div class="store-card-title-row">
               <strong class="store-card-name">${escapeHtml(store.name)}</strong>
@@ -2073,7 +2107,7 @@
       <div class="store-detail store-detail-v635">
         <header class="store-detail-head compact-store-head store-detail-identity">
           <div class="store-detail-primary-identity">
-            ${storeAvatarMarkup(store.photo_url, store.name, "store-detail-avatar")}
+            ${occupiedStoreAvatarMarkup(store, "store-detail-avatar")}
             <div class="store-detail-identity-copy">
               <strong>${escapeHtml(store.name || "매장")}</strong>
               ${detailLine ? `<p>${escapeHtml(detailLine)}</p>` : ""}
@@ -3202,14 +3236,31 @@
     },RUNTIME.takeoverUiTickMs);
   }
 
-  function renderTakeoverCount(seconds){
+  function setTakeoverCountDisplay(value){
     const count=$("#takeoverCount");
-    const bar=$("#takeoverProgressBar");
-    if(count){
-      const whole=Math.max(0,Math.ceil(Number(seconds||0)));
-      count.textContent=`${String(Math.floor(whole/60)).padStart(2,"0")}:${String(whole%60).padStart(2,"0")}`;
-      count.classList.toggle("is-final",whole>0&&whole<=5);
+    if(!count) return;
+    if(typeof value === "string"){
+      count.classList.add("is-word");
+      count.innerHTML=`<span class="takeover-word">${escapeHtml(value)}</span>`;
+      count.setAttribute("aria-label",value);
+      return;
     }
+    const whole=Math.max(0,Math.ceil(Number(value||0)));
+    count.classList.remove("is-word");
+    if(!count.querySelector(".takeover-minutes")){
+      count.innerHTML='<span class="takeover-minutes">00</span><span class="takeover-colon" aria-hidden="true">:</span><span class="takeover-seconds">00</span>';
+    }
+    const minutes=count.querySelector(".takeover-minutes");
+    const seconds=count.querySelector(".takeover-seconds");
+    if(minutes) minutes.textContent=String(Math.floor(whole/60)).padStart(2,"0");
+    if(seconds) seconds.textContent=String(whole%60).padStart(2,"0");
+    count.setAttribute("aria-label",`${String(Math.floor(whole/60)).padStart(2,"0")}:${String(whole%60).padStart(2,"0")}`);
+    count.classList.toggle("is-final",whole>0&&whole<=5);
+  }
+
+  function renderTakeoverCount(seconds){
+    const bar=$("#takeoverProgressBar");
+    setTakeoverCountDisplay(seconds);
     if(bar){
       const done=takeoverRequired>0 ? Math.max(0,Math.min(100,(1-Number(seconds||0)/takeoverRequired)*100)) : 0;
       bar.style.width=`${done}%`;
@@ -3710,8 +3761,7 @@
           presenceLastInRadiusAt = 0;
         }
         if(takeoverUi?.storeId===String(nearest.store.id)){
-          const count=$("#takeoverCount");
-          if(count) count.textContent=String(data?.status||"")==="crew" ? "HOLD" : "BOSS";
+          setTakeoverCountDisplay(String(data?.status||"")==="crew" ? "HOLD" : "BOSS");
           const status=$("#takeoverStatus");
           if(status) status.textContent=String(data?.status||"")==="crew" ? "도전 결과를 확인하세요." : `${nearest.store.name||"매장"} 점령 완료`;
           closeTakeoverUi(900);
@@ -4458,10 +4508,9 @@
         actionHtml = `<p class="crew-join-state">${escapeHtml(label)}</p>`;
       }
 
-      openModal("크루 초대", `
+      openModal(escapeHtml(data.crew_name || "크루"), `
         <div class="crew-join-preview crew-invite-detail">
           <div class="crew-invite-detail-head">
-            <strong>${escapeHtml(data.crew_name || "크루")}</strong>
             <p>개설자 ${escapeHtml(founder)}</p>
           </div>
           <div class="crew-join-stats" aria-label="크루 정보">
@@ -6471,9 +6520,9 @@
       return;
     }
 
-    openModal("크루 초대", `
+    openModal(escapeHtml(organization?.name || "크루"), `
       <div class="crew-invite-shell">
-        <div class="crew-invite-loading">크루 QR을 준비하는 중…</div>
+        <div class="crew-invite-loading">QR을 준비하는 중…</div>
       </div>
     `, { type:"detail-sheet" });
 
@@ -6519,7 +6568,6 @@
 
       shell.innerHTML = `
         <div class="crew-invite-head">
-          <strong>${escapeHtml(organization?.name || data.crew_name || "크루")}</strong>
           <p>QR을 공유하면 상대방이 크루 정보를 확인한 뒤 가입할 수 있습니다.</p>
         </div>
 
