@@ -219,7 +219,7 @@ body.user-app #page-home{position:fixed;inset:0;height:auto;min-height:0;padding
 /* modal / details */
 .modal{position:fixed;z-index:1000;inset:0;display:grid;place-items:end center;padding:0;background:rgba(0,0,0,.2);backdrop-filter:blur(10px);overscroll-behavior:contain}
 html.modal-open,body.modal-open{overflow:hidden;overscroll-behavior:none}body.modal-open{position:fixed;left:0;right:0;width:100%}
-.modal-card{position:relative;width:min(100%,680px);overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;background:#f8f8f8;color:#111;touch-action:pan-y}
+.modal-card{position:relative;width:min(100%,680px);overflow:auto;overflow-anchor:none;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;background:#f8f8f8;color:#111;touch-action:pan-y}
 .modal-card>h3,.modal-head h3{margin:0 48px 18px 0;font-size:22px;line-height:1.05;font-weight:860;letter-spacing:-.045em}.modal-card>h3:empty{display:none}
 .modal-detail-sheet .modal-card{height:92dvh;max-height:92dvh;padding:62px 20px calc(24px + var(--safe-bottom));border-radius:26px 26px 0 0}
 .partner-request-modal .modal-card{padding-top:34px}

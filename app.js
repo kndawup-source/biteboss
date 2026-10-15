@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.15";
+  const BITEBOSS_BUILD = "81.16";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -2877,7 +2877,13 @@
         <button class="primary-btn" type="submit">인증 요청</button>
         <p id="partnerRequestStatus" class="inline-status"></p>
       </form>`, {type:"partner-request"});
-    $("#partnerRequestForm")?.addEventListener("submit", event => submitPartnerRequest(event, store.id));
+    const partnerRequestForm = $("#partnerRequestForm");
+    const partnerRequestModal = $("#modal");
+    const partnerRequestBody = $("#modalBody");
+    resetModalToTop(partnerRequestModal, partnerRequestBody);
+    window.requestAnimationFrame(() => resetModalToTop(partnerRequestModal, partnerRequestBody));
+    window.setTimeout(() => resetModalToTop(partnerRequestModal, partnerRequestBody), 160);
+    partnerRequestForm?.addEventListener("submit", event => submitPartnerRequest(event, store.id));
   }
 
   async function submitPartnerRequest(event, storeId){
@@ -8144,6 +8150,12 @@
     window.scrollTo(0, modalScrollY);
   }
 
+  function resetModalToTop(modal, bodyEl){
+    const modalCard = modal?.querySelector(".modal-card");
+    if(modalCard) modalCard.scrollTop = 0;
+    if(bodyEl) bodyEl.scrollTop = 0;
+  }
+
   function openModal(title, body, options = {}){
     stopScanner();
 
@@ -8166,20 +8178,21 @@
     setText("#modalTitle", title);
 
     const bodyEl = $("#modalBody");
-    if(bodyEl){
-      bodyEl.innerHTML = body;
-      bodyEl.scrollTop = 0;
-    }
+    if(bodyEl) bodyEl.innerHTML = body;
 
+    resetModalToTop(modal, bodyEl);
     lockModalScroll();
     modal.classList.remove("hidden");
-    const modalCard = modal.querySelector(".modal-card");
-    if(modalCard) modalCard.scrollTop = 0;
+    resetModalToTop(modal, bodyEl);
+
     window.requestAnimationFrame(() => {
-      if(modalCard) modalCard.scrollTop = 0;
-      if(bodyEl) bodyEl.scrollTop = 0;
-      $("#modalClose")?.focus({preventScroll:true});
+      resetModalToTop(modal, bodyEl);
+      window.requestAnimationFrame(() => {
+        resetModalToTop(modal, bodyEl);
+        $("#modalClose")?.focus({preventScroll:true});
+      });
     });
+    window.setTimeout(() => resetModalToTop(modal, bodyEl), 120);
   }
 
   function closeModal(){
