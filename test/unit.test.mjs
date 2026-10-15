@@ -29,11 +29,11 @@ test('Kakao normalization drops invalid rows and maps cafe category',()=>{
 
 function loadBattleHelpers(){
   const source=require('node:fs').readFileSync(new URL('../app.js',import.meta.url),'utf8');
-  const start=source.indexOf('  function classifyBattleResult');
+  const start=source.indexOf('  function isBattleChallenger');
   const end=source.indexOf('\n  function renderPlayerProfile',start);
   assert.ok(start>=0 && end>start,'battle helper block should exist');
   const block=source.slice(start,end);
-  return new Function(`${block}\nreturn {classifyBattleResult,battleRecordFromActivity,getPlayerBattleRecord};`)();
+  return new Function(`${block}\nreturn {isBattleChallenger,classifyBattleResult,battleRecordFromActivity,getPlayerBattleRecord};`)();
 }
 
 test('battle activity classifies challenger wins and losses and ignores defender rows',()=>{
@@ -45,6 +45,28 @@ test('battle activity classifies challenger wins and losses and ignores defender
     {as_challenger:false,result:'crew'},
     {as_challenger:true,result:'boss_visit'}
   ]),{total:3,wins:1,losses:2});
+});
+
+
+
+test('battle activity recognizes challenger perspective without as_challenger flag',()=>{
+  const {battleRecordFromActivity}=loadBattleHelpers();
+  assert.deepEqual(battleRecordFromActivity([
+    {viewer_side:'challenger',result:'boss_win'},
+    {viewer_side:'challenger',result:'crew'},
+    {viewer_side:'org_challenger',result:'crew'},
+    {viewer_side:'defender',result:'crew'}
+  ]),{total:3,wins:1,losses:2});
+});
+
+test('battle activity falls back to actor and defender user ids',()=>{
+  const {battleRecordFromActivity}=loadBattleHelpers();
+  const userId='user-1';
+  assert.deepEqual(battleRecordFromActivity([
+    {actor_user_id:userId,defender_user_id:'user-2',result:'boss_win'},
+    {actor_user_id:userId,defender_user_id:'user-2',result:'crew'},
+    {actor_user_id:'user-2',defender_user_id:userId,result:'crew'}
+  ],userId),{total:2,wins:1,losses:1});
 });
 
 test('battle aggregate never hides a newer logged win or loss',()=>{

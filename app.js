@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.26";
+  const BITEBOSS_BUILD = "81.27";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -6444,19 +6444,37 @@
     }
   }
 
-  function classifyBattleResult(row){
-    if(!row) return "";
-    const challenger = row.as_challenger === true || row.as_challenger === 1 || String(row.as_challenger || "").toLowerCase() === "true";
-    if(!challenger) return "";
+  function isBattleChallenger(row, userId = ""){
+    if(!row) return false;
+
+    const explicit = row.as_challenger;
+    if(explicit === true || explicit === 1 || String(explicit || "").toLowerCase() === "true") return true;
+    if(explicit === false || explicit === 0 || String(explicit || "").toLowerCase() === "false") return false;
+
+    const side = String(row.viewer_side || row.perspective || row.side || "").trim().toLowerCase();
+    if(["challenger","org_challenger","attacker"].includes(side)) return true;
+    if(["defender","org_defender"].includes(side)) return false;
+
+    const targetUserId = String(userId || "").trim();
+    const actorUserId = String(row.actor_user_id || row.challenger_user_id || row.attacker_user_id || "").trim();
+    const defenderUserId = String(row.defender_user_id || row.boss_user_id || "").trim();
+    if(targetUserId && actorUserId && targetUserId === actorUserId) return true;
+    if(targetUserId && defenderUserId && targetUserId === defenderUserId) return false;
+
+    return false;
+  }
+
+  function classifyBattleResult(row, userId = ""){
+    if(!isBattleChallenger(row, userId)) return "";
     const result = String(row.result || row.outcome || row.status || "").trim().toLowerCase();
     if(["boss_win","claimed","challenger_win","win","victory"].includes(result)) return "win";
     if(["crew","challenger_loss","boss_defense","defended","loss","lose","defeat","failed"].includes(result)) return "loss";
     return "";
   }
 
-  function battleRecordFromActivity(recentActivity){
+  function battleRecordFromActivity(recentActivity, userId = ""){
     return (Array.isArray(recentActivity) ? recentActivity : []).reduce((record, row) => {
-      const result = classifyBattleResult(row);
+      const result = classifyBattleResult(row, userId);
       if(result === "win"){
         record.wins += 1;
         record.total += 1;
@@ -6468,8 +6486,8 @@
     }, { total:0, wins:0, losses:0 });
   }
 
-  function getPlayerBattleRecord(data, recentActivity){
-    const activityRecord = battleRecordFromActivity(recentActivity);
+  function getPlayerBattleRecord(data, recentActivity, userId = ""){
+    const activityRecord = battleRecordFromActivity(recentActivity, userId);
     const candidates = [
       data?.battle_record,
       data?.record,
@@ -6523,7 +6541,7 @@
   function renderPlayerProfile(data, userId){
     const player = data.player || {};
     const recentAll = Array.isArray(data.recent_activity) ? data.recent_activity : [];
-    const battleRecord = getPlayerBattleRecord(data, recentAll);
+    const battleRecord = getPlayerBattleRecord(data, recentAll, userId);
     const recent = recentAll.slice(0, 3);
 
     // Modal shell is generic; the nickname is the hero title.
@@ -6536,8 +6554,9 @@
     const recentHtml = recent.map(row => {
       const result = String(row.result || "");
       let title = "전투 기록";
-      if(result === "boss_win") title = row.as_challenger ? "보스 점령" : "보스 상실";
-      else if(result === "crew") title = row.as_challenger ? "점령 실패" : "방어 성공";
+      const challenger = isBattleChallenger(row, userId);
+      if(result === "boss_win") title = challenger ? "보스 점령" : "보스 상실";
+      else if(result === "crew") title = challenger ? "점령 실패" : "방어 성공";
       else if(result === "boss_visit") title = "보스 활동";
       else if(result === "crew_kicked") title = "크루 강퇴";
       else if(result === "crew_left") title = "크루 탈퇴";
