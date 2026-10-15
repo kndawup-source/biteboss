@@ -136,6 +136,15 @@ test('guest account flow uses one login modal path and hides crew creation until
   assert.doesNotMatch(html, /id="memberRegisterBtn"/);
 });
 
+
+test('player battle record derives missing or stale losses from total minus wins', () => {
+  const record = blockBetween(app, 'function getPlayerBattleRecord', 'function renderPlayerProfile');
+  assert.match(record, /explicitLossValue = candidate\.losses/);
+  assert.match(record, /if\(hasTotal && total > wins \+ losses\)/);
+  assert.match(record, /losses = Math\.max\(losses, total - wins\)/);
+  assert.match(record, /result === "crew"/);
+});
+
 test('runtime user and store images use deliberate loading priorities', () => {
   assert.match(app, /매장 사진" loading="lazy" decoding="async"/);
   assert.match(app, /alt="\$\{escapeAttr\(name\)\} 프로필" \$\{loading\} decoding="async"/);

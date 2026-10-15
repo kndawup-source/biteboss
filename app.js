@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.24";
+  const BITEBOSS_BUILD = "81.25";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -6454,11 +6454,27 @@
 
     for(const candidate of candidates){
       if(!candidate || typeof candidate !== "object") continue;
-      const wins = Math.max(0, Number(candidate.wins ?? candidate.win_count ?? candidate.victories ?? 0));
-      const losses = Math.max(0, Number(candidate.losses ?? candidate.loss_count ?? candidate.defeats ?? 0));
-      const explicitTotal = Number(candidate.total ?? candidate.total_battles ?? candidate.matches);
-      const total = Number.isFinite(explicitTotal) ? Math.max(0, explicitTotal) : wins + losses;
-      return { total:Math.max(total, wins + losses), wins, losses };
+
+      const wins = Math.max(0, Number(
+        candidate.wins ?? candidate.win_count ?? candidate.victories ?? candidate.battle_wins ?? 0
+      ) || 0);
+      const explicitLossValue = candidate.losses ?? candidate.loss_count ?? candidate.defeats ?? candidate.battle_losses;
+      const explicitLosses = Number(explicitLossValue);
+      const explicitTotal = Number(candidate.total ?? candidate.total_battles ?? candidate.matches ?? candidate.battle_count);
+      const hasTotal = Number.isFinite(explicitTotal);
+      const total = hasTotal ? Math.max(0, explicitTotal) : null;
+
+      // BiteBoss battles have only a win/loss outcome for the challenger. Some
+      // profile RPC versions return total + wins while loss_count is omitted or
+      // left at its old default of 0. In that case the authoritative loss count
+      // is total - wins, not the placeholder zero.
+      let losses = Number.isFinite(explicitLosses) ? Math.max(0, explicitLosses) : 0;
+      if(hasTotal && total > wins + losses){
+        losses = Math.max(losses, total - wins);
+      }
+
+      const resolvedTotal = hasTotal ? Math.max(total, wins + losses) : wins + losses;
+      return { total:resolvedTotal, wins, losses };
     }
 
     // v76.x profile RPCs already return the target player's battle activity.
