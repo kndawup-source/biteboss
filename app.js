@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.31";
+  const BITEBOSS_BUILD = "81.21";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -190,8 +190,6 @@
   let playerSession = null;
   const storeCommentState = new Map();
   let stores = [];
-  const storeDetailFallbackMap = new Map();
-  const storeDetailCoordinateCache = new Map();
   let lastPosition = null;
   let nearbyWatchId = null;
   let nearbyRefreshBusy = false;
@@ -1428,18 +1426,7 @@
     return changed;
   }
 
-  function rememberStoreDetailFallbacks(list = []){
-    (Array.isArray(list) ? list : []).forEach(store => {
-      const id = String(store?.id || "").trim();
-      if(!id) return;
-      const previous = storeDetailFallbackMap.get(id) || {};
-      storeDetailFallbackMap.set(id, { ...previous, ...store });
-      cacheStoreCoordinates(id, store);
-    });
-  }
-
   function renderStores(list = stores, options = {}){
-    rememberStoreDetailFallbacks(list);
     const box = $("#storeList");
     if(!box) return;
 
@@ -1717,70 +1704,9 @@
     `;
   }
 
-  function normalizeStoreCoordinates(source = {}){
-    const latitude = source?.latitude == null || source.latitude === "" ? NaN : Number(source.latitude);
-    const longitude = source?.longitude == null || source.longitude === "" ? NaN : Number(source.longitude);
-    if(!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
-    return { latitude, longitude };
-  }
-
-  function cacheStoreCoordinates(storeId, source = {}){
-    const id = String(storeId || source?.id || "").trim();
-    const coordinates = normalizeStoreCoordinates(source);
-    if(!id || !coordinates) return null;
-    storeDetailCoordinateCache.set(id, coordinates);
-    const previous = storeDetailFallbackMap.get(id) || {};
-    storeDetailFallbackMap.set(id, { ...previous, ...coordinates });
-    return coordinates;
-  }
-
-  async function resolveStoreDetailCoordinates(storeId, detailStore = {}, cachedStore = null){
-    const id = String(storeId || detailStore?.id || cachedStore?.id || "").trim();
-    const detailCoordinates = cacheStoreCoordinates(id, detailStore);
-    if(detailCoordinates) return detailCoordinates;
-
-    const memoryCoordinates = storeDetailCoordinateCache.get(id) || normalizeStoreCoordinates(cachedStore);
-    if(memoryCoordinates){
-      cacheStoreCoordinates(id, memoryCoordinates);
-      return memoryCoordinates;
-    }
-
-    try{
-      const { data, error } = await sb
-        .from("biteboss_stores")
-        .select("id,latitude,longitude")
-        .eq("id", id)
-        .maybeSingle();
-
-      if(error) throw error;
-      const directCoordinates = cacheStoreCoordinates(id, data || {});
-      if(directCoordinates) return directCoordinates;
-    }catch(error){
-      console.warn("BiteBoss store coordinates:", error);
-    }
-
-    // Occupied stores are also published through the territory map RPC. This is a
-    // second public-safe source when direct table reads are restricted by RLS.
-    try{
-      const { data, error } = await sb.rpc("biteboss_territory_map");
-      if(error) throw error;
-      const row = (Array.isArray(data) ? data : []).find(item =>
-        String(item?.store_id || item?.id || "").trim() === id
-      );
-      const territoryCoordinates = cacheStoreCoordinates(id, row || {});
-      if(territoryCoordinates) return territoryCoordinates;
-    }catch(error){
-      console.warn("BiteBoss territory coordinates:", error);
-    }
-
-    return null;
-  }
-
   async function openStoreDetail(storeId, options = {}){
-    const id = String(storeId);
-    const cached = storeDetailFallbackMap.get(id)
-      || stores.find(store => String(store.id) === id)
-      || (options?.storeFallback && String(options.storeFallback.id) === id
+    const cached = stores.find(store => String(store.id) === String(storeId))
+      || (options?.storeFallback && String(options.storeFallback.id) === String(storeId)
         ? options.storeFallback
         : null);
     if(options?.preserveModal !== true){
@@ -1797,7 +1723,7 @@
         sb.rpc("biteboss_my_store_status", { p_store_id:storeId }),
         sb.rpc("biteboss_store_organization_status", { p_store_id:storeId }),
         sb.rpc("biteboss_store_offer_access", { p_store_id:storeId }),
-        playerSession?.authenticated
+        playerSession?.authenticated && options?.showStoreManagerCard !== false
           ? sb.rpc("biteboss_partner_request_status", { p_store_id:storeId })
           : Promise.resolve({ data:null, error:null }),
         sb.rpc("biteboss_store_public_growth_v63", { p_store_id:storeId, p_days:30 }),
@@ -1833,14 +1759,23 @@
       if(growthResult?.error) console.warn("BiteBoss public growth:", growthResult.error);
       if(arenaResult?.error) console.warn("BiteBoss arena:", arenaResult.error);
 
-      if(cached && !Number.isFinite(Number(data.store.distance_m)) && Number.isFinite(Number(cached.distance_m))){
-        data.store.distance_m = Number(cached.distance_m);
-      }
-
-      const coordinates = await resolveStoreDetailCoordinates(storeId, data.store, cached);
-      if(coordinates){
-        data.store.latitude = coordinates.latitude;
-        data.store.longitude = coordinates.longitude;
+      if(cached){
+        if(!Number.isFinite(Number(data.store.distance_m)) && Number.isFinite(Number(cached.distance_m))){
+          data.store.distance_m = Number(cached.distance_m);
+        }
+        // biteboss_store_detail is intentionally public-safe and older deployments do not
+        // return GPS coordinates. Reuse the same canonical store coordinates already loaded
+        // by the store list so the detail mini-map can render without a DB migration.
+        const detailLat = data.store.latitude == null || data.store.latitude === "" ? NaN : Number(data.store.latitude);
+        const detailLng = data.store.longitude == null || data.store.longitude === "" ? NaN : Number(data.store.longitude);
+        const cachedLat = cached.latitude == null || cached.latitude === "" ? NaN : Number(cached.latitude);
+        const cachedLng = cached.longitude == null || cached.longitude === "" ? NaN : Number(cached.longitude);
+        if(!Number.isFinite(detailLat) && Number.isFinite(cachedLat)){
+          data.store.latitude = cachedLat;
+        }
+        if(!Number.isFinite(detailLng) && Number.isFinite(cachedLng)){
+          data.store.longitude = cachedLng;
+        }
       }
 
       activeStoreDetailId = String(storeId);
@@ -2036,7 +1971,7 @@
     const myRole = String(game.my_role || "visitor");
     const isBoss = myRole === "boss";
     const isCrew = myRole === "crew";
-    const showStoreManagerCard = true;
+    const showStoreManagerCard = shouldShowStoreManagerCard({ isBoss, options });
     const myPower = Math.max(0, Number(game.my_power ?? 0));
     const storeBonus = Math.max(0, Number(game.my_store_bonus ?? growth.store_bonus ?? 0));
     const validVisits = Math.max(0, Number(game.my_valid_visits ?? growth.valid_visits ?? 0));
@@ -2363,16 +2298,33 @@
             </div>` : ""}
         </header>
 
-        <section class="store-detail-map-section" aria-label="매장 위치">
-          <div id="storeDetailMap" class="store-detail-map" aria-label="${escapeAttr(store.name || "매장")} 지도">
-            <div class="store-detail-map-state" role="status">매장 위치를 불러오는 중…</div>
-          </div>
-        </section>
-
         ${ownerStatusHtml}
+
+        ${store.latitude != null && store.latitude !== "" && store.longitude != null && store.longitude !== "" &&
+          Number.isFinite(Number(store.latitude)) && Number.isFinite(Number(store.longitude)) ? `
+          <section class="store-detail-map-section" aria-label="매장 위치">
+            <div id="storeDetailMap" class="store-detail-map" aria-label="${escapeAttr(store.name || "매장")} 지도"></div>
+          </section>
+        ` : ""}
 
         ${noticeHtml}
         ${featuredMenuHtml}
+
+        ${bossExists && !isBoss ? `
+          <section class="boss-focus" aria-label="보스 정보">
+            <div class="boss-focus-head">
+              <span></span>
+              <small>${protectedNow ? `보호 ${escapeHtml(formatRemaining(protectionUntil))}` : `방어력 ${bossDefense}`}</small>
+            </div>
+            <div class="boss-focus-main">
+              ${bossAvatarMarkup(bossAvatar, bossName || "보스", "boss-focus-avatar")}
+              <div class="boss-focus-copy">
+                <strong>${escapeHtml(bossName || "보스")}</strong>
+                <small>${escapeHtml([bossOrganizationName, `Lv ${bossLevel}`, `방어력 ${bossDefense}`].filter(Boolean).join(" · "))}</small>
+              </div>
+            </div>
+          </section>
+        ` : ""}
 
         ${offersHtml}
 
@@ -2468,17 +2420,17 @@
       const ownerDetails = body.querySelector("details.store-owner-conversion");
       ownerDetails?.addEventListener("toggle", () => {
         if(!ownerDetails.open) return;
-        requestAnimationFrame(() => { void smoothScrollElementInModal(ownerDetails); });
+        requestAnimationFrame(() => smoothScrollToStoreOwner(ownerDetails));
       });
-      $("#detailPartnerRequest")?.addEventListener("click", async event => {
+      $("#detailPartnerRequest")?.addEventListener("click", event => {
         const button = event.currentTarget;
-        if(button.disabled) return;
-        button.disabled = true;
+        if(button.dataset.transitioning === "true") return;
+        button.dataset.transitioning = "true";
 
-        const modalCard = button.closest(".modal-card");
-        await smoothScrollModalCard(modalCard, 0);
-
-        if(!openPartnerRequestForm(store)) button.disabled = false;
+        smoothScrollToStoreOwner(
+          body.querySelector(".store-owner-conversion"),
+          () => openPartnerRequestForm(store)
+        );
       });
       $("#detailPartnerAdmin")?.addEventListener("click", () => { location.href = "./store-admin.html"; });
     }
@@ -2771,149 +2723,99 @@
     return true;
   }
 
-  function renderStoreDetailMapState(message, { retry = false } = {}){
-    const mapEl = $("#storeDetailMap");
-    if(!mapEl) return;
-    mapEl.innerHTML = `
-      <div class="store-detail-map-state" role="status">
-        <span>${escapeHtml(message)}</span>
-        ${retry ? `<button class="store-detail-map-retry" type="button">다시 시도</button>` : ""}
-      </div>
-    `;
-    if(retry){
-      mapEl.querySelector(".store-detail-map-retry")?.addEventListener("click", async () => {
-        const storeId = String(activeStoreDetailId || "").trim();
-        if(!storeId) return;
-        await openStoreDetail(storeId, { preserveModal:true });
-      });
-    }
-  }
-
   function renderStoreDetailMap(store = {}){
     destroyStoreDetailMap();
 
     const mapEl = $("#storeDetailMap");
-    if(!mapEl) return;
+    if(!mapEl || typeof L === "undefined") return;
 
-    const coordinates = normalizeStoreCoordinates(store);
-    if(!coordinates){
-      renderStoreDetailMapState("매장 위치 정보가 없습니다.");
-      return;
-    }
+    const lat = store.latitude == null || store.latitude === "" ? NaN : Number(store.latitude);
+    const lng = store.longitude == null || store.longitude === "" ? NaN : Number(store.longitude);
+    if(!Number.isFinite(lat) || !Number.isFinite(lng)) return;
 
-    if(typeof L === "undefined" || typeof L.map !== "function"){
-      renderStoreDetailMapState("지도를 불러오지 못했습니다.", { retry:true });
-      return;
-    }
-
-    const { latitude:lat, longitude:lng } = coordinates;
-
-    try{
-      mapEl.innerHTML = "";
-      storeDetailMap = L.map(mapEl, {
-        zoomControl:true,
-        attributionControl:true,
-        preferCanvas:true,
-        scrollWheelZoom:false
-      });
-
-      const tiles = L.tileLayer(
-        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-        {
-          maxZoom:19,
-          subdomains:"abc",
-          attribution:'&copy; OpenStreetMap contributors'
-        }
-      );
-
-      let tileErrorShown = false;
-      tiles.on("tileerror", () => {
-        if(tileErrorShown || !storeDetailMap) return;
-        tileErrorShown = true;
-        console.warn("BiteBoss store map tiles failed to load.");
-      });
-      tiles.addTo(storeDetailMap);
-
-      storeDetailStorePoint = L.latLng(lat,lng);
-
-      L.circleMarker(storeDetailStorePoint, {
-        radius:8,
-        weight:3,
-        color:"#ffffff",
-        fillColor:"#111111",
-        fillOpacity:1
-      }).addTo(storeDetailMap).bindTooltip(String(store.name || "매장"), {
-        permanent:false,
-        direction:"top",
-        offset:[0,-7]
-      });
-
-      const hasUserLocation = updateStoreDetailUserLocation(lastPosition);
-      if(hasUserLocation){
-        fitStoreDetailMap();
-      }else{
-        storeDetailMap.setView(storeDetailStorePoint,17,{animate:false});
-      }
-
-      window.requestAnimationFrame(() => storeDetailMap?.invalidateSize());
-    }catch(error){
-      console.warn("BiteBoss store map:", error);
-      destroyStoreDetailMap();
-      renderStoreDetailMapState("지도를 불러오지 못했습니다.", { retry:true });
-    }
-  }
-
-
-
-  function smoothScrollModalCard(modalCard, targetTop){
-    if(!modalCard) return Promise.resolve();
-
-    const maxTop = Math.max(0, modalCard.scrollHeight - modalCard.clientHeight);
-    const nextTop = Math.min(maxTop, Math.max(0, Number(targetTop) || 0));
-    if(Math.abs(modalCard.scrollTop - nextTop) <= 2){
-      modalCard.scrollTop = nextTop;
-      return Promise.resolve();
-    }
-
-    return new Promise(resolve => {
-      const startedAt = performance.now();
-      let previousTop = modalCard.scrollTop;
-      let stableFrames = 0;
-
-      const finishWhenSettled = now => {
-        const currentTop = modalCard.scrollTop;
-        const atTarget = Math.abs(currentTop - nextTop) <= 2;
-        const stopped = Math.abs(currentTop - previousTop) < 0.5;
-        stableFrames = stopped ? stableFrames + 1 : 0;
-        previousTop = currentTop;
-
-        if(atTarget || stableFrames >= 3 || now - startedAt >= 900){
-          if(atTarget) modalCard.scrollTop = nextTop;
-          resolve();
-          return;
-        }
-        requestAnimationFrame(finishWhenSettled);
-      };
-
-      modalCard.scrollTo({ top:nextTop, behavior:"smooth" });
-      requestAnimationFrame(finishWhenSettled);
+    storeDetailMap = L.map(mapEl, {
+      zoomControl:true,
+      attributionControl:true,
+      preferCanvas:true,
+      scrollWheelZoom:false
     });
-  }
 
-  function smoothScrollElementInModal(element){
-    if(!element) return Promise.resolve();
+    L.tileLayer(
+      "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      {
+        maxZoom:19,
+        subdomains:"abc",
+        attribution:'&copy; OpenStreetMap contributors'
+      }
+    ).addTo(storeDetailMap);
 
-    const modalCard = element.closest(".modal-card");
-    if(!modalCard){
-      element.scrollIntoView({ behavior:"smooth", block:"start" });
-      return Promise.resolve();
+    storeDetailStorePoint = L.latLng(lat,lng);
+
+    L.circleMarker(storeDetailStorePoint, {
+      radius:8,
+      weight:3,
+      color:"#ffffff",
+      fillColor:"#111111",
+      fillOpacity:1
+    }).addTo(storeDetailMap).bindTooltip(String(store.name || "매장"), {
+      permanent:false,
+      direction:"top",
+      offset:[0,-7]
+    });
+
+    const hasUserLocation = updateStoreDetailUserLocation(lastPosition);
+    if(hasUserLocation){
+      fitStoreDetailMap();
+    }else{
+      storeDetailMap.setView(storeDetailStorePoint,17,{animate:false});
     }
 
-    const targetTop = modalCard.scrollTop
-      + element.getBoundingClientRect().top
-      - modalCard.getBoundingClientRect().top;
+    window.requestAnimationFrame(() => storeDetailMap?.invalidateSize());
+  }
 
-    return smoothScrollModalCard(modalCard, targetTop);
+
+  function shouldShowStoreManagerCard({ isBoss = false, options = {} } = {}){
+    // A player who currently owns this territory is in the Boss flow, not the store-owner claim flow.
+    // Explicitly hidden entry points (profile battle history, compact activity views, etc.) also stay hidden.
+    return !isBoss && options?.showStoreManagerCard !== false;
+  }
+
+  function smoothScrollToStoreOwner(ownerSection, afterScroll){
+    if(!ownerSection){
+      afterScroll?.();
+      return;
+    }
+
+    const modalCard = ownerSection.closest(".modal-card");
+    if(!modalCard){
+      ownerSection.scrollIntoView({ behavior:"smooth", block:"start" });
+      afterScroll?.();
+      return;
+    }
+
+    const targetTop = Math.max(
+      0,
+      modalCard.scrollTop + ownerSection.getBoundingClientRect().top - modalCard.getBoundingClientRect().top
+    );
+
+    if(Math.abs(modalCard.scrollTop - targetTop) <= 2){
+      afterScroll?.();
+      return;
+    }
+
+    let completed = false;
+    let fallbackTimer = 0;
+    const complete = () => {
+      if(completed) return;
+      completed = true;
+      if(fallbackTimer) window.clearTimeout(fallbackTimer);
+      modalCard.removeEventListener("scrollend", complete);
+      afterScroll?.();
+    };
+
+    modalCard.addEventListener("scrollend", complete, { once:true });
+    modalCard.scrollTo({ top:targetTop, behavior:"smooth" });
+    fallbackTimer = window.setTimeout(complete, 650);
   }
 
   function hasStoreManagerAccount(store = {}, request = {}){
@@ -3003,11 +2905,11 @@
   }
 
   function openPartnerRequestForm(store){
+    recordGrowthEvent(store?.id, "claim_store_opened", {});
     if(!playerSession?.authenticated){
       toast("회원 로그인 후 매장 관리자 인증을 신청할 수 있습니다.");
-      return false;
+      return;
     }
-    recordGrowthEvent(store?.id, "claim_store_opened", {});
     openModal("매장 인증", `
       <form id="partnerRequestForm" class="partner-request-form">
         <div class="partner-request-store">
@@ -3021,7 +2923,6 @@
         <p id="partnerRequestStatus" class="inline-status"></p>
       </form>`, {type:"partner-request"});
     $("#partnerRequestForm")?.addEventListener("submit", event => submitPartnerRequest(event, store.id));
-    return true;
   }
 
   async function submitPartnerRequest(event, storeId){
@@ -3303,7 +3204,8 @@
           event?.stopPropagation?.();
         }
         openStoreDetail(storeId, {
-          source:fromProfileBattleLog ? "profile_battle" : "activity"
+          source:fromProfileBattleLog ? "profile_battle" : "activity",
+          showStoreManagerCard:!fromProfileBattleLog
         });
       };
     });
@@ -3364,11 +3266,7 @@
       const result = String(row.result || "");
       const actor = row.actor_name || "사용자";
       const defender = row.defender_name || "보스";
-      const storeId = String(row.store_id || "").trim();
-      const storeDeleted = Boolean(row.store_deleted || !storeId);
-      const storeName = row.store_name || (storeDeleted ? "삭제된 매장" : "매장");
-      const activityStoreAttr = storeDeleted ? "" : ` data-activity-store="${escapeAttr(storeId)}"`;
-      const activityPlayerAttr = storeDeleted ? "" : ` data-player-profile="${escapeAttr(row.actor_user_id || "")}"`;
+      const storeName = row.store_name || "매장";
 
       const perspective = String(row.viewer_side || "");
       let title = "보스 도전";
@@ -3394,7 +3292,7 @@
       if(compact){
         const scope = row.is_mine ? "나" : row.is_org ? "크루" : "";
         return `
-          <button class="activity-row is-compact${storeDeleted ? " is-deleted-store" : ""}" type="button"${activityStoreAttr}${activityPlayerAttr}>
+          <button class="activity-row is-compact" type="button" data-activity-store="${escapeAttr(row.store_id)}" data-player-profile="${escapeAttr(row.actor_user_id || "")}">
             <div class="activity-main">
               <div class="activity-title-row">
                 <strong>${escapeHtml(title)}</strong>
@@ -3420,7 +3318,7 @@
         : `<span class="profile-record-thumb profile-record-thumb-fallback" aria-hidden="true">${escapeHtml(fallback)}</span>`;
 
       return `
-        <button class="profile-record-row has-thumb${storeDeleted ? " is-deleted-store" : ""}" type="button"${activityStoreAttr}${activityPlayerAttr}>
+        <button class="profile-record-row has-thumb" type="button" data-activity-store="${escapeAttr(row.store_id)}" data-player-profile="${escapeAttr(row.actor_user_id || "")}">
           ${thumb}
           <span class="profile-record-main">
             <strong class="profile-record-title">${escapeHtml(title)}</strong>
@@ -3577,7 +3475,8 @@
 
       row.addEventListener("click", () => {
         openStoreDetail(storeId, {
-          source:"profile_visit"
+          source:"profile_visit",
+          showStoreManagerCard:false
         });
       });
     });
@@ -4299,7 +4198,7 @@
           loadMyOrganization()
         ]);
         if(String(activeStoreDetailId || "") === String(nearest.store.id))
-          await openStoreDetail(nearest.store.id, { preserveModal:true });
+          await openStoreDetail(nearest.store.id, { preserveModal:true, showStoreManagerCard:false });
         return;
       }
 
@@ -6386,13 +6285,6 @@
   async function fetchPlayerProfileData(userId){
     const params = { p_user_id:userId };
 
-    const canonical = await sb.rpc("biteboss_player_profile_v8129", params);
-    if(!canonical.error) return canonical;
-
-    const canonicalMessage = String(canonical.error?.message || "");
-    const canonicalMissing = canonicalMessage.includes("Could not find the function") || canonicalMessage.includes("PGRST202");
-    if(!canonicalMissing) return canonical;
-
     const corrected = await sb.rpc("biteboss_player_profile_v766", params);
     if(!corrected.error) return corrected;
 
@@ -6448,50 +6340,7 @@
     }
   }
 
-  function isBattleChallenger(row, userId = ""){
-    if(!row) return false;
-
-    const explicit = row.as_challenger;
-    if(explicit === true || explicit === 1 || String(explicit || "").toLowerCase() === "true") return true;
-    if(explicit === false || explicit === 0 || String(explicit || "").toLowerCase() === "false") return false;
-
-    const side = String(row.viewer_side || row.perspective || row.side || "").trim().toLowerCase();
-    if(["challenger","org_challenger","attacker"].includes(side)) return true;
-    if(["defender","org_defender"].includes(side)) return false;
-
-    const targetUserId = String(userId || "").trim();
-    const actorUserId = String(row.actor_user_id || row.challenger_user_id || row.attacker_user_id || "").trim();
-    const defenderUserId = String(row.defender_user_id || row.boss_user_id || "").trim();
-    if(targetUserId && actorUserId && targetUserId === actorUserId) return true;
-    if(targetUserId && defenderUserId && targetUserId === defenderUserId) return false;
-
-    return false;
-  }
-
-  function classifyBattleResult(row, userId = ""){
-    if(!isBattleChallenger(row, userId)) return "";
-    const result = String(row.result || row.outcome || row.status || "").trim().toLowerCase();
-    if(["boss_win","claimed","challenger_win","win","victory"].includes(result)) return "win";
-    if(["crew","challenger_loss","boss_defense","defended","loss","lose","defeat","failed"].includes(result)) return "loss";
-    return "";
-  }
-
-  function battleRecordFromActivity(recentActivity, userId = ""){
-    return (Array.isArray(recentActivity) ? recentActivity : []).reduce((record, row) => {
-      const result = classifyBattleResult(row, userId);
-      if(result === "win"){
-        record.wins += 1;
-        record.total += 1;
-      }else if(result === "loss"){
-        record.losses += 1;
-        record.total += 1;
-      }
-      return record;
-    }, { total:0, wins:0, losses:0 });
-  }
-
-  function getPlayerBattleRecord(data, recentActivity, userId = ""){
-    const activityRecord = battleRecordFromActivity(recentActivity, userId);
+  function getPlayerBattleRecord(data, recentActivity){
     const candidates = [
       data?.battle_record,
       data?.record,
@@ -6501,51 +6350,34 @@
 
     for(const candidate of candidates){
       if(!candidate || typeof candidate !== "object") continue;
-
-      const explicitWins = Number(
-        candidate.wins ?? candidate.win_count ?? candidate.victories ?? candidate.battle_wins
-      );
-      const explicitLosses = Number(
-        candidate.losses ?? candidate.loss_count ?? candidate.defeats ?? candidate.battle_losses
-      );
-      const explicitTotal = Number(
-        candidate.total ?? candidate.total_battles ?? candidate.matches ?? candidate.battle_count
-      );
-
-      // The aggregate record is the long-term source of truth, while recent_activity
-      // is the transaction-level lower bound. Reconcile both sides so a stale aggregate
-      // can never hide a battle that is already present in the activity log.
-      let wins = Number.isFinite(explicitWins) ? Math.max(0, explicitWins) : 0;
-      let losses = Number.isFinite(explicitLosses) ? Math.max(0, explicitLosses) : 0;
-      const hasTotal = Number.isFinite(explicitTotal);
-      const total = hasTotal ? Math.max(0, explicitTotal) : 0;
-
-      // Some profile RPC versions persist total + wins before loss_count catches up.
-      // A completed challenger battle has exactly one outcome, so the missing remainder
-      // is a loss. This also repairs historical rows where loss_count stayed at zero.
-      if(hasTotal && total > wins + losses){
-        losses = Math.max(losses, total - wins);
-      }
-
-      // A freshly completed result can appear in recent_activity before the aggregate
-      // counters are refreshed. Never let either W or L display below the concrete log.
-      wins = Math.max(wins, activityRecord.wins);
-      losses = Math.max(losses, activityRecord.losses);
-
-      return {
-        total:Math.max(total, wins + losses, activityRecord.total),
-        wins,
-        losses
-      };
+      const wins = Math.max(0, Number(candidate.wins ?? candidate.win_count ?? candidate.victories ?? 0));
+      const losses = Math.max(0, Number(candidate.losses ?? candidate.loss_count ?? candidate.defeats ?? 0));
+      const explicitTotal = Number(candidate.total ?? candidate.total_battles ?? candidate.matches);
+      const total = Number.isFinite(explicitTotal) ? Math.max(0, explicitTotal) : wins + losses;
+      return { total:Math.max(total, wins + losses), wins, losses };
     }
 
-    return activityRecord;
+    // v76.x profile RPCs already return the target player's battle activity.
+    // Count only battles where that player was the challenger; visits, defenses and
+    // crew membership events are not a player's W/L record.
+    return (Array.isArray(recentActivity) ? recentActivity : []).reduce((record, row) => {
+      if(!row?.as_challenger) return record;
+      const result = String(row.result || "");
+      if(result === "boss_win"){
+        record.wins += 1;
+        record.total += 1;
+      }else if(result === "crew"){
+        record.losses += 1;
+        record.total += 1;
+      }
+      return record;
+    }, { total:0, wins:0, losses:0 });
   }
 
   function renderPlayerProfile(data, userId){
     const player = data.player || {};
     const recentAll = Array.isArray(data.recent_activity) ? data.recent_activity : [];
-    const battleRecord = getPlayerBattleRecord(data, recentAll, userId);
+    const battleRecord = getPlayerBattleRecord(data, recentAll);
     const recent = recentAll.slice(0, 3);
 
     // Modal shell is generic; the nickname is the hero title.
@@ -6558,9 +6390,8 @@
     const recentHtml = recent.map(row => {
       const result = String(row.result || "");
       let title = "전투 기록";
-      const challenger = isBattleChallenger(row, userId);
-      if(result === "boss_win") title = challenger ? "보스 점령" : "보스 상실";
-      else if(result === "crew") title = challenger ? "점령 실패" : "방어 성공";
+      if(result === "boss_win") title = row.as_challenger ? "보스 점령" : "보스 상실";
+      else if(result === "crew") title = row.as_challenger ? "점령 실패" : "방어 성공";
       else if(result === "boss_visit") title = "보스 활동";
       else if(result === "crew_kicked") title = "크루 강퇴";
       else if(result === "crew_left") title = "크루 탈퇴";
@@ -6635,7 +6466,8 @@
         closeModal();
         if(storeId){
           openStoreDetail(storeId, {
-            source:"player_profile_battle"
+            source:"player_profile_battle",
+            showStoreManagerCard:false
           });
         }
       });
@@ -6705,7 +6537,7 @@
     list.querySelectorAll("[data-profile-comment-store]").forEach(button => {
       button.addEventListener("click", () => {
         const storeId = button.dataset.profileCommentStore;
-        if(storeId) openStoreDetail(storeId, { source:"my_profile_comment" });
+        if(storeId) openStoreDetail(storeId, { source:"my_profile_comment", showStoreManagerCard:false });
       });
     });
 
