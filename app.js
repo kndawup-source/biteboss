@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "80.9.1";
+  const BITEBOSS_BUILD = "81.0";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -142,10 +142,7 @@
     home_hook_text:"찍고, 점령하고, 보스가 돼.",
     home_primary_cta:"QR 스캔하기",
     home_secondary_cta:"내 주변 보스 찾기",
-    partner_banner_store_ids:[],
-    partner_banner_copy:{},
-    partner_banner_distance_km:{},
-    partner_banner_priority:{},
+    partner_banners:[],
     crew_qr_invite_hours:72,
     crew_qr_max_uses:30,
     crew_max_members:30,
@@ -315,6 +312,7 @@
 
     renderHomeSplashImage();
     renderHomeCopy();
+    paintImmediatePartnerBanner();
     updateProfileUi();
     await refreshNotificationState({ registerIfGranted:true });
 
@@ -446,7 +444,7 @@
       await loadConfig();
       renderHomeSplashImage();
       renderHomeCopy();
-
+  
       const positionPromise = getPositionSafe(false, {
         timeout:RUNTIME.initialLocationTimeoutMs,
         maximumAge:RUNTIME.foregroundLocationMaxAgeMs
@@ -708,11 +706,34 @@
       return;
     }
 
-    (data || []).forEach(row => {
-      if(Object.prototype.hasOwnProperty.call(config, row.key)){
-        config[row.key] = row.value;
-      }
+    const rows = Object.fromEntries((data || []).map(row => [row.key, row.value]));
+    Object.keys(config).forEach(key => {
+      if(Object.prototype.hasOwnProperty.call(rows, key)) config[key] = rows[key];
     });
+
+    // v81 canonical banner payload. Legacy keys are read only as a temporary
+    // compatibility source; the public renderer itself uses one payload only.
+    if(!Array.isArray(config.partner_banners) || !config.partner_banners.length){
+      const ids = Array.isArray(rows.partner_banner_store_ids) ? rows.partner_banner_store_ids.map(String) : [];
+      const copies = rows.partner_banner_copy && typeof rows.partner_banner_copy === "object" ? rows.partner_banner_copy : {};
+      const distances = rows.partner_banner_distance_km && typeof rows.partner_banner_distance_km === "object" ? rows.partner_banner_distance_km : {};
+      const priorities = rows.partner_banner_priority && typeof rows.partner_banner_priority === "object" ? rows.partner_banner_priority : {};
+      const cached = Array.isArray(rows.partner_banner_store_cache) ? rows.partner_banner_store_cache : [];
+      config.partner_banners = cached
+        .filter(store => ids.includes(String(store?.id || "")))
+        .map(store => ({
+          id:String(store.id),
+          name:String(store.name || ""),
+          photo_url:String(store.photo_url || ""),
+          status:String(store.status || "active"),
+          latitude:Number(store.latitude),
+          longitude:Number(store.longitude),
+          partnership_status:String(store.partnership_status || ""),
+          copy:String(copies[String(store.id)] || ""),
+          distance_km:distances[String(store.id)] ?? 5,
+          priority:Number(priorities[String(store.id)] || 3)
+        }));
+    }
   }
 
   function renderHomeSplashImage(options = {}){
@@ -3659,11 +3680,74 @@
       }));
   }
 
+  function currentPartnerBanner(){
+    const banners = Array.isArray(config.partner_banners) ? config.partner_banners : [];
+    const eligible = banners.filter(banner => {
+      if(!banner?.id || String(banner.status || "active") !== "active") return false;
+      const rawLimit = banner.distance_km ?? 5;
+      const limitKm = rawLimit === "all" ? Infinity : Math.max(0, Number(rawLimit));
+      if(!Number.isFinite(limitKm)) return true;
+      const distanceM = localStoreDistance(banner);
+      return Number.isFinite(distanceM) && distanceM <= limitKm * 1000;
+    });
+    const topPriority = eligible.reduce((max,banner) => Math.max(max, Number(banner.priority || 3)), -Infinity);
+    const top = eligible
+      .filter(banner => Number(banner.priority || 3) === topPriority)
+      .sort((left,right) => localStoreDistance(left) - localStoreDistance(right));
+    if(!top.length) return null;
+    const slot = Math.floor(Date.now() / (30 * 60 * 1000));
+    return top[slot % top.length];
+  }
+
+  function partnerBannerMarkup(banner){
+    if(!banner) return "";
+    const defaultCopy = String(banner.partnership_status || "") === "partnered"
+      ? "이 매장에서 BiteBoss 혜택을 확인해 보세요."
+      : "지금 이 매장을 확인해 보세요.";
+    const copy = String(banner.copy || defaultCopy).trim();
+    const image = String(banner.photo_url || "").trim();
+    const visual = image
+      ? `<span class="partner-banner-thumb" aria-hidden="true"><img src="${escapeAttr(image)}" alt="" loading="eager" decoding="async" fetchpriority="high" /></span>`
+      : `<span class="partner-banner-thumb partner-banner-fallback" aria-hidden="true">${escapeHtml(String(banner.name || "P").trim().charAt(0) || "P")}</span>`;
+    return `<button class="game-pulse-item is-partner-banner" type="button" data-pulse-store="${escapeAttr(banner.id)}" data-pulse-name="${escapeAttr(banner.name || "")}">${visual}<strong>${escapeHtml(banner.name || "매장")}</strong><small>${escapeHtml(copy)}</small></button>`;
+  }
+
+  function bindGamePulseStoreLinks(box){
+    $$("[data-pulse-store]",box).forEach(btn => btn.addEventListener("click",()=>{
+      const rawStoreId=String(btn.dataset.pulseStore||"").trim();
+      const storeName=String(btn.dataset.pulseName||"").trim();
+      const matchedStore = stores.find(store => String(store?.id || "").trim() === rawStoreId)
+        || (storeName ? stores.find(store => String(store?.name || "").trim().toLowerCase() === storeName.toLowerCase()) : null);
+      const storeId = String(matchedStore?.id || rawStoreId || "").trim();
+      if(storeId) openStoreDetail(storeId);
+    }));
+  }
+
+  function paintImmediatePartnerBanner(){
+    const box=$("#gamePulse");
+    if(!box) return;
+    const markup=partnerBannerMarkup(currentPartnerBanner());
+    if(!markup) return;
+    box.innerHTML=markup;
+    box.classList.remove("hidden");
+    bindGamePulseStoreLinks(box);
+  }
+
   async function loadGamePulse(force=false){
     const box=$("#gamePulse");
     if(!box) return;
     if(!force && Date.now()-gamePulseLoadedAt<RUNTIME.gamePulseCacheMs) return;
     gamePulseLoadedAt=Date.now();
+
+    // Paint the campaign from config immediately. No network request is required
+    // before the user can see the store banner.
+    const partnerBanner=currentPartnerBanner();
+    const immediateMarkup=partnerBannerMarkup(partnerBanner);
+    if(immediateMarkup){
+      box.innerHTML=immediateMarkup;
+      box.classList.remove("hidden");
+      bindGamePulseStoreLinks(box);
+    }
 
     let data=null;
     try{
@@ -3677,107 +3761,24 @@
       .map(s=>({store_id:s.id,store_name:s.name}));
     const fallbackHot=stores
       .filter(s=>s.is_hot||Number(s.challenges_24h||0)>=Number(config.hot_store_challenges_24h||5))
-      .sort((a,b)=>localStoreDistance(a)-localStoreDistance(b))
+      .sort((left,right)=>localStoreDistance(left)-localStoreDistance(right))
       .slice(0,3)
       .map(s=>({store_id:s.id,store_name:s.name,challenges_24h:s.challenges_24h||0}));
 
     const retakes=(Array.isArray(data?.retakes)?data.retakes:fallbackRetakes)
-      .map(normalizePulseStore)
-      .filter(Boolean)
+      .map(normalizePulseStore).filter(Boolean)
       .filter(row=>!isMyBossStore(stores.find(store=>String(store.id)===String(row.store_id))||{}));
-    const serverHot=(Array.isArray(data?.hot)?data.hot:[])
-      .map(normalizePulseStore)
-      .filter(Boolean);
+    const serverHot=(Array.isArray(data?.hot)?data.hot:[]).map(normalizePulseStore).filter(Boolean);
     const localHot=fallbackHot.map(normalizePulseStore).filter(Boolean);
     const hot=nearbyHotRows([...serverHot,...localHot])
       .filter(row=>!isMyBossStore(stores.find(store=>String(store.id)===String(row.store_id))||{}));
     const newcomer=data?.new_player_protected===true;
 
-    const partnerBannerIds = Array.isArray(config.partner_banner_store_ids)
-      ? config.partner_banner_store_ids.map(String)
-      : [];
-    const partnerBannerCopy = config.partner_banner_copy && typeof config.partner_banner_copy === "object"
-      ? config.partner_banner_copy
-      : {};
-    const partnerBannerDistance = config.partner_banner_distance_km && typeof config.partner_banner_distance_km === "object"
-      ? config.partner_banner_distance_km
-      : {};
-    const partnerBannerPriority = config.partner_banner_priority && typeof config.partner_banner_priority === "object"
-      ? config.partner_banner_priority
-      : {};
-
-    let bannerCandidates = stores
-      .filter(store => partnerBannerIds.includes(String(store.id)))
-      .filter(store => String(store.status || "active") === "active");
-
-    // Banner campaigns are independent from the nearby-store cache.
-    // Fetch selected stores directly so an enabled banner cannot disappear just because
-    // that store has not yet entered the user's nearby list.
-    const missingBannerIds = partnerBannerIds.filter(id => !bannerCandidates.some(store => String(store.id) === id));
-    if(missingBannerIds.length){
-      try{
-        const { data: bannerStores, error: bannerStoreError } = await sb
-          .from("biteboss_stores")
-          .select("id,name,photo_url,status,latitude,longitude,partnership_status")
-          .in("id", missingBannerIds)
-          .eq("status", "active");
-        if(!bannerStoreError && Array.isArray(bannerStores)){
-          const seen = new Set(bannerCandidates.map(store => String(store.id)));
-          bannerStores.forEach(store => {
-            if(!seen.has(String(store.id))){
-              seen.add(String(store.id));
-              bannerCandidates.push(store);
-            }
-          });
-        }
-      }catch(error){
-        console.warn("BiteBoss store banner:", error);
-      }
-    }
-
-    const eligibleBannerStores = bannerCandidates.filter(store => {
-      const rawLimit = partnerBannerDistance[String(store.id)];
-      const limitKm = rawLimit === "all" ? Infinity : Math.max(0, Number(rawLimit ?? 5));
-      if(!Number.isFinite(limitKm)) return true;
-      const distanceM = localStoreDistance(store);
-      return Number.isFinite(distanceM) && distanceM <= limitKm * 1000;
-    });
-
-    // Higher priority wins. Stores tied at the same priority rotate every 30 minutes,
-    // while distance is still used to keep the rotation locally relevant.
-    const topPriority = eligibleBannerStores.reduce((max, store) => {
-      return Math.max(max, Number(partnerBannerPriority[String(store.id)] || 3));
-    }, -Infinity);
-    const topBannerStores = eligibleBannerStores
-      .filter(store => Number(partnerBannerPriority[String(store.id)] || 3) === topPriority)
-      .sort((left,right) => localStoreDistance(left) - localStoreDistance(right));
-    const rotationSlot = Math.floor(Date.now() / (30 * 60 * 1000));
-    const partnerBannerStore = topBannerStores.length
-      ? topBannerStores[rotationSlot % topBannerStores.length]
-      : null;
-
-    // NEXT TARGET already lives in takeover-command.
-    // This surface is reserved for exceptional game signals only, avoiding duplicate hierarchy.
     const items=[];
     if(newcomer){
       items.push(`<div class="game-pulse-item is-guide" role="note"><span class="guide-bulb" aria-hidden="true">💡</span><strong>첫 점령 가이드</strong><small>가까운 미점령 매장부터 시작해 보세요.</small></div>`);
     }
-    if(partnerBannerStore){
-      const defaultBannerCopy = String(partnerBannerStore.partnership_status || "") === "partnered"
-        ? "이 매장에서 BiteBoss 혜택을 확인해 보세요."
-        : "지금 이 매장을 확인해 보세요.";
-      const partnerCopy = String(partnerBannerCopy[String(partnerBannerStore.id)] || defaultBannerCopy).trim();
-      const partnerImage = String(
-        partnerBannerStore.photo_url
-        || partnerBannerStore.cover_photo_url
-        || partnerBannerStore.image_url
-        || ""
-      ).trim();
-      const partnerVisual = partnerImage
-        ? `<span class="partner-banner-thumb" aria-hidden="true"><img src="${escapeAttr(partnerImage)}" alt="" loading="lazy" /></span>`
-        : `<span class="partner-banner-thumb partner-banner-fallback" aria-hidden="true">${escapeHtml(String(partnerBannerStore.name || "P").trim().charAt(0) || "P")}</span>`;
-      items.push(`<button class="game-pulse-item is-partner-banner" type="button" data-pulse-store="${escapeAttr(partnerBannerStore.id)}" data-pulse-name="${escapeAttr(partnerBannerStore.name || "")}">${partnerVisual}<strong>${escapeHtml(partnerBannerStore.name || "제휴 매장")}</strong><small>${escapeHtml(partnerCopy)}</small></button>`);
-    }
+    if(partnerBanner) items.push(partnerBannerMarkup(partnerBanner));
     if(retakes[0]){
       items.push(`<button class="game-pulse-item is-retake" type="button" data-pulse-store="${escapeAttr(retakes[0].store_id)}" data-pulse-name="${escapeAttr(retakes[0].store_name||"")}"><span>RETAKE</span><strong>${escapeHtml(retakes[0].store_name||"빼앗긴 매장")}</strong><small>다시 가져오기</small></button>`);
     }
@@ -3785,24 +3786,14 @@
       items.push(`<button class="game-pulse-item is-hot" type="button" data-pulse-store="${escapeAttr(hot[0].store_id)}" data-pulse-name="${escapeAttr(hot[0].store_name||"")}"><span class="hot-flame" aria-hidden="true">🔥</span><strong>${escapeHtml(hot[0].store_name||"인기 매장")}</strong><small>가장 치열한 점령지</small></button>`);
     }
 
-
     if(!items.length){
       box.innerHTML="";
       box.classList.add("hidden");
       return;
     }
-
     box.innerHTML=items.join("");
     box.classList.remove("hidden");
-    $$("[data-pulse-store]",box).forEach(btn=>btn.addEventListener("click",()=>{
-      const rawStoreId=String(btn.dataset.pulseStore||"").trim();
-      const storeName=String(btn.dataset.pulseName||"").trim();
-      const matchedStore = stores.find(store => String(store?.id || "").trim() === rawStoreId)
-        || (storeName ? stores.find(store => String(store?.name || "").trim().toLowerCase() === storeName.toLowerCase()) : null);
-      const storeId = String(matchedStore?.id || rawStoreId || "").trim();
-      if(!storeId) return;
-      openStoreDetail(storeId);
-    }));
+    bindGamePulseStoreLinks(box);
   }
 
 

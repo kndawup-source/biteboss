@@ -849,12 +849,25 @@
         const store = stores.find(item => String(item.id) === id);
         if(!store) return;
         const enabled = btn.dataset.bannerEnabled === "true";
-        const ids = normalizedPartnerBannerIds().filter(item => item !== id);
-        if(!enabled) ids.push(id);
+        const banners = normalizedPartnerBanners().filter(item => item.id !== id);
+        if(!enabled){
+          banners.push({
+            id,
+            name:String(store.name || ""),
+            photo_url:String(store.photo_url || ""),
+            status:String(store.status || "active"),
+            latitude:Number(store.latitude),
+            longitude:Number(store.longitude),
+            partnership_status:String(store.partnership_status || ""),
+            copy:"",
+            distance_km:5,
+            priority:3
+          });
+        }
         btn.disabled = true;
         try{
           const { error } = await adminSb.from("biteboss_app_config").upsert([{
-            key:"partner_banner_store_ids", value:[...new Set(ids)],
+            key:"partner_banners", value:banners,
             updated_by:session.user.id, updated_at:new Date().toISOString()
           }], { onConflict:"key" });
           if(error) throw error;
@@ -1435,28 +1448,18 @@
     renderAdminStoreEditor();
   }
 
-  function normalizedPartnerBannerIds(){
-    return Array.isArray(appConfig.partner_banner_store_ids)
-      ? appConfig.partner_banner_store_ids.map(String)
+  function normalizedPartnerBanners(){
+    return Array.isArray(appConfig.partner_banners)
+      ? appConfig.partner_banners.map(item => ({ ...item, id:String(item?.id || "") })).filter(item => item.id)
       : [];
   }
 
-  function normalizedPartnerBannerCopy(){
-    return appConfig.partner_banner_copy && typeof appConfig.partner_banner_copy === "object"
-      ? { ...appConfig.partner_banner_copy }
-      : {};
+  function bannerConfigForStore(store = {}){
+    return normalizedPartnerBanners().find(item => item.id === String(store.id)) || null;
   }
 
-  function normalizedPartnerBannerDistance(){
-    return appConfig.partner_banner_distance_km && typeof appConfig.partner_banner_distance_km === "object"
-      ? { ...appConfig.partner_banner_distance_km }
-      : {};
-  }
-
-  function normalizedPartnerBannerPriority(){
-    return appConfig.partner_banner_priority && typeof appConfig.partner_banner_priority === "object"
-      ? { ...appConfig.partner_banner_priority }
-      : {};
+  function normalizedPartnerBannerIds(){
+    return normalizedPartnerBanners().map(item => item.id);
   }
 
   function bannerOperationalState(store = {}, enabled = false){
@@ -1465,25 +1468,22 @@
     return { label:"배너 ON · 노출 가능", className:"is-on" };
   }
 
+
   function renderAdminPartnerPromotion(store = {}){
     const section = $("#adminPartnerPromotionSection");
     if(!section) return;
     section.classList.remove("hidden");
 
-    const ids = normalizedPartnerBannerIds();
-    const copy = normalizedPartnerBannerCopy();
-    const distance = normalizedPartnerBannerDistance();
-    const priority = normalizedPartnerBannerPriority();
-    const id = String(store.id);
-    const enabled = ids.includes(id);
+    const banner = bannerConfigForStore(store);
+    const enabled = Boolean(banner);
     $("#adminPartnerBannerEnabled").value = enabled ? "true" : "false";
-    $("#adminPartnerBannerDistance").value = String(distance[id] ?? 5);
-    $("#adminPartnerBannerPriority").value = String(priority[id] ?? 3);
+    $("#adminPartnerBannerDistance").value = String(banner?.distance_km ?? 5);
+    $("#adminPartnerBannerPriority").value = String(banner?.priority ?? 3);
     const defaultCopy = String(store.partnership_status || "") === "partnered"
       ? "이 매장에서 BiteBoss 혜택을 확인해 보세요."
       : "지금 이 매장을 확인해 보세요.";
     $("#adminPartnerBannerCopy").placeholder = defaultCopy;
-    $("#adminPartnerBannerCopy").value = String(copy[id] || "");
+    $("#adminPartnerBannerCopy").value = String(banner?.copy || "");
     const operational = bannerOperationalState(store, enabled);
     const operationalEl = $("#adminPartnerBannerOperationalState");
     if(operationalEl){
@@ -1502,34 +1502,38 @@
     const distanceValue = String($("#adminPartnerBannerDistance")?.value || "5");
     const priorityValue = Math.min(5, Math.max(1, Number($("#adminPartnerBannerPriority")?.value || 3)));
     const id = String(editingStoreId);
-    const ids = normalizedPartnerBannerIds().filter(item => item !== id);
-    const copy = normalizedPartnerBannerCopy();
-    const distance = normalizedPartnerBannerDistance();
-    const priority = normalizedPartnerBannerPriority();
+    const banners = normalizedPartnerBanners().filter(item => item.id !== id);
 
-    if(enabled) ids.push(id);
-    if(copyText) copy[id] = copyText;
-    else delete copy[id];
-    distance[id] = distanceValue === "all" ? "all" : Number(distanceValue || 5);
-    priority[id] = priorityValue;
+    if(enabled){
+      banners.push({
+        id,
+        name:String(store.name || ""),
+        photo_url:String(store.photo_url || ""),
+        status:String(store.status || "active"),
+        latitude:Number(store.latitude),
+        longitude:Number(store.longitude),
+        partnership_status:String(store.partnership_status || ""),
+        copy:copyText,
+        distance_km:distanceValue === "all" ? "all" : Number(distanceValue || 5),
+        priority:priorityValue
+      });
+    }
 
     const submit = event.currentTarget.querySelector('button[type="submit"]');
     if(submit) submit.disabled = true;
     setStatusText($("#adminPartnerPromotionStatus"), "저장 중…");
-
     try{
-      const now = new Date().toISOString();
-      const rows = [
-        { key:"partner_banner_store_ids", value:[...new Set(ids)], updated_by:session.user.id, updated_at:now },
-        { key:"partner_banner_copy", value:copy, updated_by:session.user.id, updated_at:now },
-        { key:"partner_banner_distance_km", value:distance, updated_by:session.user.id, updated_at:now },
-        { key:"partner_banner_priority", value:priority, updated_by:session.user.id, updated_at:now }
-      ];
-      const { error } = await adminSb.from("biteboss_app_config").upsert(rows, { onConflict:"key" });
+      const { error } = await adminSb.from("biteboss_app_config").upsert([{
+        key:"partner_banners",
+        value:banners,
+        updated_by:session.user.id,
+        updated_at:new Date().toISOString()
+      }], { onConflict:"key" });
       if(error) throw error;
       await loadConfig();
       renderAdminPartnerPromotion(store);
-      setStatusText($("#adminPartnerPromotionStatus"), enabled ? "배너 노출을 켰습니다." : "배너 노출을 껐습니다.");
+      renderStores();
+      setStatusText($("#adminPartnerPromotionStatus"), enabled ? "배너 설정을 저장했습니다." : "배너 노출을 껐습니다.");
     }catch(error){
       setStatusText($("#adminPartnerPromotionStatus"), error?.message || "저장하지 못했습니다.");
     }finally{
@@ -1568,6 +1572,25 @@
       });
       if(error) throw error;
       if(!data?.ok) throw new Error(data?.error || "STORE_UPDATE_FAILED");
+
+      const existingBanner = bannerConfigForStore({ id:editingStoreId });
+      if(existingBanner){
+        const banners = normalizedPartnerBanners().filter(item => item.id !== String(editingStoreId));
+        banners.push({
+          ...existingBanner,
+          name:String(form.get("name") || "").trim(),
+          status:String(form.get("status") || "active"),
+          latitude:lat,
+          longitude:lng
+        });
+        const syncResult = await adminSb.from("biteboss_app_config").upsert([{
+          key:"partner_banners", value:banners,
+          updated_by:session.user.id, updated_at:new Date().toISOString()
+        }], { onConflict:"key" });
+        if(syncResult.error) throw syncResult.error;
+        await loadConfig();
+      }
+
       setStatusText(status, "저장되었습니다.");
       await Promise.all([reloadStoreEditor(), loadStores(), loadDashboard()]);
     }catch(error){

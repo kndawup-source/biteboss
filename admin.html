@@ -7,7 +7,7 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <title>BiteBoss Admin</title>
   <link rel="stylesheet" href="./styles.css?v=76.3" />
-  <link rel="stylesheet" href="./admin.css?v=80.9.1" />
+  <link rel="stylesheet" href="./admin.css?v=81.0" />
   <script src="./app-config.js?v=76.3"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -393,7 +393,7 @@
           <label>노출 우선순위<select id="adminPartnerBannerPriority" class="input">
             <option value="5">1순위 · 최우선</option><option value="4">2순위</option><option value="3">3순위 · 기본</option><option value="2">4순위</option><option value="1">5순위</option>
           </select></label>
-          <label class="wide">한 줄 문구<input id="adminPartnerBannerCopy" class="input" maxlength="56" placeholder="지금 이 매장을 확인해 보세요." /></label>
+          <label class="wide">배너 문구<input id="adminPartnerBannerCopy" class="input" maxlength="56" placeholder="지금 이 매장을 확인해 보세요." /><small class="field-help">비워두면 매장 유형에 맞는 기본 문구가 사용됩니다.</small></label>
           <div id="adminPartnerBannerOperationalState" class="admin-banner-operational wide" aria-live="polite"></div>
           <div class="admin-partner-promo-note wide">도전 페이지 상단 배너 영역에 노출됩니다. 같은 우선순위의 매장이 여러 곳이면 30분 단위로 순환하며, 설정한 거리 밖의 사용자에게는 노출되지 않습니다.</div>
           <button class="secondary-btn wide" type="submit">배너 설정 저장</button>
@@ -448,6 +448,6 @@
   </section>
 </div>
 
-<script src="./admin.js?v=80.9.1"></script>
+<script src="./admin.js?v=81.0"></script>
 </body>
 </html>
