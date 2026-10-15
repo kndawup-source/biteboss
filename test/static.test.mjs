@@ -168,7 +168,7 @@ test("profile game metrics are actionable buttons", () => {
 test("owned store detail uses owner layout instead of self-vs-self battle UI", () => {
   const app = read("app.js").toString();
   const css = read("styles.css").toString();
-  assert.match(app, /bossExists && !isBoss \? `\n          <section class="boss-focus"/);
+  assert.doesNotMatch(app, /<section class="boss-focus"/);
   assert.match(app, /!isBoss \? `\n          <section class="power-matchup"/);
   assert.match(app, /ownerStatusHtml = isBoss && bossExists/);
   assert.match(app, /<span>방어력<\/span>/);

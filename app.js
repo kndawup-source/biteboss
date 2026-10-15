@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.21";
+  const BITEBOSS_BUILD = "81.22";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -2309,22 +2309,6 @@
 
         ${noticeHtml}
         ${featuredMenuHtml}
-
-        ${bossExists && !isBoss ? `
-          <section class="boss-focus" aria-label="보스 정보">
-            <div class="boss-focus-head">
-              <span></span>
-              <small>${protectedNow ? `보호 ${escapeHtml(formatRemaining(protectionUntil))}` : `방어력 ${bossDefense}`}</small>
-            </div>
-            <div class="boss-focus-main">
-              ${bossAvatarMarkup(bossAvatar, bossName || "보스", "boss-focus-avatar")}
-              <div class="boss-focus-copy">
-                <strong>${escapeHtml(bossName || "보스")}</strong>
-                <small>${escapeHtml([bossOrganizationName, `Lv ${bossLevel}`, `방어력 ${bossDefense}`].filter(Boolean).join(" · "))}</small>
-              </div>
-            </div>
-          </section>
-        ` : ""}
 
         ${offersHtml}
 
