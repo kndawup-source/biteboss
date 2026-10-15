@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.11";
+  const BITEBOSS_BUILD = "81.13";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -2205,6 +2205,13 @@
     const impactRepeat = Math.max(0, Number(publicGrowth.repeat_visitors || 0));
     const impactChallengers = Math.max(0, Number(publicGrowth.challengers || 0));
     const impactShares = Math.max(0, Number(publicGrowth.shares || 0));
+    const ownerClaimHtml = showStoreManagerCard ? renderPartnerRequestCard(store, partnerRequest, isPartner, {
+      visits:impactVisits,
+      users:impactUnique,
+      repeats:impactRepeat,
+      challengers:impactChallengers,
+      shares:impactShares
+    }) : "";
 
 
 
@@ -2395,16 +2402,10 @@
           <nav class="list-pagination store-comment-pagination hidden" data-store-comment-pagination aria-label="한마디 페이지"></nav>
         </section>
 
-        ${showStoreManagerCard ? `
+        ${ownerClaimHtml ? `
           <div class="store-owner-entry">
             <p class="store-owner-entry-copy">이 매장의 관리자이신가요? 매장을 인증하면 방문·도전 현황과 매장 정보를 직접 관리할 수 있습니다.</p>
-            ${renderPartnerRequestCard(store, partnerRequest, isPartner, {
-              visits:impactVisits,
-              users:impactUnique,
-              repeats:impactRepeat,
-              challengers:impactChallengers,
-              shares:impactShares
-            })}
+            ${ownerClaimHtml}
           </div>
         ` : ""}
 
@@ -2415,13 +2416,20 @@
     renderStoreDetailMap(store);
     bindStoreComments(store.id);
 
-    if(showStoreManagerCard){
+    if(ownerClaimHtml){
+      const ownerDetails = body.querySelector("details.store-owner-conversion");
+      ownerDetails?.addEventListener("toggle", () => {
+        if(!ownerDetails.open) return;
+        requestAnimationFrame(() => {
+          ownerDetails.scrollIntoView({ behavior:"smooth", block:"start" });
+        });
+      });
       $("#detailPartnerRequest")?.addEventListener("click", () => openPartnerRequestForm(store));
+      $("#detailPartnerAdmin")?.addEventListener("click", () => { location.href = "./store-admin.html"; });
     }
     $("#shareBossCardBtn")?.addEventListener("click",()=>shareBossCard({
       store,bossName,bossDefense,protectedNow,protectionUntil,myPower,isBoss,context:"store_detail"
     }));
-    $("#detailPartnerAdmin")?.addEventListener("click", () => { location.href = "./store-admin.html"; });
 
     startOwnerReclaimCountdown();
 
@@ -2785,12 +2793,23 @@
     return Boolean(String(activatedAt || "").trim());
   }
 
-  function renderPartnerRequestCard(store, request, isPartner, activity = {}){
-    const status = String(request?.status || "");
+  function getStoreOwnerClaimState(store = {}, request = {}, isPartner = false){
+    if(hasStoreManagerAccount(store, request)) return "managed";
+    const status = String(request?.status || "").trim().toLowerCase();
     const activationCode = String(request?.activation_code || "").trim();
-    if(hasStoreManagerAccount(store, request)) return "";
+    if(status === "approved" && activationCode) return "approved";
+    if(status === "pending") return "pending";
+    if(isPartner) return "partner";
+    if(status === "rejected") return "rejected";
+    return "available";
+  }
 
-    if(status === "approved" && activationCode){
+  function renderPartnerRequestCard(store, request, isPartner, activity = {}){
+    const ownerState = getStoreOwnerClaimState(store, request, isPartner);
+    const activationCode = String(request?.activation_code || "").trim();
+    if(ownerState === "managed" || ownerState === "partner") return "";
+
+    if(ownerState === "approved"){
       return `
         <section class="store-owner-conversion approved">
           <span class="store-owner-kicker">매장 관리자</span>
@@ -2800,7 +2819,7 @@
           <button id="detailPartnerAdmin" class="primary-btn" type="button">매장 관리자 열기</button>
         </section>`;
     }
-    if(status === "pending"){
+    if(ownerState === "pending"){
       return `
         <section class="store-owner-conversion pending">
           <span class="store-owner-kicker">매장 인증</span>
@@ -2808,8 +2827,6 @@
           <p>확인이 끝나면 이 화면에서 관리자 활성화를 진행할 수 있습니다.</p>
         </section>`;
     }
-    if(isPartner) return "";
-
     const visits = Math.max(0, Number(activity.visits || 0));
     const users = Math.max(0, Number(activity.users || 0));
     const repeats = Math.max(0, Number(activity.repeats || 0));
@@ -2819,7 +2836,7 @@
 
     return `
       <details class="store-owner-conversion ${hasActivity ? "has-activity" : "is-empty"}">
-        <summary class="store-owner-manage-btn">${status === "rejected" ? "다시 매장 관리하기" : "이 매장 관리하기"}</summary>
+        <summary class="store-owner-manage-btn">${ownerState === "rejected" ? "다시 매장 관리하기" : "이 매장 관리하기"}</summary>
         <div class="store-owner-body">
           ${hasActivity ? `
             <div class="store-owner-body-head">
@@ -2837,7 +2854,7 @@
             ${shares ? `<p class="store-owner-share">공유 ${shares.toLocaleString("ko-KR")}회</p>` : ""}
           ` : ""}
           <p>${hasActivity ? "매장을 인증하면 이 현황을 직접 확인하고 매장 정보와 혜택을 관리할 수 있습니다." : "매장을 인증하면 매장 정보와 혜택을 직접 관리할 수 있습니다."}</p>
-          <button id="detailPartnerRequest" class="store-owner-auth-btn" type="button">${status === "rejected" ? "다시 인증 요청" : "매장 인증하기"}</button>
+          <button id="detailPartnerRequest" class="store-owner-auth-btn" type="button">${ownerState === "rejected" ? "다시 인증 요청" : "매장 인증하기"}</button>
         </div>
       </details>`;
   }
@@ -2866,6 +2883,8 @@
   async function submitPartnerRequest(event, storeId){
     event.preventDefault();
     const formEl = event.currentTarget;
+    if(formEl.dataset.submitting === "true") return;
+    formEl.dataset.submitting = "true";
     const form = new FormData(formEl);
     const status = $("#partnerRequestStatus");
     const submit = formEl.querySelector('button[type="submit"]');
@@ -2875,6 +2894,7 @@
 
     if(!requesterName || contact.length < 4){
       if(status) status.textContent = "이름과 연락처를 확인하세요.";
+      formEl.dataset.submitting = "false";
       return;
     }
     if(submit) submit.disabled = true;
@@ -2899,6 +2919,7 @@
           INVALID_REQUEST:"이름과 연락처를 확인하세요."
         })[data?.error] || "신청을 완료하지 못했습니다.";
         if(status) status.textContent = messageText;
+        formEl.dataset.submitting = "false";
         return;
       }
       closeModal();
@@ -2908,6 +2929,7 @@
       console.warn("BiteBoss partner request:", error);
       if(status) status.textContent = error?.message || "신청을 완료하지 못했습니다.";
     }finally{
+      formEl.dataset.submitting = "false";
       if(submit) submit.disabled = false;
     }
   }
