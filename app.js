@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "76.7";
+  const BITEBOSS_BUILD = "76.8";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1006,9 +1006,20 @@
     const autoImportEnabled = config.auto_store_import_enabled !== false &&
       String(config.auto_store_import_enabled).toLowerCase() !== "false";
     const autoImportMinCount = Math.max(1, Number(config.auto_store_import_min_count || 10));
+    const autoImportRadius = Math.max(
+      300,
+      Math.min(2000, Number(config.auto_store_import_radius_m || 1000))
+    );
+    // The import threshold must be evaluated inside the same radius Kakao will fill.
+    // Counting the wider 3 km display list allowed distant DB stores to suppress
+    // discovery even when the user's immediate 1 km area was empty.
+    const autoImportNearbyCount = stores.reduce((count, store) => {
+      const distance = Number(store?.distance_m);
+      return count + (Number.isFinite(distance) && distance <= autoImportRadius ? 1 : 0);
+    }, 0);
 
-    if(lastPosition && autoImportEnabled && stores.length < autoImportMinCount){
-      const sync = await syncNearbyAutoStores(lastPosition);
+    if(lastPosition && autoImportEnabled && autoImportNearbyCount < autoImportMinCount){
+      const sync = await syncNearbyAutoStores(lastPosition, autoImportRadius);
 
       if(sync?.ok){
         const refreshed = await sb.rpc("biteboss_nearby_stores_v631", {
@@ -1056,7 +1067,7 @@
     return true;
   }
 
-  async function syncNearbyAutoStores(pos){
+  async function syncNearbyAutoStores(pos, requestedRadius = null){
     if(!pos?.coords) return null;
 
     try{
@@ -1068,7 +1079,7 @@
       const lng = Number(pos.coords.longitude);
       const radius = Math.max(
         300,
-        Math.min(2000, Number(config.auto_store_import_radius_m || 1000))
+        Math.min(2000, Number(requestedRadius || config.auto_store_import_radius_m || 1000))
       );
 
       if(!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
@@ -1406,6 +1417,35 @@
     return `<span class="${escapeAttr(className)} boss-avatar-fallback" aria-hidden="true"></span>`;
   }
 
+  function occupiedStoreAvatarMarkup(store, className = "store-card-photo"){
+    const storeUrl = String(store?.photo_url || "").trim();
+    const storeName = String(store?.name || "매장").trim();
+    const crewUrl = String(
+      store?.current_boss_organization_avatar_url ||
+      store?.current_crew_avatar_url ||
+      store?.organization_avatar_url ||
+      store?.current_boss_avatar_url ||
+      ""
+    ).trim();
+    const crewName = String(
+      store?.current_boss_organization_name ||
+      store?.current_crew_name ||
+      store?.organization_name ||
+      store?.current_boss_nickname ||
+      "점령 크루"
+    ).trim();
+
+    const left = storeUrl
+      ? `<img src="${escapeAttr(storeUrl)}" alt="${escapeAttr(storeName)} 매장 사진" loading="lazy" decoding="async" />`
+      : `<span class="occupied-store-half-fallback" aria-hidden="true">${escapeHtml(Array.from(storeName)[0] || "B")}</span>`;
+    const right = crewUrl
+      ? `<img src="${escapeAttr(crewUrl)}" alt="${escapeAttr(crewName)} 프로필" loading="lazy" decoding="async" />`
+      : `<span class="occupied-boss-half-fallback" aria-hidden="true"></span>`;
+
+    return `<span class="${escapeAttr(className)} occupied-store-avatar" role="img" aria-label="${escapeAttr(storeName)} · ${escapeAttr(crewName)} 점령">` +
+      `<span class="occupied-store-half">${left}</span><span class="occupied-boss-half">${right}</span></span>`;
+  }
+
 
   function storeCard(store){
     const roleState = storeRoleMap.get(String(store.id)) || {};
@@ -1473,7 +1513,9 @@
     return `
       <article class="store-card store-card-open challenge-card mode-${escapeAttr(cardMode)} ${isPartner ? "is-partner-store" : ""}" data-store-detail="${escapeAttr(store.id)}" role="button" tabindex="0" aria-label="${escapeAttr(store.name)} 매장 정보 보기">
         <div class="store-card-main">
-          ${storeAvatarMarkup(store.photo_url, store.name, "store-card-photo")}
+          ${bossExists
+            ? occupiedStoreAvatarMarkup(store, "store-card-photo")
+            : storeAvatarMarkup(store.photo_url, store.name, "store-card-photo")}
           <div class="store-card-copy">
             <div class="store-card-title-row">
               <strong class="store-card-name">${escapeHtml(store.name)}</strong>
