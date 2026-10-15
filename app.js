@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.9";
+  const BITEBOSS_BUILD = "81.10";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -2300,14 +2300,6 @@
           </section>
         ` : ""}
 
-        ${showStoreManagerCard ? renderPartnerRequestCard(store, partnerRequest, isPartner, {
-          visits:impactVisits,
-          users:impactUnique,
-          repeats:impactRepeat,
-          challengers:impactChallengers,
-          shares:impactShares
-        }) : ""}
-
         ${noticeHtml}
         ${featuredMenuHtml}
 
@@ -2402,6 +2394,19 @@
           </div>
           <nav class="list-pagination store-comment-pagination hidden" data-store-comment-pagination aria-label="한마디 페이지"></nav>
         </section>
+
+        ${showStoreManagerCard ? `
+          <div class="store-owner-entry">
+            <p class="store-owner-entry-copy">이 매장의 관리자이신가요? 매장을 인증하면 방문·도전 현황과 매장 정보를 직접 관리할 수 있습니다.</p>
+            ${renderPartnerRequestCard(store, partnerRequest, isPartner, {
+              visits:impactVisits,
+              users:impactUnique,
+              repeats:impactRepeat,
+              challengers:impactChallengers,
+              shares:impactShares
+            })}
+          </div>
+        ` : ""}
 
         ${action ? `<div class="store-detail-bottom-action">${action}</div>` : ""}
       </div>
