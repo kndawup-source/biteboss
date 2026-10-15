@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.22";
+  const BITEBOSS_BUILD = "81.23";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -190,6 +190,7 @@
   let playerSession = null;
   const storeCommentState = new Map();
   let stores = [];
+  const storeDetailFallbackMap = new Map();
   let lastPosition = null;
   let nearbyWatchId = null;
   let nearbyRefreshBusy = false;
@@ -1426,7 +1427,17 @@
     return changed;
   }
 
+  function rememberStoreDetailFallbacks(list = []){
+    (Array.isArray(list) ? list : []).forEach(store => {
+      const id = String(store?.id || "").trim();
+      if(!id) return;
+      const previous = storeDetailFallbackMap.get(id) || {};
+      storeDetailFallbackMap.set(id, { ...previous, ...store });
+    });
+  }
+
   function renderStores(list = stores, options = {}){
+    rememberStoreDetailFallbacks(list);
     const box = $("#storeList");
     if(!box) return;
 
@@ -1705,8 +1716,10 @@
   }
 
   async function openStoreDetail(storeId, options = {}){
-    const cached = stores.find(store => String(store.id) === String(storeId))
-      || (options?.storeFallback && String(options.storeFallback.id) === String(storeId)
+    const id = String(storeId);
+    const cached = storeDetailFallbackMap.get(id)
+      || stores.find(store => String(store.id) === id)
+      || (options?.storeFallback && String(options.storeFallback.id) === id
         ? options.storeFallback
         : null);
     if(options?.preserveModal !== true){
