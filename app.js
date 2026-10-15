@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "78.9";
+  const BITEBOSS_BUILD = "79.0";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1549,7 +1549,12 @@
     const url = String(avatarUrl || "").trim();
     const name = String(nickname || "보스").trim();
     if(url){
-      return `<img class="${escapeAttr(className)}" src="${escapeAttr(url)}" alt="${escapeAttr(name)} 프로필" loading="lazy" decoding="async" />`;
+      const criticalAvatar = /(?:crew-rank-avatar|crew-profile-avatar|organization-member-avatar|organization-detail-member-avatar|nearby-avatar|rank-player-avatar|my-rank-avatar)/.test(String(className));
+      if(criticalAvatar) preloadOccupiedAvatar(url);
+      const loading = criticalAvatar
+        ? `loading="eager" fetchpriority="high"`
+        : `loading="lazy"`;
+      return `<img class="${escapeAttr(className)}" src="${escapeAttr(url)}" alt="${escapeAttr(name)} 프로필" ${loading} decoding="async" />`;
     }
     return `<span class="${escapeAttr(className)} boss-avatar-fallback" aria-hidden="true"></span>`;
   }
@@ -6430,7 +6435,7 @@
         <section class="player-profile-hero crew-profile-hero">
           <div class="player-profile-avatar crew-profile-avatar">
             ${String(org.avatar_url || "").trim()
-              ? `<img src="${escapeAttr(org.avatar_url)}" alt="${escapeAttr(org.name || "크루")} 프로필" loading="lazy" decoding="async" />`
+              ? `<img src="${escapeAttr(org.avatar_url)}" alt="${escapeAttr(org.name || "크루")} 프로필" loading="eager" fetchpriority="high" decoding="async" />`
               : `<span aria-hidden="true">${escapeHtml(Array.from(String(org.name || "C"))[0] || "C")}</span>`}
           </div>
           <div class="player-profile-hero-copy crew-profile-hero-copy">

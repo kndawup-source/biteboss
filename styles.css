@@ -272,14 +272,14 @@ html.modal-open,body.modal-open{overflow:hidden;overscroll-behavior:none}body.mo
 .takeover-screen-inner{width:100%;max-width:680px;min-width:0;min-height:100%;margin:0 auto;padding:max(24px,var(--safe-top)) 22px max(24px,var(--safe-bottom));display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;overflow:hidden}
 .takeover-topline{display:flex;justify-content:space-between;color:#96969c;font-size:8px;font-weight:820;letter-spacing:.14em}
 .takeover-topline span:last-child{color:var(--accent)}
-.takeover-title-block{min-width:0;padding-top:18px}
-.takeover-eyebrow{display:block;color:#929298;font-size:9px;font-weight:820;letter-spacing:.13em}
-.takeover-store-name{display:block;margin-top:6px;max-width:100%;font-size:31px;line-height:1.04;font-weight:860;letter-spacing:-.055em;word-break:keep-all;overflow-wrap:anywhere}
-.takeover-count-wrap{min-width:0;display:grid;align-content:center;justify-items:stretch;padding-bottom:clamp(48px,7vh,72px)}
-.takeover-count-meta{display:grid;grid-template-columns:1fr 1fr;align-items:end;width:100%;margin-bottom:8px;color:#aaaab0;font-size:8px;font-weight:820;letter-spacing:.12em}
+.takeover-title-block{min-width:0;padding-top:22px}
+.takeover-eyebrow{display:block;color:#85858b;font-size:9px;font-weight:900;letter-spacing:.16em}
+.takeover-store-name{display:block;margin-top:9px;max-width:100%;font-size:clamp(31px,8.2vw,40px);line-height:1.02;font-weight:920;letter-spacing:-.06em;word-break:keep-all;overflow-wrap:anywhere}
+.takeover-count-wrap{min-width:0;display:grid;align-content:center;justify-items:stretch;padding:clamp(8px,2vh,18px) 0 clamp(42px,6vh,64px)}
+.takeover-count-meta{display:grid;grid-template-columns:1fr 1fr;align-items:end;width:100%;margin-bottom:14px;color:#9c9ca2;font-size:9px;font-weight:850;letter-spacing:.15em}
 .takeover-count-meta span:first-child{justify-self:start}
 .takeover-count-meta span:last-child{justify-self:end}
-.takeover-count{justify-self:center;display:grid;grid-template-columns:2ch .58ch 2ch;align-items:baseline;justify-content:center;width:4.58ch;max-width:none;font-family:var(--takeover-timer-font);font-size:clamp(60px,17vw,88px);line-height:.88;font-weight:400;letter-spacing:0;text-align:center;white-space:nowrap;font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1,"kern" 0;font-kerning:none}
+.takeover-count{justify-self:center;display:grid;grid-template-columns:2ch .54ch 2ch;align-items:baseline;justify-content:center;width:4.54ch;max-width:none;font-family:var(--takeover-timer-font);font-size:clamp(76px,21vw,108px);line-height:.82;font-weight:450;letter-spacing:-.025em;text-align:center;white-space:nowrap;font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1,"kern" 0;font-kerning:none}
 .takeover-minutes,.takeover-seconds{display:block;width:2ch;text-align:center}
 .takeover-colon{display:block;width:.58ch;text-align:center}
 .takeover-count.is-word{display:block;width:auto;min-width:4.58ch}
@@ -331,7 +331,7 @@ body.biteboss-info-page{min-height:100dvh;background:var(--bg);color:#111}.info-
   .power-matchup-values{grid-template-columns:minmax(0,1fr) 24px minmax(0,1fr)!important;gap:6px!important}.power-matchup-values>article{padding:11px 10px}.power-matchup-values>article strong{font-size:18px}.power-matchup-result{display:grid;gap:3px}.power-matchup-result small{text-align:left}
   .player-profile-stats,.crew-profile-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.player-profile-hero,.crew-profile-hero{grid-template-columns:50px minmax(0,1fr)}.player-profile-avatar,.crew-profile-hero .crew-profile-avatar{width:50px;height:50px;min-width:50px}.player-profile-hero-copy>strong{font-size:20px}
   .store-more-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.form-grid{grid-template-columns:1fr}.store-detail-gallery{grid-template-columns:1fr 1fr}
-  .takeover-bottom-grid{display:grid;gap:5px}.takeover-live-mark{justify-self:start}.takeover-store-name{font-size:27px}
+  .takeover-bottom-grid{display:grid;gap:5px}.takeover-live-mark{justify-self:start}.takeover-store-name{font-size:clamp(29px,8.4vw,36px)}
 }
 
 /* legal + support */
@@ -407,3 +407,5 @@ body.biteboss-info-page{min-height:100dvh;background:var(--bg);color:#111}.info-
 .occupied-store-half img{display:block;width:100%;height:100%;object-fit:cover;border-radius:0!important}
 .occupied-store-half-store{border-right:0}
 .occupied-store-initial{display:grid;width:100%;height:100%;place-items:center;border-radius:0;background:#e4e4e6;color:#111;font:830 18px/1 var(--font)}
+
+@media(max-width:390px){.takeover-count{font-size:clamp(72px,20.5vw,92px)}.takeover-count-meta{font-size:8px}}
