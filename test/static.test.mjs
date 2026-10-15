@@ -137,12 +137,14 @@ test('guest account flow uses one login modal path and hides crew creation until
 });
 
 
-test('player battle record derives missing or stale losses from total minus wins', () => {
-  const record = blockBetween(app, 'function getPlayerBattleRecord', 'function renderPlayerProfile');
-  assert.match(record, /explicitLossValue = candidate\.losses/);
+test('player battle record reconciles aggregate and activity for both wins and losses', () => {
+  const record = blockBetween(app, 'function classifyBattleResult', 'function renderPlayerProfile');
+  assert.match(record, /\["boss_win","claimed","challenger_win","win","victory"\]/);
+  assert.match(record, /\["crew","challenger_loss","boss_defense","defended","loss","lose","defeat","failed"\]/);
   assert.match(record, /if\(hasTotal && total > wins \+ losses\)/);
   assert.match(record, /losses = Math\.max\(losses, total - wins\)/);
-  assert.match(record, /result === "crew"/);
+  assert.match(record, /wins = Math\.max\(wins, activityRecord\.wins\)/);
+  assert.match(record, /losses = Math\.max\(losses, activityRecord\.losses\)/);
 });
 
 test('runtime user and store images use deliberate loading priorities', () => {

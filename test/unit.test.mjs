@@ -25,3 +25,44 @@ test('Kakao normalization drops invalid rows and maps cafe category',()=>{
   assert.equal(rows.length,1); assert.equal(rows[0].category,'cafe'); assert.equal(rows[0].provider,'kakao');
   assert.equal(h.normalizePlaces([{id:'',place_name:'bad',y:'x',x:'127'}]).length,0);
 });
+
+
+function loadBattleHelpers(){
+  const source=require('node:fs').readFileSync(new URL('../app.js',import.meta.url),'utf8');
+  const start=source.indexOf('  function classifyBattleResult');
+  const end=source.indexOf('\n  function renderPlayerProfile',start);
+  assert.ok(start>=0 && end>start,'battle helper block should exist');
+  const block=source.slice(start,end);
+  return new Function(`${block}\nreturn {classifyBattleResult,battleRecordFromActivity,getPlayerBattleRecord};`)();
+}
+
+test('battle activity classifies challenger wins and losses and ignores defender rows',()=>{
+  const {battleRecordFromActivity}=loadBattleHelpers();
+  assert.deepEqual(battleRecordFromActivity([
+    {as_challenger:true,result:'boss_win'},
+    {as_challenger:1,result:'crew'},
+    {as_challenger:'true',result:'boss_defense'},
+    {as_challenger:false,result:'crew'},
+    {as_challenger:true,result:'boss_visit'}
+  ]),{total:3,wins:1,losses:2});
+});
+
+test('battle aggregate never hides a newer logged win or loss',()=>{
+  const {getPlayerBattleRecord}=loadBattleHelpers();
+  const recent=[
+    {as_challenger:true,result:'boss_win'},
+    {as_challenger:true,result:'crew'}
+  ];
+  assert.deepEqual(
+    getPlayerBattleRecord({battle_record:{total:1,wins:1,losses:0}},recent),
+    {total:2,wins:1,losses:1}
+  );
+});
+
+test('battle record derives historical losses from total minus wins',()=>{
+  const {getPlayerBattleRecord}=loadBattleHelpers();
+  assert.deepEqual(
+    getPlayerBattleRecord({battle_record:{total:7,wins:5,losses:0}},[]),
+    {total:7,wins:5,losses:2}
+  );
+});

@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.25";
+  const BITEBOSS_BUILD = "81.26";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -6444,7 +6444,32 @@
     }
   }
 
+  function classifyBattleResult(row){
+    if(!row) return "";
+    const challenger = row.as_challenger === true || row.as_challenger === 1 || String(row.as_challenger || "").toLowerCase() === "true";
+    if(!challenger) return "";
+    const result = String(row.result || row.outcome || row.status || "").trim().toLowerCase();
+    if(["boss_win","claimed","challenger_win","win","victory"].includes(result)) return "win";
+    if(["crew","challenger_loss","boss_defense","defended","loss","lose","defeat","failed"].includes(result)) return "loss";
+    return "";
+  }
+
+  function battleRecordFromActivity(recentActivity){
+    return (Array.isArray(recentActivity) ? recentActivity : []).reduce((record, row) => {
+      const result = classifyBattleResult(row);
+      if(result === "win"){
+        record.wins += 1;
+        record.total += 1;
+      }else if(result === "loss"){
+        record.losses += 1;
+        record.total += 1;
+      }
+      return record;
+    }, { total:0, wins:0, losses:0 });
+  }
+
   function getPlayerBattleRecord(data, recentActivity){
+    const activityRecord = battleRecordFromActivity(recentActivity);
     const candidates = [
       data?.battle_record,
       data?.record,
@@ -6455,43 +6480,44 @@
     for(const candidate of candidates){
       if(!candidate || typeof candidate !== "object") continue;
 
-      const wins = Math.max(0, Number(
-        candidate.wins ?? candidate.win_count ?? candidate.victories ?? candidate.battle_wins ?? 0
-      ) || 0);
-      const explicitLossValue = candidate.losses ?? candidate.loss_count ?? candidate.defeats ?? candidate.battle_losses;
-      const explicitLosses = Number(explicitLossValue);
-      const explicitTotal = Number(candidate.total ?? candidate.total_battles ?? candidate.matches ?? candidate.battle_count);
-      const hasTotal = Number.isFinite(explicitTotal);
-      const total = hasTotal ? Math.max(0, explicitTotal) : null;
+      const explicitWins = Number(
+        candidate.wins ?? candidate.win_count ?? candidate.victories ?? candidate.battle_wins
+      );
+      const explicitLosses = Number(
+        candidate.losses ?? candidate.loss_count ?? candidate.defeats ?? candidate.battle_losses
+      );
+      const explicitTotal = Number(
+        candidate.total ?? candidate.total_battles ?? candidate.matches ?? candidate.battle_count
+      );
 
-      // BiteBoss battles have only a win/loss outcome for the challenger. Some
-      // profile RPC versions return total + wins while loss_count is omitted or
-      // left at its old default of 0. In that case the authoritative loss count
-      // is total - wins, not the placeholder zero.
+      // The aggregate record is the long-term source of truth, while recent_activity
+      // is the transaction-level lower bound. Reconcile both sides so a stale aggregate
+      // can never hide a battle that is already present in the activity log.
+      let wins = Number.isFinite(explicitWins) ? Math.max(0, explicitWins) : 0;
       let losses = Number.isFinite(explicitLosses) ? Math.max(0, explicitLosses) : 0;
+      const hasTotal = Number.isFinite(explicitTotal);
+      const total = hasTotal ? Math.max(0, explicitTotal) : 0;
+
+      // Some profile RPC versions persist total + wins before loss_count catches up.
+      // A completed challenger battle has exactly one outcome, so the missing remainder
+      // is a loss. This also repairs historical rows where loss_count stayed at zero.
       if(hasTotal && total > wins + losses){
         losses = Math.max(losses, total - wins);
       }
 
-      const resolvedTotal = hasTotal ? Math.max(total, wins + losses) : wins + losses;
-      return { total:resolvedTotal, wins, losses };
+      // A freshly completed result can appear in recent_activity before the aggregate
+      // counters are refreshed. Never let either W or L display below the concrete log.
+      wins = Math.max(wins, activityRecord.wins);
+      losses = Math.max(losses, activityRecord.losses);
+
+      return {
+        total:Math.max(total, wins + losses, activityRecord.total),
+        wins,
+        losses
+      };
     }
 
-    // v76.x profile RPCs already return the target player's battle activity.
-    // Count only battles where that player was the challenger; visits, defenses and
-    // crew membership events are not a player's W/L record.
-    return (Array.isArray(recentActivity) ? recentActivity : []).reduce((record, row) => {
-      if(!row?.as_challenger) return record;
-      const result = String(row.result || "");
-      if(result === "boss_win"){
-        record.wins += 1;
-        record.total += 1;
-      }else if(result === "crew"){
-        record.losses += 1;
-        record.total += 1;
-      }
-      return record;
-    }, { total:0, wins:0, losses:0 });
+    return activityRecord;
   }
 
   function renderPlayerProfile(data, userId){
