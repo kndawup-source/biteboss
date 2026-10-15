@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.25";
+  const BITEBOSS_BUILD = "81.26";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -139,6 +139,7 @@
     feature_ranking:true,
     feature_offers:true,
     home_splash_image_url:"",
+    default_profile_image_url:"",
     home_hook_enabled:true,
     home_hook_text:"찍고, 점령하고, 보스가 돼.",
     home_primary_cta:"QR 스캔하기",
@@ -161,8 +162,48 @@
     season_days:30
   };
 
-  // Warm-start campaign data so the store banner can paint without waiting for Supabase.
+  const DEFAULT_PROFILE_IMAGE_CACHE_KEY = "biteboss-default-profile-image-v1";
+
+  function readCachedDefaultProfileImage(){
+    try{ return String(localStorage.getItem(DEFAULT_PROFILE_IMAGE_CACHE_KEY) || "").trim(); }
+    catch{ return ""; }
+  }
+
+  function cacheDefaultProfileImage(url){
+    try{
+      const value = String(url || "").trim();
+      if(value) localStorage.setItem(DEFAULT_PROFILE_IMAGE_CACHE_KEY, value);
+      else localStorage.removeItem(DEFAULT_PROFILE_IMAGE_CACHE_KEY);
+    }catch{}
+  }
+
+  function defaultProfileImageUrl(){
+    return String(config.default_profile_image_url || readCachedDefaultProfileImage() || "").trim();
+  }
+
+  const defaultProfilePreloads = new Map();
+  function preloadDefaultProfileImage(url = defaultProfileImageUrl()){
+    const src = String(url || "").trim();
+    if(!src) return Promise.resolve(false);
+    if(defaultProfilePreloads.has(src)) return defaultProfilePreloads.get(src);
+
+    const request = new Promise(resolve => {
+      const image = new Image();
+      image.decoding = "sync";
+      image.fetchPriority = "high";
+      image.onload = () => resolve(true);
+      image.onerror = () => resolve(false);
+      image.src = src;
+      if(image.complete && image.naturalWidth > 0) resolve(true);
+    });
+    defaultProfilePreloads.set(src, request);
+    return request;
+  }
+
+  // Warm-start campaign/profile assets so first paint never waits for a second avatar request.
   config.partner_banners = readCachedPartnerBanners();
+  config.default_profile_image_url = readCachedDefaultProfileImage();
+  void preloadDefaultProfileImage(config.default_profile_image_url);
 
   const RUNTIME = Object.freeze({
     foregroundRefreshMinMs:30000,
@@ -737,6 +778,12 @@
     if(Array.isArray(rows.partner_banners)){
       config.partner_banners = rows.partner_banners;
       cachePartnerBanners(config.partner_banners);
+    }
+
+    if(Object.prototype.hasOwnProperty.call(rows, "default_profile_image_url")){
+      config.default_profile_image_url = String(rows.default_profile_image_url || "").trim();
+      cacheDefaultProfileImage(config.default_profile_image_url);
+      await preloadDefaultProfileImage(config.default_profile_image_url);
     }
 
     // v81 canonical banner payload. Legacy keys are read only as a temporary
@@ -1576,7 +1623,7 @@
   function occupiedStoreAvatarMarkup(store, className = "store-card-photo"){
     const photoUrl = String(store?.photo_url || "").trim();
     const storeName = String(store?.name || "매장").trim();
-    const occupierUrl = String(
+    const occupierCustomUrl = String(
       store?.current_boss_avatar_url
       || store?.boss_avatar_url
       || store?.boss_organization_avatar_url
@@ -1584,7 +1631,7 @@
       || ""
     ).trim();
     const occupied = Boolean(
-      occupierUrl
+      occupierCustomUrl
       || store?.current_boss_user_id
       || store?.boss_user_id
       || store?.current_boss_nickname
@@ -1592,6 +1639,7 @@
       || store?.boss_organization_id
       || store?.current_boss_organization_id
     );
+    const occupierUrl = occupierCustomUrl || (occupied ? defaultProfileImageUrl() : "");
 
     if(!occupied || !occupierUrl){
       return storeAvatarMarkup(photoUrl, storeName, className);
@@ -1609,15 +1657,17 @@
   }
 
   function bossAvatarMarkup(avatarUrl, nickname, className = "boss-avatar"){
-    const url = String(avatarUrl || "").trim();
+    const customUrl = String(avatarUrl || "").trim();
+    const defaultUrl = defaultProfileImageUrl();
+    const url = customUrl || defaultUrl;
     const name = String(nickname || "보스").trim();
     if(url){
-      const criticalAvatar = /(?:crew-rank-avatar|crew-profile-avatar|organization-member-avatar|organization-detail-member-avatar|nearby-avatar|rank-player-avatar|my-rank-avatar)/.test(String(className));
+      const criticalAvatar = !customUrl || /(?:crew-rank-avatar|crew-profile-avatar|organization-member-avatar|organization-detail-member-avatar|nearby-avatar|rank-player-avatar|my-rank-avatar)/.test(String(className));
       if(criticalAvatar) preloadOccupiedAvatar(url);
       const loading = criticalAvatar
         ? `loading="eager" fetchpriority="high"`
         : `loading="lazy"`;
-      return `<img class="${escapeAttr(className)}" src="${escapeAttr(url)}" alt="${escapeAttr(name)} 프로필" ${loading} decoding="async" />`;
+      return `<img class="${escapeAttr(className)}" src="${escapeAttr(url)}" alt="${escapeAttr(name)} 프로필" ${loading} decoding="${customUrl ? "async" : "sync"}" />`;
     }
     return `<span class="${escapeAttr(className)} boss-avatar-fallback" aria-hidden="true"></span>`;
   }
@@ -7428,10 +7478,14 @@
   function renderProfilePhoto(imageSelector, fallbackSelector, url){
     const image = $(imageSelector);
     const fallback = $(fallbackSelector);
-    const hasPhoto = Boolean(url);
+    const customUrl = String(url || "").trim();
+    const resolvedUrl = customUrl || defaultProfileImageUrl();
+    const hasPhoto = Boolean(resolvedUrl);
     if(image){
       if(hasPhoto){
-        image.src = url;
+        image.decoding = customUrl ? "async" : "sync";
+        image.fetchPriority = customUrl ? "auto" : "high";
+        if(image.getAttribute("src") !== resolvedUrl) image.src = resolvedUrl;
         image.classList.remove("hidden");
       }else{
         image.removeAttribute("src");

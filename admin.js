@@ -255,6 +255,7 @@
     $("#useCurrentLocationBtn")?.addEventListener("click", fillCurrentStoreLocation);
     $("#rulesForm")?.addEventListener("submit", saveRules);
     $("#splashForm")?.addEventListener("submit", saveSplash);
+    $("#defaultProfileForm")?.addEventListener("submit", saveDefaultProfileImage);
     $("#homeCopyForm")?.addEventListener("submit", saveHomeCopy);
     $("#adCampaignForm")?.addEventListener("submit", saveAdCampaign);
   }
@@ -1293,6 +1294,14 @@
     const preview = $("#splashPreview");
     if(preview) preview.innerHTML = url ? `<img src="${escapeAttr(url)}" alt="Splash" />` : `<span>SPLASH</span>`;
 
+    const defaultProfileUrl = String(appConfig.default_profile_image_url || "");
+    const defaultProfilePreview = $("#defaultProfilePreview");
+    if(defaultProfilePreview){
+      defaultProfilePreview.innerHTML = defaultProfileUrl
+        ? `<img src="${escapeAttr(defaultProfileUrl)}" alt="기본 프로필 이미지" />`
+        : `<span>PROFILE</span>`;
+    }
+
     const hookEnabled = String(appConfig.home_hook_enabled ?? "true").toLowerCase() !== "false";
     const hookText = String(appConfig.home_hook_text || "");
     const primary = String(appConfig.home_primary_cta || "QR 스캔하기");
@@ -1335,6 +1344,62 @@
       if(error) throw error;
       appConfig.home_splash_image_url = url;
       await loadAssets();
+      if(status) status.textContent = "저장되었습니다.";
+    }catch(error){
+      console.warn(error);
+      if(status) status.textContent = "저장에 실패했습니다.";
+    }finally{
+      if(submit) submit.disabled = false;
+    }
+  }
+
+
+  async function saveDefaultProfileImage(event){
+    event.preventDefault();
+    const formEl = event.currentTarget;
+    const submit = formEl?.querySelector('button[type="submit"]');
+    if(submit?.disabled) return;
+
+    const status = $("#defaultProfileStatus");
+    const file = $("#defaultProfileFile")?.files?.[0];
+    if(!file) return;
+    if(submit) submit.disabled = true;
+    if(status) status.textContent = "업로드 중…";
+
+    try{
+      const blob = await imageFileToJpegBlob(file, 720, 720, 0.9);
+      const version = Date.now();
+      const path = `public/default-profile-${version}.jpg`;
+      const upload = await adminSb.storage.from("biteboss-assets").upload(path, blob, {
+        upsert:false,
+        contentType:"image/jpeg",
+        cacheControl:"31536000"
+      });
+      if(upload.error) throw upload.error;
+
+      const { data } = adminSb.storage.from("biteboss-assets").getPublicUrl(path);
+      const url = String(data?.publicUrl || "").trim();
+      if(!url) throw new Error("DEFAULT_PROFILE_PUBLIC_URL_MISSING");
+
+      // Preload before publishing the config so clients never switch to an uncached asset mid-render.
+      await new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = resolve;
+        image.onerror = () => reject(new Error("DEFAULT_PROFILE_PRELOAD_FAILED"));
+        image.src = url;
+      });
+
+      const { error } = await adminSb.from("biteboss_app_config").upsert({
+        key:"default_profile_image_url",
+        value:url,
+        updated_by:session.user.id,
+        updated_at:new Date().toISOString()
+      }, { onConflict:"key" });
+      if(error) throw error;
+
+      appConfig.default_profile_image_url = url;
+      await loadAssets();
+      formEl.reset();
       if(status) status.textContent = "저장되었습니다.";
     }catch(error){
       console.warn(error);
