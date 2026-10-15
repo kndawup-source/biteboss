@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.24";
+  const BITEBOSS_BUILD = "81.25";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1704,6 +1704,49 @@
     `;
   }
 
+  async function hydrateStoreDetailCoordinates(store = {}, cached = null){
+    const hasCoordinates = value => {
+      const lat = value?.latitude == null || value.latitude === "" ? NaN : Number(value.latitude);
+      const lng = value?.longitude == null || value.longitude === "" ? NaN : Number(value.longitude);
+      return Number.isFinite(lat) && Number.isFinite(lng);
+    };
+
+    if(hasCoordinates(store)) return store;
+
+    if(hasCoordinates(cached)){
+      store.latitude = Number(cached.latitude);
+      store.longitude = Number(cached.longitude);
+      return store;
+    }
+
+    const name = String(store.name || "").trim();
+    const id = String(store.id || "").trim();
+    if(!name || !id) return store;
+
+    try{
+      const { data, error } = await sb.rpc("biteboss_search_stores_v631", {
+        p_query:name,
+        p_lat:lastPosition?.coords?.latitude ?? null,
+        p_lng:lastPosition?.coords?.longitude ?? null,
+        p_limit:20
+      });
+      if(error) throw error;
+
+      const matched = (Array.isArray(data) ? data : []).find(row => String(row?.id || "") === id);
+      if(hasCoordinates(matched)){
+        store.latitude = Number(matched.latitude);
+        store.longitude = Number(matched.longitude);
+        if(!Number.isFinite(Number(store.distance_m)) && Number.isFinite(Number(matched.distance_m))){
+          store.distance_m = Number(matched.distance_m);
+        }
+      }
+    }catch(error){
+      console.warn("BiteBoss store detail coordinates:", error);
+    }
+
+    return store;
+  }
+
   async function openStoreDetail(storeId, options = {}){
     const cached = stores.find(store => String(store.id) === String(storeId))
       || (options?.storeFallback && String(options.storeFallback.id) === String(storeId)
@@ -1759,24 +1802,14 @@
       if(growthResult?.error) console.warn("BiteBoss public growth:", growthResult.error);
       if(arenaResult?.error) console.warn("BiteBoss arena:", arenaResult.error);
 
-      if(cached){
-        if(!Number.isFinite(Number(data.store.distance_m)) && Number.isFinite(Number(cached.distance_m))){
-          data.store.distance_m = Number(cached.distance_m);
-        }
-        // biteboss_store_detail is intentionally public-safe and older deployments do not
-        // return GPS coordinates. Reuse the same canonical store coordinates already loaded
-        // by the store list so the detail mini-map can render without a DB migration.
-        const detailLat = data.store.latitude == null || data.store.latitude === "" ? NaN : Number(data.store.latitude);
-        const detailLng = data.store.longitude == null || data.store.longitude === "" ? NaN : Number(data.store.longitude);
-        const cachedLat = cached.latitude == null || cached.latitude === "" ? NaN : Number(cached.latitude);
-        const cachedLng = cached.longitude == null || cached.longitude === "" ? NaN : Number(cached.longitude);
-        if(!Number.isFinite(detailLat) && Number.isFinite(cachedLat)){
-          data.store.latitude = cachedLat;
-        }
-        if(!Number.isFinite(detailLng) && Number.isFinite(cachedLng)){
-          data.store.longitude = cachedLng;
-        }
+      if(cached && !Number.isFinite(Number(data.store.distance_m)) && Number.isFinite(Number(cached.distance_m))){
+        data.store.distance_m = Number(cached.distance_m);
       }
+
+      // Store detail RPCs on older deployments may omit coordinates. This must not make
+      // "내 점령지" different from any other store detail: resolve the same canonical
+      // store coordinates by id before rendering the shared detail map.
+      await hydrateStoreDetailCoordinates(data.store, cached);
 
       activeStoreDetailId = String(storeId);
       renderStoreDetail(data, options);
