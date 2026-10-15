@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "76.8";
+  const BITEBOSS_BUILD = "76.9";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1006,20 +1006,9 @@
     const autoImportEnabled = config.auto_store_import_enabled !== false &&
       String(config.auto_store_import_enabled).toLowerCase() !== "false";
     const autoImportMinCount = Math.max(1, Number(config.auto_store_import_min_count || 10));
-    const autoImportRadius = Math.max(
-      300,
-      Math.min(2000, Number(config.auto_store_import_radius_m || 1000))
-    );
-    // The import threshold must be evaluated inside the same radius Kakao will fill.
-    // Counting the wider 3 km display list allowed distant DB stores to suppress
-    // discovery even when the user's immediate 1 km area was empty.
-    const autoImportNearbyCount = stores.reduce((count, store) => {
-      const distance = Number(store?.distance_m);
-      return count + (Number.isFinite(distance) && distance <= autoImportRadius ? 1 : 0);
-    }, 0);
 
-    if(lastPosition && autoImportEnabled && autoImportNearbyCount < autoImportMinCount){
-      const sync = await syncNearbyAutoStores(lastPosition, autoImportRadius);
+    if(lastPosition && autoImportEnabled && stores.length < autoImportMinCount){
+      const sync = await syncNearbyAutoStores(lastPosition);
 
       if(sync?.ok){
         const refreshed = await sb.rpc("biteboss_nearby_stores_v631", {
@@ -1067,7 +1056,7 @@
     return true;
   }
 
-  async function syncNearbyAutoStores(pos, requestedRadius = null){
+  async function syncNearbyAutoStores(pos){
     if(!pos?.coords) return null;
 
     try{
@@ -1079,7 +1068,7 @@
       const lng = Number(pos.coords.longitude);
       const radius = Math.max(
         300,
-        Math.min(2000, Number(requestedRadius || config.auto_store_import_radius_m || 1000))
+        Math.min(2000, Number(config.auto_store_import_radius_m || 1000))
       );
 
       if(!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
@@ -1417,35 +1406,6 @@
     return `<span class="${escapeAttr(className)} boss-avatar-fallback" aria-hidden="true"></span>`;
   }
 
-  function occupiedStoreAvatarMarkup(store, className = "store-card-photo"){
-    const storeUrl = String(store?.photo_url || "").trim();
-    const storeName = String(store?.name || "매장").trim();
-    const crewUrl = String(
-      store?.current_boss_organization_avatar_url ||
-      store?.current_crew_avatar_url ||
-      store?.organization_avatar_url ||
-      store?.current_boss_avatar_url ||
-      ""
-    ).trim();
-    const crewName = String(
-      store?.current_boss_organization_name ||
-      store?.current_crew_name ||
-      store?.organization_name ||
-      store?.current_boss_nickname ||
-      "점령 크루"
-    ).trim();
-
-    const left = storeUrl
-      ? `<img src="${escapeAttr(storeUrl)}" alt="${escapeAttr(storeName)} 매장 사진" loading="lazy" decoding="async" />`
-      : `<span class="occupied-store-half-fallback" aria-hidden="true">${escapeHtml(Array.from(storeName)[0] || "B")}</span>`;
-    const right = crewUrl
-      ? `<img src="${escapeAttr(crewUrl)}" alt="${escapeAttr(crewName)} 프로필" loading="lazy" decoding="async" />`
-      : `<span class="occupied-boss-half-fallback" aria-hidden="true"></span>`;
-
-    return `<span class="${escapeAttr(className)} occupied-store-avatar" role="img" aria-label="${escapeAttr(storeName)} · ${escapeAttr(crewName)} 점령">` +
-      `<span class="occupied-store-half">${left}</span><span class="occupied-boss-half">${right}</span></span>`;
-  }
-
 
   function storeCard(store){
     const roleState = storeRoleMap.get(String(store.id)) || {};
@@ -1513,9 +1473,7 @@
     return `
       <article class="store-card store-card-open challenge-card mode-${escapeAttr(cardMode)} ${isPartner ? "is-partner-store" : ""}" data-store-detail="${escapeAttr(store.id)}" role="button" tabindex="0" aria-label="${escapeAttr(store.name)} 매장 정보 보기">
         <div class="store-card-main">
-          ${bossExists
-            ? occupiedStoreAvatarMarkup(store, "store-card-photo")
-            : storeAvatarMarkup(store.photo_url, store.name, "store-card-photo")}
+          ${storeAvatarMarkup(store.photo_url, store.name, "store-card-photo")}
           <div class="store-card-copy">
             <div class="store-card-title-row">
               <strong class="store-card-name">${escapeHtml(store.name)}</strong>
@@ -5913,10 +5871,44 @@
     }
   }
 
+  function getPlayerBattleRecord(data, recentActivity){
+    const candidates = [
+      data?.battle_record,
+      data?.record,
+      data?.player?.battle_record,
+      data?.player?.record
+    ];
+
+    for(const candidate of candidates){
+      if(!candidate || typeof candidate !== "object") continue;
+      const wins = Math.max(0, Number(candidate.wins ?? candidate.win_count ?? candidate.victories ?? 0));
+      const losses = Math.max(0, Number(candidate.losses ?? candidate.loss_count ?? candidate.defeats ?? 0));
+      const explicitTotal = Number(candidate.total ?? candidate.total_battles ?? candidate.matches);
+      const total = Number.isFinite(explicitTotal) ? Math.max(0, explicitTotal) : wins + losses;
+      return { total:Math.max(total, wins + losses), wins, losses };
+    }
+
+    // v76.x profile RPCs already return the target player's battle activity.
+    // Count only battles where that player was the challenger; visits, defenses and
+    // crew membership events are not a player's W/L record.
+    return (Array.isArray(recentActivity) ? recentActivity : []).reduce((record, row) => {
+      if(!row?.as_challenger) return record;
+      const result = String(row.result || "");
+      if(result === "boss_win"){
+        record.wins += 1;
+        record.total += 1;
+      }else if(result === "crew"){
+        record.losses += 1;
+        record.total += 1;
+      }
+      return record;
+    }, { total:0, wins:0, losses:0 });
+  }
+
   function renderPlayerProfile(data, userId){
     const player = data.player || {};
-    const h2h = data.head_to_head || {};
     const recentAll = Array.isArray(data.recent_activity) ? data.recent_activity : [];
+    const battleRecord = getPlayerBattleRecord(data, recentAll);
     const recent = recentAll.slice(0, 3);
 
     // Modal shell is generic; the nickname is the hero title.
@@ -5977,14 +5969,14 @@
           <div><span>크루</span><strong>${Number(player.crew_count || 0)}</strong></div>
         </section>
 
-        <section class="player-profile-h2h">
+        <section class="player-profile-record">
           <div class="player-profile-section-head">
-            <span>맞대결 전적</span>
-            <strong>${Number(h2h.total || 0)}전</strong>
+            <span>전적</span>
+            <strong>${Number(battleRecord.total || 0)}전</strong>
           </div>
-          <div class="player-profile-h2h-grid">
-            <p><span>내 승리</span><strong>${Number(h2h.viewer_wins || 0)}</strong></p>
-            <p><span>상대 승리</span><strong>${Number(h2h.target_wins || 0)}</strong></p>
+          <div class="player-profile-record-grid">
+            <p><span>승리</span><strong>${Number(battleRecord.wins || 0)}</strong></p>
+            <p><span>패배</span><strong>${Number(battleRecord.losses || 0)}</strong></p>
           </div>
         </section>
 
