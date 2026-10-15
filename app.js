@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "80.2";
+  const BITEBOSS_BUILD = "80.3";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -237,6 +237,9 @@
   const locallyOwnedStoreIds = new Map();
   let territoryMap = null;
   let storeDetailMap = null;
+  let storeDetailStorePoint = null;
+  let storeDetailUserMarker = null;
+  let storeDetailAccuracyCircle = null;
   let territoryMapLayer = null;
   let territoryUserLayer = null;
   let territoryMapRows = [];
@@ -930,6 +933,7 @@
       nearbyWatchId = navigator.geolocation.watchPosition(
         position => {
           lastPosition = position;
+          updateStoreDetailUserLocation(position);
           void refreshStoresForPosition(position);
         },
         error => {
@@ -2564,9 +2568,83 @@
   }
 
   function destroyStoreDetailMap(){
-    if(!storeDetailMap) return;
-    try{ storeDetailMap.remove(); }catch(_error){}
+    if(storeDetailMap){
+      try{ storeDetailMap.remove(); }catch(_error){}
+    }
     storeDetailMap = null;
+    storeDetailStorePoint = null;
+    storeDetailUserMarker = null;
+    storeDetailAccuracyCircle = null;
+  }
+
+  function fitStoreDetailMap(){
+    if(!storeDetailMap || !storeDetailStorePoint) return;
+
+    const points = [storeDetailStorePoint];
+    if(storeDetailUserMarker){
+      points.push(storeDetailUserMarker.getLatLng());
+    }
+
+    if(points.length > 1){
+      const bounds = L.latLngBounds(points);
+      storeDetailMap.fitBounds(bounds, {
+        padding:[28,28],
+        maxZoom:17,
+        animate:false
+      });
+    }else{
+      storeDetailMap.setView(storeDetailStorePoint,17,{animate:false});
+    }
+  }
+
+  function updateStoreDetailUserLocation(pos = lastPosition, { fit=false } = {}){
+    if(!storeDetailMap || !pos?.coords || typeof L === "undefined") return false;
+
+    const lat = Number(pos.coords.latitude);
+    const lng = Number(pos.coords.longitude);
+    if(!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
+
+    const point = L.latLng(lat,lng);
+    const accuracy = Number(pos.coords.accuracy);
+
+    if(!storeDetailUserMarker){
+      storeDetailUserMarker = L.circleMarker(point, {
+        radius:6,
+        weight:2,
+        color:"#ffffff",
+        fillColor:"#d33f3f",
+        fillOpacity:1
+      }).addTo(storeDetailMap).bindTooltip("내 위치", {
+        permanent:false,
+        direction:"top",
+        offset:[0,-6]
+      });
+    }else{
+      storeDetailUserMarker.setLatLng(point);
+    }
+
+    if(Number.isFinite(accuracy) && accuracy > 0){
+      if(!storeDetailAccuracyCircle){
+        storeDetailAccuracyCircle = L.circle(point, {
+          radius:accuracy,
+          weight:1,
+          color:"#d33f3f",
+          opacity:.22,
+          fillColor:"#d33f3f",
+          fillOpacity:.06,
+          interactive:false
+        }).addTo(storeDetailMap);
+      }else{
+        storeDetailAccuracyCircle.setLatLng(point);
+        storeDetailAccuracyCircle.setRadius(accuracy);
+      }
+    }else if(storeDetailAccuracyCircle){
+      try{ storeDetailAccuracyCircle.remove(); }catch(_error){}
+      storeDetailAccuracyCircle = null;
+    }
+
+    if(fit) fitStoreDetailMap();
+    return true;
   }
 
   function renderStoreDetailMap(store = {}){
@@ -2595,7 +2673,9 @@
       }
     ).addTo(storeDetailMap);
 
-    L.circleMarker([lat,lng], {
+    storeDetailStorePoint = L.latLng(lat,lng);
+
+    L.circleMarker(storeDetailStorePoint, {
       radius:8,
       weight:3,
       color:"#ffffff",
@@ -2607,10 +2687,15 @@
       offset:[0,-7]
     });
 
-    storeDetailMap.setView([lat,lng],17,{animate:false});
+    const hasUserLocation = updateStoreDetailUserLocation(lastPosition);
+    if(hasUserLocation){
+      fitStoreDetailMap();
+    }else{
+      storeDetailMap.setView(storeDetailStorePoint,17,{animate:false});
+    }
+
     window.requestAnimationFrame(() => storeDetailMap?.invalidateSize());
   }
-
 
 
   function shouldShowStoreManagerCard({ isBoss = false, options = {} } = {}){
@@ -3682,6 +3767,7 @@
       const pos = await getPositionSafe(false);
       if(!pos) return;
       lastPosition = pos;
+      updateStoreDetailUserLocation(pos);
       void refreshStoresForPosition(pos);
 
       const accuracy = Number(pos.coords.accuracy || 0);
