@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "80.4";
+  const BITEBOSS_BUILD = "80.7";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -3699,7 +3699,7 @@
       : {};
     const partnerBannerStore = stores
       .filter(store => partnerBannerIds.includes(String(store.id)))
-      .filter(store => String(store.partnership_status || "") === "partnered")
+      .filter(store => String(store.status || "active") === "active")
       .sort((a,b) => localStoreDistance(a) - localStoreDistance(b))[0] || null;
 
     // NEXT TARGET already lives in takeover-command.

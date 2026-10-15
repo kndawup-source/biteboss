@@ -33,6 +33,7 @@
   let adminCommentPage = 1;
   let adminCommentFilter = "all";
   let adminStorePage = 1;
+  let adminStoreFilter = "all";
   let partnerRequestPage = 1;
   let adminUserPage = 1;
   let bossPage = 1;
@@ -207,6 +208,12 @@
     });
     $("#userSearch")?.addEventListener("input", () => { adminUserPage = 1; loadUsers(); });
     $("#adminStoreSearch")?.addEventListener("input", () => { adminStorePage = 1; renderStores(); });
+    $$("[data-store-filter]").forEach(button => button.addEventListener("click", () => {
+      adminStoreFilter = String(button.dataset.storeFilter || "all");
+      adminStorePage = 1;
+      $$("[data-store-filter]").forEach(item => item.classList.toggle("active", item === button));
+      renderStores();
+    }));
     $("#adCampaignCancel")?.addEventListener("click", resetAdCampaignForm);
     $("#partnerRequestFilter")?.addEventListener("change", () => { partnerRequestPage = 1; loadPartnerRequests(); });
     $("#refreshPartnerRequests")?.addEventListener("click", loadPartnerRequests);
@@ -745,7 +752,12 @@
     if(!box) return;
 
     const query = String($("#adminStoreSearch")?.value || "").trim().toLowerCase();
+    const partnerBannerIds = normalizedPartnerBannerIds();
     const filtered = stores.filter(store => {
+      const isPartner = String(store.partnership_status || "") === "partnered";
+      const bannerEnabled = partnerBannerIds.includes(String(store.id));
+      if(adminStoreFilter === "partner" && !isPartner) return false;
+      if(adminStoreFilter === "banner" && !bannerEnabled) return false;
       if(!query) return true;
       return [store.name, store.brand_name, store.city, store.district, store.address, categoryLabel(store.category)]
         .filter(Boolean)
@@ -761,19 +773,21 @@
 
     box.innerHTML = pageRows.map(store => {
       const isPartner = store.partnership_status === "partnered";
+      const bannerEnabled = partnerBannerIds.includes(String(store.id));
       const location = [store.city, store.district].filter(Boolean).join(" ") || "지역 미등록";
       return `
         <article class="admin-store-row">
           <div class="admin-store-summary">
             <div class="admin-store-thumb-wrap">${store.photo_url ? `<img class="admin-store-thumb" src="${escapeAttr(store.photo_url)}" alt="" loading="lazy" decoding="async" />` : `<span class="admin-store-thumb admin-store-thumb-empty" aria-hidden="true"></span>`}</div>
             <div class="admin-store-copy">
-              <div class="admin-store-title-line"><strong>${escapeHtml(store.name)}</strong><span class="partner-badge ${partnershipClass(store.partnership_status)}">${escapeHtml(partnershipLabel(store.partnership_status))}</span></div>
+              <div class="admin-store-title-line"><strong>${escapeHtml(store.name)}</strong><span class="partner-badge ${partnershipClass(store.partnership_status)}">${escapeHtml(partnershipLabel(store.partnership_status))}</span><span class="admin-banner-state ${bannerEnabled ? "is-on" : ""}">배너 ${bannerEnabled ? "ON" : "OFF"}</span></div>
               <p>${escapeHtml(location)} · ${escapeHtml(categoryLabel(store.category))}</p>
               <p class="admin-store-coords">${store.latitude ?? "-"}, ${store.longitude ?? "-"}</p>
             </div>
           </div>
           <div class="admin-store-actions">
             <button class="secondary-btn admin-store-edit-btn" data-edit-store="${escapeAttr(store.id)}" type="button">매장 수정</button>
+            <button class="text-btn admin-banner-toggle ${bannerEnabled ? "is-on" : ""}" data-banner-store="${escapeAttr(store.id)}" data-banner-enabled="${bannerEnabled ? "true" : "false"}" type="button">${bannerEnabled ? "배너 끄기" : "배너 켜기"}</button>
             ${isPartner
               ? `<a class="text-link" href="./store-admin.html">매장 어드민</a><span class="admin-action-note">관리자 계정에서 메뉴·공지·QR을 운영할 수 있습니다.</span>`
               : `<button class="text-btn" data-partner-store="${escapeAttr(store.id)}" type="button">제휴 전환</button><span class="admin-action-note">GPS 체류 자동점령</span>`}
@@ -814,6 +828,31 @@
           alert(error?.message || "제휴 전환에 실패했습니다.");
           btn.textContent = original;
         }finally{
+          btn.disabled = false;
+        }
+      };
+    });
+
+    $$('[data-banner-store]').forEach(btn => {
+      btn.onclick = async () => {
+        const id = String(btn.dataset.bannerStore || "");
+        const store = stores.find(item => String(item.id) === id);
+        if(!store) return;
+        const enabled = btn.dataset.bannerEnabled === "true";
+        const ids = normalizedPartnerBannerIds().filter(item => item !== id);
+        if(!enabled) ids.push(id);
+        btn.disabled = true;
+        try{
+          const { error } = await adminSb.from("biteboss_app_config").upsert([{
+            key:"partner_banner_store_ids", value:[...new Set(ids)],
+            updated_by:session.user.id, updated_at:new Date().toISOString()
+          }], { onConflict:"key" });
+          if(error) throw error;
+          await loadConfig();
+          renderStores();
+        }catch(error){
+          console.error(error);
+          alert(error?.message || "배너 설정을 저장하지 못했습니다.");
           btn.disabled = false;
         }
       };
@@ -1400,9 +1439,7 @@
   function renderAdminPartnerPromotion(store = {}){
     const section = $("#adminPartnerPromotionSection");
     if(!section) return;
-    const partnered = String(store.partnership_status || "") === "partnered";
-    section.classList.toggle("hidden", !partnered);
-    if(!partnered) return;
+    section.classList.remove("hidden");
 
     const ids = normalizedPartnerBannerIds();
     const copy = normalizedPartnerBannerCopy();
@@ -1415,10 +1452,6 @@
     event.preventDefault();
     if(!editingStoreId || !editingStoreBundle?.store) return;
     const store = editingStoreBundle.store;
-    if(String(store.partnership_status || "") !== "partnered"){
-      return setStatusText($("#adminPartnerPromotionStatus"), "제휴 매장만 노출할 수 있습니다.");
-    }
-
     const enabled = $("#adminPartnerBannerEnabled")?.value === "true";
     const copyText = String($("#adminPartnerBannerCopy")?.value || "").trim();
     const id = String(editingStoreId);
