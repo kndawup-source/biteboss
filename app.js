@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "78.3";
+  const BITEBOSS_BUILD = "78.5";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -603,7 +603,12 @@
       loadHome();
       loadBanner();
     }
-    if(tab === "stores"){ renderStores(); void loadGamePulse(); }
+    if(tab === "stores"){
+      const storeList = $("#storeList");
+      if(storeList) storeList.replaceChildren();
+      renderStores();
+      void loadGamePulse();
+    }
     if(tab === "rank"){
       syncTerritoryMapVisibility();
       loadRank();
@@ -1266,9 +1271,7 @@
     const box = $("#storeList");
     if(!box) return;
 
-    // Challenge is a target list. Stores already owned by the current player
-    // are excluded before the first paint so they cannot flash during async refresh.
-    storeViewRows = (Array.isArray(list) ? list : []).filter(store => !isMyBossStore(store));
+    storeViewRows = Array.isArray(list) ? list : [];
     if(options.resetPage) storePage = 1;
     const view = pageSlice(storeViewRows, storePage, STORE_PAGE_SIZE);
     storePage = view.page;
