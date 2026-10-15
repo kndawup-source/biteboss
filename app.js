@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "79.0";
+  const BITEBOSS_BUILD = "79.2";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -3600,7 +3600,8 @@
       .map(normalizePulseStore)
       .filter(Boolean);
     const localHot=fallbackHot.map(normalizePulseStore).filter(Boolean);
-    const hot=nearbyHotRows([...serverHot,...localHot]);
+    const hot=nearbyHotRows([...serverHot,...localHot])
+      .filter(row=>!isMyBossStore(stores.find(store=>String(store.id)===String(row.store_id))||{}));
     const newcomer=data?.new_player_protected===true;
 
     // NEXT TARGET already lives in takeover-command.
