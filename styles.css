@@ -245,10 +245,10 @@ html.modal-open,body.modal-open{overflow:hidden;overscroll-behavior:none}body.mo
 .store-owner-conversion{margin:0;background:transparent;scroll-margin-top:18px}
 .store-owner-conversion>summary{list-style:none}
 .store-owner-conversion>summary::-webkit-details-marker{display:none}
-.store-owner-manage-btn{display:flex;align-items:center;justify-content:center;width:100%;min-height:44px;padding:0 16px;border:1px solid #dedee1;border-radius:14px;background:#f3f3f4;color:#333338;font-size:11px;font-weight:800;line-height:1;cursor:pointer}
+.store-owner-manage-btn{display:flex;align-items:center;justify-content:center;width:100%;min-height:44px;padding:0 16px;border:0;border-radius:14px;background:#f3f3f4;color:#333338;font-size:11px;font-weight:800;line-height:1;cursor:pointer}
 .store-owner-conversion[open] .store-owner-manage-btn{margin-bottom:12px}
-.store-owner-body{display:grid;gap:10px;padding:0 2px 2px}
-.store-owner-body-head{display:grid;gap:3px}
+.store-owner-body{display:grid;gap:8px;padding:0 2px 2px}
+.store-owner-body-head{display:grid;gap:2px}
 .store-owner-kicker{color:#99999f;font-size:9px;font-weight:700;line-height:1.2}
 .store-owner-body>strong{font-size:13px;line-height:1.35;word-break:keep-all}
 .store-owner-body>p,.store-owner-share{margin:0;color:#85858b;font-size:10px;line-height:1.45}

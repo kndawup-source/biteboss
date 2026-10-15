@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.19";
+  const BITEBOSS_BUILD = "81.20";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -2422,7 +2422,11 @@
         if(!ownerDetails.open) return;
         requestAnimationFrame(() => smoothScrollToStoreOwner(ownerDetails));
       });
-      $("#detailPartnerRequest")?.addEventListener("click", () => {
+      $("#detailPartnerRequest")?.addEventListener("click", event => {
+        const button = event.currentTarget;
+        if(button.dataset.transitioning === "true") return;
+        button.dataset.transitioning = "true";
+
         smoothScrollToStoreOwner(
           body.querySelector(".store-owner-conversion"),
           () => openPartnerRequestForm(store)
@@ -2793,9 +2797,8 @@
       0,
       modalCard.scrollTop + ownerSection.getBoundingClientRect().top - modalCard.getBoundingClientRect().top
     );
-    const needsScroll = Math.abs(modalCard.scrollTop - targetTop) > 2;
 
-    if(!needsScroll){
+    if(Math.abs(modalCard.scrollTop - targetTop) <= 2){
       afterScroll?.();
       return;
     }
@@ -2812,7 +2815,7 @@
 
     modalCard.addEventListener("scrollend", complete, { once:true });
     modalCard.scrollTo({ top:targetTop, behavior:"smooth" });
-    if(afterScroll) fallbackTimer = window.setTimeout(complete, 650);
+    fallbackTimer = window.setTimeout(complete, 650);
   }
 
   function hasStoreManagerAccount(store = {}, request = {}){
@@ -2907,7 +2910,7 @@
       toast("회원 로그인 후 매장 관리자 인증을 신청할 수 있습니다.");
       return;
     }
-    openModal("매장 관리자 인증", `
+    openModal("매장 인증", `
       <form id="partnerRequestForm" class="partner-request-form">
         <div class="partner-request-store">
           <strong>${escapeHtml(store.name || "매장")}</strong>
