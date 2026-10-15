@@ -138,13 +138,11 @@ test('guest account flow uses one login modal path and hides crew creation until
 
 
 
-test('failed capture outcomes are persisted server-side before battle views refresh', () => {
-  assert.match(app, /async function ensureFailedChallengeRecorded\(/);
+test('battle views use the canonical v81.29+ server ledger instead of client-side loss repair', () => {
   assert.match(app, /biteboss_player_profile_v8129/);
-  const presence = blockBetween(app, 'if(["claimed","crew","boss_visit","boss_reclaim"].includes', 'function updateStoreListReclaimCountdowns');
-  assert.match(presence, /await ensureFailedChallengeRecorded\(data, nearest\.store\.id\)/);
-  const qr = blockBetween(app, 'async function claimByQrToken', 'function showChallengeOutcome');
-  assert.match(qr, /await ensureFailedChallengeRecorded\(data, data\?\.store_id \|\| ""\)/);
+  assert.doesNotMatch(app, /ensureFailedChallengeRecorded/);
+  assert.doesNotMatch(app, /biteboss_record_failed_challenge_v8128/);
+  assert.match(app, /sb\.rpc\("biteboss_game_activity"/);
 });
 
 test('player battle record reconciles aggregate and activity for both wins and losses', () => {
@@ -207,4 +205,11 @@ test('network-bound user views retain retry states', () => {
 
 test('release source contains no temporary patch markers', () => {
   assert.doesNotMatch(`${app}\n${css}\n${html}`, /\b(?:TODO|FIXME|HACK|HOTFIX)\b/i);
+});
+
+test('deleted stores preserve battle history and do not expose dead store navigation', () => {
+  assert.match(app, /const storeDeleted = Boolean\(row\.store_deleted \|\| !storeId\)/);
+  assert.match(app, /row\.store_name \|\| \(storeDeleted \? "삭제된 매장" : "매장"\)/);
+  assert.match(app, /activityStoreAttr = storeDeleted \? ""/);
+  assert.match(app, /is-deleted-store/);
 });
