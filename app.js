@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "77.4";
+  const BITEBOSS_BUILD = "77.5";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -4461,7 +4461,6 @@
       openModal("크루 초대", `
         <div class="crew-join-preview crew-invite-detail">
           <div class="crew-invite-detail-head">
-            <span class="crew-kicker">크루 초대</span>
             <strong>${escapeHtml(data.crew_name || "크루")}</strong>
             <p>개설자 ${escapeHtml(founder)}</p>
           </div>
@@ -6520,7 +6519,6 @@
 
       shell.innerHTML = `
         <div class="crew-invite-head">
-          <span>크루 초대</span>
           <strong>${escapeHtml(organization?.name || data.crew_name || "크루")}</strong>
           <p>QR을 공유하면 상대방이 크루 정보를 확인한 뒤 가입할 수 있습니다.</p>
         </div>
