@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "80.3";
+  const BITEBOSS_BUILD = "80.4";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -142,6 +142,8 @@
     home_hook_text:"찍고, 점령하고, 보스가 돼.",
     home_primary_cta:"QR 스캔하기",
     home_secondary_cta:"내 주변 보스 찾기",
+    partner_banner_store_ids:[],
+    partner_banner_copy:{},
     crew_qr_invite_hours:72,
     crew_qr_max_uses:30,
     crew_max_members:30,
@@ -3689,9 +3691,33 @@
       .filter(row=>!isMyBossStore(stores.find(store=>String(store.id)===String(row.store_id))||{}));
     const newcomer=data?.new_player_protected===true;
 
+    const partnerBannerIds = Array.isArray(config.partner_banner_store_ids)
+      ? config.partner_banner_store_ids.map(String)
+      : [];
+    const partnerBannerCopy = config.partner_banner_copy && typeof config.partner_banner_copy === "object"
+      ? config.partner_banner_copy
+      : {};
+    const partnerBannerStore = stores
+      .filter(store => partnerBannerIds.includes(String(store.id)))
+      .filter(store => String(store.partnership_status || "") === "partnered")
+      .sort((a,b) => localStoreDistance(a) - localStoreDistance(b))[0] || null;
+
     // NEXT TARGET already lives in takeover-command.
     // This surface is reserved for exceptional game signals only, avoiding duplicate hierarchy.
     const items=[];
+    if(partnerBannerStore){
+      const partnerCopy = String(partnerBannerCopy[String(partnerBannerStore.id)] || "이 매장에서 BiteBoss 혜택을 확인해 보세요.").trim();
+      const partnerImage = String(
+        partnerBannerStore.photo_url
+        || partnerBannerStore.cover_photo_url
+        || partnerBannerStore.image_url
+        || ""
+      ).trim();
+      const partnerVisual = partnerImage
+        ? `<span class="partner-banner-thumb" aria-hidden="true"><img src="${escapeAttr(partnerImage)}" alt="" loading="lazy" /></span>`
+        : `<span class="partner-banner-thumb partner-banner-fallback" aria-hidden="true">${escapeHtml(storeInitial(partnerBannerStore.name || "P"))}</span>`;
+      items.push(`<button class="game-pulse-item is-partner-banner" type="button" data-pulse-store="${escapeAttr(partnerBannerStore.id)}" data-pulse-name="${escapeAttr(partnerBannerStore.name || "")}">${partnerVisual}<strong>${escapeHtml(partnerBannerStore.name || "제휴 매장")}</strong><small>${escapeHtml(partnerCopy)}</small></button>`);
+    }
     if(retakes[0]){
       items.push(`<button class="game-pulse-item is-retake" type="button" data-pulse-store="${escapeAttr(retakes[0].store_id)}" data-pulse-name="${escapeAttr(retakes[0].store_name||"")}"><span>RETAKE</span><strong>${escapeHtml(retakes[0].store_name||"빼앗긴 매장")}</strong><small>다시 가져오기</small></button>`);
     }

@@ -401,6 +401,17 @@
         <div id="adminMenuList" class="admin-data-list"></div>
       </section>
 
+      <section id="adminPartnerPromotionSection" class="admin-edit-section hidden">
+        <div class="section-head"><h3>제휴 노출</h3><span>매장 탭 배너</span></div>
+        <form id="adminPartnerPromotionForm" class="form-grid admin-form compact-admin-form">
+          <label>배너 노출<select id="adminPartnerBannerEnabled" class="input"><option value="false">OFF</option><option value="true">ON</option></select></label>
+          <label class="wide">한 줄 문구<input id="adminPartnerBannerCopy" class="input" maxlength="56" placeholder="이 매장에서 BiteBoss 혜택을 확인해 보세요." /></label>
+          <div class="admin-partner-promo-note wide">주변 매장 목록 위에서 ‘첫 점령 가이드’와 동일한 크기·위계로 노출됩니다. 여러 제휴매장이 ON이면 사용자와 가까운 매장을 우선 표시합니다.</div>
+          <button class="secondary-btn wide" type="submit">제휴 노출 저장</button>
+          <p id="adminPartnerPromotionStatus" class="asset-status wide" aria-live="polite"></p>
+        </form>
+      </section>
+
       <section class="admin-edit-section">
         <div class="section-head"><h3>혜택</h3></div>
         <form id="adminOfferForm" class="form-grid admin-form compact-admin-form">
@@ -422,6 +433,6 @@
   </section>
 </div>
 
-<script src="./admin.js?v=79.0"></script>
+<script src="./admin.js?v=80.4"></script>
 </body>
 </html>

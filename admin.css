@@ -246,3 +246,5 @@ body.admin-app{min-height:100dvh;background:#fff;color:#111}
   .admin-app .partner-request-toolbar{grid-template-columns:minmax(0,1fr) auto}
   .admin-app .admin-ad-guide{display:grid;gap:5px}
 }
+
+.admin-partner-promo-note{font-size:11px;line-height:1.5;color:#777;padding-top:2px}
