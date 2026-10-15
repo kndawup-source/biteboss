@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.27";
+  const BITEBOSS_BUILD = "81.28";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -4290,6 +4290,7 @@
           if(status) status.textContent=String(data?.status||"")==="crew" ? "도전 결과를 확인하세요." : `${nearest.store.name||"매장"} 점령 완료`;
           closeTakeoverUi(900);
         }
+        await ensureFailedChallengeRecorded(data, nearest.store.id);
         showChallengeOutcome({
           ...data,
           store_name:data?.store_name || nearest.store.name || "매장",
@@ -5130,6 +5131,7 @@
       return toast(claimErrorMessage(error.message));
     }
 
+    await ensureFailedChallengeRecorded(data, data?.store_id || "");
     showChallengeOutcome({
       ...data,
       had_organization_before:hadOrganizationBeforeChallenge
@@ -5144,6 +5146,26 @@
       loadAlerts(),
       loadMyOrganization()
     ]);
+  }
+
+  async function ensureFailedChallengeRecorded(data, fallbackStoreId=""){
+    const outcome = String(data?.outcome || data?.status || "").trim().toLowerCase();
+    if(outcome !== "crew") return { ok:true, skipped:true };
+
+    const storeId = String(data?.store_id || fallbackStoreId || "").trim();
+    if(!storeId) return { ok:false, reason:"STORE_REQUIRED" };
+
+    const { data:recorded, error } = await sb.rpc("biteboss_record_failed_challenge_v8128", {
+      p_store_id:storeId,
+      p_method:String(data?.method || "gps").trim() || "gps"
+    });
+
+    if(error){
+      console.warn("BiteBoss failed challenge record:", error);
+      return { ok:false, reason:String(error.message || "RECORD_FAILED") };
+    }
+
+    return recorded || { ok:true };
   }
 
   function showChallengeOutcome(data){
