@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.29";
+  const BITEBOSS_BUILD = "81.30";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -3370,7 +3370,11 @@
       const result = String(row.result || "");
       const actor = row.actor_name || "사용자";
       const defender = row.defender_name || "보스";
-      const storeName = row.store_name || "매장";
+      const storeId = String(row.store_id || "").trim();
+      const storeDeleted = Boolean(row.store_deleted || !storeId);
+      const storeName = row.store_name || (storeDeleted ? "삭제된 매장" : "매장");
+      const activityStoreAttr = storeDeleted ? "" : ` data-activity-store="${escapeAttr(storeId)}"`;
+      const activityPlayerAttr = storeDeleted ? "" : ` data-player-profile="${escapeAttr(row.actor_user_id || "")}"`;
 
       const perspective = String(row.viewer_side || "");
       let title = "보스 도전";
@@ -3396,7 +3400,7 @@
       if(compact){
         const scope = row.is_mine ? "나" : row.is_org ? "크루" : "";
         return `
-          <button class="activity-row is-compact" type="button" data-activity-store="${escapeAttr(row.store_id)}" data-player-profile="${escapeAttr(row.actor_user_id || "")}">
+          <button class="activity-row is-compact${storeDeleted ? " is-deleted-store" : ""}" type="button"${activityStoreAttr}${activityPlayerAttr}>
             <div class="activity-main">
               <div class="activity-title-row">
                 <strong>${escapeHtml(title)}</strong>
@@ -3422,7 +3426,7 @@
         : `<span class="profile-record-thumb profile-record-thumb-fallback" aria-hidden="true">${escapeHtml(fallback)}</span>`;
 
       return `
-        <button class="profile-record-row has-thumb" type="button" data-activity-store="${escapeAttr(row.store_id)}" data-player-profile="${escapeAttr(row.actor_user_id || "")}">
+        <button class="profile-record-row has-thumb${storeDeleted ? " is-deleted-store" : ""}" type="button"${activityStoreAttr}${activityPlayerAttr}>
           ${thumb}
           <span class="profile-record-main">
             <strong class="profile-record-title">${escapeHtml(title)}</strong>
