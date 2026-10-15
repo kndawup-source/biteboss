@@ -405,5 +405,5 @@ body.biteboss-info-page{min-height:100dvh;background:var(--bg);color:#111}.info-
 .occupied-store-avatar{display:grid!important;grid-template-columns:1fr 1fr;aspect-ratio:1/1;border-radius:50%!important;clip-path:circle(50% at 50% 50%)!important;overflow:hidden;padding:0!important;background:#e3e3e5}
 .occupied-store-half{display:block;min-width:0;min-height:100%;overflow:hidden;border-radius:0!important}
 .occupied-store-half img{display:block;width:100%;height:100%;object-fit:cover;border-radius:0!important}
-.occupied-store-half-store{border-right:1px solid rgba(17,17,17,.12)}
+.occupied-store-half-store{border-right:0}
 .occupied-store-initial{display:grid;width:100%;height:100%;place-items:center;border-radius:0;background:#e4e4e6;color:#111;font:830 18px/1 var(--font)}

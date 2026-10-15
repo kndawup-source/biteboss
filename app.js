@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "78.7";
+  const BITEBOSS_BUILD = "78.8";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1453,12 +1453,12 @@
     }
 
     const storeSide = photoUrl
-      ? `<img src="${escapeAttr(photoUrl)}" alt="" loading="lazy" decoding="async" />`
+      ? `<img src="${escapeAttr(photoUrl)}" alt="" loading="eager" fetchpriority="high" decoding="async" />`
       : `<span class="occupied-store-initial" aria-hidden="true">${escapeHtml(Array.from(storeName)[0] || "B")}</span>`;
 
     return `<span class="${escapeAttr(className)} occupied-store-avatar" role="img" aria-label="${escapeAttr(storeName)} 점령 매장">
       <span class="occupied-store-half occupied-store-half-store">${storeSide}</span>
-      <span class="occupied-store-half occupied-store-half-boss"><img src="${escapeAttr(occupierUrl)}" alt="" loading="lazy" decoding="async" /></span>
+      <span class="occupied-store-half occupied-store-half-boss"><img src="${escapeAttr(occupierUrl)}" alt="" loading="eager" fetchpriority="high" decoding="async" /></span>
     </span>`;
   }
 
