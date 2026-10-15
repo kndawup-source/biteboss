@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.10";
+  const BITEBOSS_BUILD = "81.11";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -2821,10 +2821,12 @@
       <details class="store-owner-conversion ${hasActivity ? "has-activity" : "is-empty"}">
         <summary class="store-owner-manage-btn">${status === "rejected" ? "다시 매장 관리하기" : "이 매장 관리하기"}</summary>
         <div class="store-owner-body">
-          <div class="store-owner-body-head">
-            <span class="store-owner-kicker">최근 30일</span>
-            <strong>${hasActivity ? "BiteBoss 활동 현황" : "아직 집계된 활동이 없습니다."}</strong>
-          </div>
+          ${hasActivity ? `
+            <div class="store-owner-body-head">
+              <span class="store-owner-kicker">최근 30일</span>
+              <strong>BiteBoss 활동 현황</strong>
+            </div>
+          ` : `<strong class="store-owner-empty-title">아직 집계된 활동이 없습니다.</strong>`}
           ${hasActivity ? `
             <div class="store-owner-stats" aria-label="최근 30일 BiteBoss 활동">
               <article><span>방문</span><strong>${visits.toLocaleString("ko-KR")}</strong></article>
@@ -2834,7 +2836,7 @@
             </div>
             ${shares ? `<p class="store-owner-share">공유 ${shares.toLocaleString("ko-KR")}회</p>` : ""}
           ` : ""}
-          <p>매장을 인증하면 이 현황을 직접 확인하고 매장 정보와 혜택을 관리할 수 있습니다.</p>
+          <p>${hasActivity ? "매장을 인증하면 이 현황을 직접 확인하고 매장 정보와 혜택을 관리할 수 있습니다." : "매장을 인증하면 매장 정보와 혜택을 직접 관리할 수 있습니다."}</p>
           <button id="detailPartnerRequest" class="store-owner-auth-btn" type="button">${status === "rejected" ? "다시 인증 요청" : "매장 인증하기"}</button>
         </div>
       </details>`;
