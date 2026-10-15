@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.20";
+  const BITEBOSS_BUILD = "81.21";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -2420,17 +2420,17 @@
       const ownerDetails = body.querySelector("details.store-owner-conversion");
       ownerDetails?.addEventListener("toggle", () => {
         if(!ownerDetails.open) return;
-        requestAnimationFrame(() => smoothScrollToStoreOwner(ownerDetails));
+        requestAnimationFrame(() => { void smoothScrollElementInModal(ownerDetails); });
       });
-      $("#detailPartnerRequest")?.addEventListener("click", event => {
+      $("#detailPartnerRequest")?.addEventListener("click", async event => {
         const button = event.currentTarget;
-        if(button.dataset.transitioning === "true") return;
-        button.dataset.transitioning = "true";
+        if(button.disabled) return;
+        button.disabled = true;
 
-        smoothScrollToStoreOwner(
-          body.querySelector(".store-owner-conversion"),
-          () => openPartnerRequestForm(store)
-        );
+        const modalCard = button.closest(".modal-card");
+        await smoothScrollModalCard(modalCard, 0);
+
+        if(!openPartnerRequestForm(store)) button.disabled = false;
       });
       $("#detailPartnerAdmin")?.addEventListener("click", () => { location.href = "./store-admin.html"; });
     }
@@ -2780,42 +2780,55 @@
     return !isBoss && options?.showStoreManagerCard !== false;
   }
 
-  function smoothScrollToStoreOwner(ownerSection, afterScroll){
-    if(!ownerSection){
-      afterScroll?.();
-      return;
+  function smoothScrollModalCard(modalCard, targetTop){
+    if(!modalCard) return Promise.resolve();
+
+    const maxTop = Math.max(0, modalCard.scrollHeight - modalCard.clientHeight);
+    const nextTop = Math.min(maxTop, Math.max(0, Number(targetTop) || 0));
+    if(Math.abs(modalCard.scrollTop - nextTop) <= 2){
+      modalCard.scrollTop = nextTop;
+      return Promise.resolve();
     }
 
-    const modalCard = ownerSection.closest(".modal-card");
+    return new Promise(resolve => {
+      const startedAt = performance.now();
+      let previousTop = modalCard.scrollTop;
+      let stableFrames = 0;
+
+      const finishWhenSettled = now => {
+        const currentTop = modalCard.scrollTop;
+        const atTarget = Math.abs(currentTop - nextTop) <= 2;
+        const stopped = Math.abs(currentTop - previousTop) < 0.5;
+        stableFrames = stopped ? stableFrames + 1 : 0;
+        previousTop = currentTop;
+
+        if(atTarget || stableFrames >= 3 || now - startedAt >= 900){
+          if(atTarget) modalCard.scrollTop = nextTop;
+          resolve();
+          return;
+        }
+        requestAnimationFrame(finishWhenSettled);
+      };
+
+      modalCard.scrollTo({ top:nextTop, behavior:"smooth" });
+      requestAnimationFrame(finishWhenSettled);
+    });
+  }
+
+  function smoothScrollElementInModal(element){
+    if(!element) return Promise.resolve();
+
+    const modalCard = element.closest(".modal-card");
     if(!modalCard){
-      ownerSection.scrollIntoView({ behavior:"smooth", block:"start" });
-      afterScroll?.();
-      return;
+      element.scrollIntoView({ behavior:"smooth", block:"start" });
+      return Promise.resolve();
     }
 
-    const targetTop = Math.max(
-      0,
-      modalCard.scrollTop + ownerSection.getBoundingClientRect().top - modalCard.getBoundingClientRect().top
-    );
+    const targetTop = modalCard.scrollTop
+      + element.getBoundingClientRect().top
+      - modalCard.getBoundingClientRect().top;
 
-    if(Math.abs(modalCard.scrollTop - targetTop) <= 2){
-      afterScroll?.();
-      return;
-    }
-
-    let completed = false;
-    let fallbackTimer = 0;
-    const complete = () => {
-      if(completed) return;
-      completed = true;
-      if(fallbackTimer) window.clearTimeout(fallbackTimer);
-      modalCard.removeEventListener("scrollend", complete);
-      afterScroll?.();
-    };
-
-    modalCard.addEventListener("scrollend", complete, { once:true });
-    modalCard.scrollTo({ top:targetTop, behavior:"smooth" });
-    fallbackTimer = window.setTimeout(complete, 650);
+    return smoothScrollModalCard(modalCard, targetTop);
   }
 
   function hasStoreManagerAccount(store = {}, request = {}){
@@ -2905,11 +2918,11 @@
   }
 
   function openPartnerRequestForm(store){
-    recordGrowthEvent(store?.id, "claim_store_opened", {});
     if(!playerSession?.authenticated){
       toast("회원 로그인 후 매장 관리자 인증을 신청할 수 있습니다.");
-      return;
+      return false;
     }
+    recordGrowthEvent(store?.id, "claim_store_opened", {});
     openModal("매장 인증", `
       <form id="partnerRequestForm" class="partner-request-form">
         <div class="partner-request-store">
@@ -2923,6 +2936,7 @@
         <p id="partnerRequestStatus" class="inline-status"></p>
       </form>`, {type:"partner-request"});
     $("#partnerRequestForm")?.addEventListener("submit", event => submitPartnerRequest(event, store.id));
+    return true;
   }
 
   async function submitPartnerRequest(event, storeId){

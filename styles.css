@@ -251,6 +251,7 @@ html.modal-open,body.modal-open{overflow:hidden;overscroll-behavior:none}body.mo
 .store-owner-body-head{display:grid;gap:2px}
 .store-owner-kicker{color:#99999f;font-size:9px;font-weight:700;line-height:1.2}
 .store-owner-body>strong{font-size:13px;line-height:1.35;word-break:keep-all}
+.store-owner-empty-title{font-size:12px;line-height:1.35;font-weight:800}
 .store-owner-body>p,.store-owner-share{margin:0;color:#85858b;font-size:10px;line-height:1.45}
 .store-owner-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid #ececef;border-bottom:1px solid #ececef}
 .store-owner-stats article{display:grid;gap:3px;min-width:0;padding:9px 5px}
@@ -443,6 +444,3 @@ body.biteboss-info-page{min-height:100dvh;background:var(--bg);color:#111}.info-
 .takeover-count{font-size:clamp(92px,25vw,128px)}
 @media(max-width:390px){.takeover-count{font-size:clamp(86px,24vw,112px)}}
 
-.store-owner-auth-btn{width:100%;min-height:38px;padding:0 2px;border:0;border-top:1px solid #e2e2e5;background:transparent;color:#111;font:inherit;font-size:11px;font-weight:850;text-align:left;cursor:pointer}
-
-.store-owner-empty-title{font-size:12px;line-height:1.35;font-weight:800}
