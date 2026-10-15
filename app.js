@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.4";
+  const BITEBOSS_BUILD = "81.5";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -2206,24 +2206,7 @@
     const impactChallengers = Math.max(0, Number(publicGrowth.challengers || 0));
     const impactShares = Math.max(0, Number(publicGrowth.shares || 0));
 
-    const publicImpactHtml = `
-      <section class="public-impact ${isPartner ? "is-partner" : ""}">
-        <div class="public-impact-head">
-          <div>
-            <span>최근 30일 기록</span>
-            <strong>${isPartner ? "BiteBoss 활동 현황" : "이 매장에서도 이미 게임이 진행 중입니다."}</strong>
-          </div>
-          ${isPartner ? `<b>제휴</b>` : `<b>미제휴</b>`}
-        </div>
-        <div class="public-impact-grid">
-          <article><span>방문</span><strong>${impactVisits}</strong></article>
-          <article><span>사용자</span><strong>${impactUnique}</strong></article>
-          <article><span>재방문</span><strong>${impactRepeat}</strong></article>
-          <article><span>도전</span><strong>${impactChallengers}</strong></article>
-        </div>
-        ${impactShares ? `<p>최근 30일 공유 ${impactShares}회</p>` : ""}
-      </section>
-    `;
+
 
     const powerState = isBoss
       ? ""
@@ -2316,6 +2299,14 @@
             <div id="storeDetailMap" class="store-detail-map" aria-label="${escapeAttr(store.name || "매장")} 지도"></div>
           </section>
         ` : ""}
+
+        ${showStoreManagerCard ? renderPartnerRequestCard(store, partnerRequest, isPartner, {
+          visits:impactVisits,
+          users:impactUnique,
+          repeats:impactRepeat,
+          challengers:impactChallengers,
+          shares:impactShares
+        }) : ""}
 
         ${noticeHtml}
         ${featuredMenuHtml}
@@ -2411,8 +2402,6 @@
           </div>
           <nav class="list-pagination store-comment-pagination hidden" data-store-comment-pagination aria-label="한마디 페이지"></nav>
         </section>
-
-        ${showStoreManagerCard ? renderPartnerRequestCard(store, partnerRequest, isPartner) : ""}
 
         ${action ? `<div class="store-detail-bottom-action">${action}</div>` : ""}
       </div>
@@ -2791,36 +2780,60 @@
     return Boolean(String(activatedAt || "").trim());
   }
 
-  function renderPartnerRequestCard(store, request, isPartner){
+  function renderPartnerRequestCard(store, request, isPartner, activity = {}){
     const status = String(request?.status || "");
     const activationCode = String(request?.activation_code || "").trim();
     if(hasStoreManagerAccount(store, request)) return "";
 
     if(status === "approved" && activationCode){
       return `
-        <section class="store-detail-section partner-owner-card approved">
-          <span class="partner-owner-kicker">매장 관리자</span>
-          <strong>제휴 승인이 완료됐습니다.</strong>
-          <p>아래 활성화 코드로 매장 관리자 계정을 만들 수 있습니다.</p>
+        <section class="store-owner-conversion approved">
+          <span class="store-owner-kicker">매장 관리자</span>
+          <strong>매장 인증이 완료됐습니다.</strong>
+          <p>활성화 코드로 관리자 계정을 만들고 매장 활동과 혜택을 관리하세요.</p>
           <code>${escapeHtml(activationCode)}</code>
           <button id="detailPartnerAdmin" class="primary-btn" type="button">매장 관리자 열기</button>
         </section>`;
     }
     if(status === "pending"){
       return `
-        <section class="store-detail-section partner-owner-card pending">
-          <span class="partner-owner-kicker">매장 인증</span>
+        <section class="store-owner-conversion pending">
+          <span class="store-owner-kicker">매장 인증</span>
           <strong>매장 관리자 확인 중</strong>
-          <p>승인되면 이 화면에서 활성화 코드를 확인할 수 있습니다.</p>
+          <p>확인이 끝나면 이 화면에서 관리자 활성화를 진행할 수 있습니다.</p>
         </section>`;
     }
     if(isPartner) return "";
+
+    const visits = Math.max(0, Number(activity.visits || 0));
+    const users = Math.max(0, Number(activity.users || 0));
+    const repeats = Math.max(0, Number(activity.repeats || 0));
+    const challengers = Math.max(0, Number(activity.challengers || 0));
+    const shares = Math.max(0, Number(activity.shares || 0));
+    const hasActivity = visits + users + repeats + challengers > 0;
+
     return `
-      <section class="store-detail-section partner-owner-card">
-        <span class="partner-owner-kicker">매장 관리자</span>
-        <strong>${status === "rejected" ? "매장 관리자 인증을 다시 신청할 수 있습니다." : "내 매장, 직접 관리하세요."}</strong>
-        <p>${status === "rejected" ? "인증 정보를 확인한 뒤 다시 신청해주세요." : "매장 인증 후 방문·도전 현황과 매장 정보를 확인하고 관리할 수 있습니다."}</p>
-        <button id="detailPartnerRequest" class="primary-btn claim-store-btn" type="button">매장 인증</button>
+      <section class="store-owner-conversion ${hasActivity ? "has-activity" : "is-empty"}">
+        <div class="store-owner-conversion-head">
+          <div>
+            <span class="store-owner-kicker">최근 30일</span>
+            <strong>${hasActivity ? "이미 BiteBoss 사용자들이 이 매장에서 활동하고 있습니다." : "이 매장의 관리자이신가요?"}</strong>
+          </div>
+          <b>미제휴</b>
+        </div>
+        ${hasActivity ? `
+          <div class="store-owner-stats" aria-label="최근 30일 BiteBoss 활동">
+            <article><span>방문</span><strong>${visits.toLocaleString("ko-KR")}</strong></article>
+            <article><span>사용자</span><strong>${users.toLocaleString("ko-KR")}</strong></article>
+            <article><span>재방문</span><strong>${repeats.toLocaleString("ko-KR")}</strong></article>
+            <article><span>도전</span><strong>${challengers.toLocaleString("ko-KR")}</strong></article>
+          </div>
+          ${shares ? `<p class="store-owner-share">공유 ${shares.toLocaleString("ko-KR")}회</p>` : ""}
+        ` : `<p>매장을 인증하면 방문·도전 현황과 매장 정보를 확인하고 혜택을 직접 관리할 수 있습니다.</p>`}
+        <div class="store-owner-cta">
+          ${hasActivity ? `<p>매장을 인증하면 이 활동을 직접 확인하고 혜택을 운영할 수 있습니다.</p>` : ""}
+          <button id="detailPartnerRequest" class="primary-btn claim-store-btn" type="button">${status === "rejected" ? "다시 인증 요청" : "이 매장 관리하기"}</button>
+        </div>
       </section>`;
   }
 
