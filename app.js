@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "78.6";
+  const BITEBOSS_BUILD = "78.7";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1015,36 +1015,53 @@
     }
 
     stores = Array.isArray(result.data) ? result.data : [];
+    stores.sort(compareNearbyStores);
+
+    // First paint must not wait for role enrichment or Kakao auto discovery.
+    // The RPC result is already enough to show the nearby list immediately.
+    renderStores(stores, { resetPage:true });
+    renderHomeNearbyBosses();
+
+    const roleTask = loadStoreRoles(stores).catch(error => {
+      console.warn("BiteBoss store roles:", error);
+    });
 
     const autoImportEnabled = config.auto_store_import_enabled !== false &&
       String(config.auto_store_import_enabled).toLowerCase() !== "false";
-    // Auto discovery is coverage-driven, not count-driven.
-    // Even when BiteBoss already has many stores nearby, Kakao may expose
-    // additional restaurants/cafes that have not been imported yet.
-    if(lastPosition && autoImportEnabled){
-      const sync = await syncNearbyAutoStores(lastPosition);
 
-      if(sync?.ok){
-        const refreshed = await sb.rpc("biteboss_nearby_stores_v631", {
-          p_lat:lastPosition.coords.latitude,
-          p_lng:lastPosition.coords.longitude,
-          p_radius_m:Number(config.nearby_radius_m || 3000),
-          p_limit:Number(config.nearby_limit || 20)
-        });
+    const importTask = (lastPosition && autoImportEnabled)
+      ? syncNearbyAutoStores(lastPosition).catch(error => {
+          console.warn("BiteBoss auto store import:", error);
+          return null;
+        })
+      : Promise.resolve(null);
 
-        if(!refreshed.error){
-          stores = Array.isArray(refreshed.data) ? refreshed.data : stores;
-        }else{
-          console.warn("BiteBoss nearby refresh:", refreshed.error);
-        }
+    // Role state is lightweight and can enrich the already-visible list independently.
+    await roleTask;
+    stores.sort(compareNearbyStores);
+    renderStores(stores);
+    void loadGamePulse(false);
+
+    // Discovery can be the slowest request. Keep it off the critical render path.
+    const sync = await importTask;
+    if(sync?.ok && lastPosition){
+      const refreshed = await sb.rpc("biteboss_nearby_stores_v631", {
+        p_lat:lastPosition.coords.latitude,
+        p_lng:lastPosition.coords.longitude,
+        p_radius_m:Number(config.nearby_radius_m || 3000),
+        p_limit:Number(config.nearby_limit || 20)
+      });
+
+      if(!refreshed.error){
+        stores = Array.isArray(refreshed.data) ? refreshed.data : stores;
+        await loadStoreRoles(stores);
+        stores.sort(compareNearbyStores);
+        renderStores(stores);
+        renderHomeNearbyBosses();
+      }else{
+        console.warn("BiteBoss nearby refresh:", refreshed.error);
       }
     }
-
-    await loadStoreRoles(stores);
-    stores.sort(compareNearbyStores);
-    void loadGamePulse(false);
-    renderStores(stores);
-    renderHomeNearbyBosses();
   }
 
   function autoImportAttemptKey(pos, radius){
@@ -2219,7 +2236,9 @@
           ${playerSession?.authenticated ? `
             <form class="store-comment-form" data-store-comment-form="${escapeAttr(store.id)}">
               <div class="store-comment-input-row">
-                <input class="store-comment-input" name="body" type="text" maxlength="120" autocomplete="off" placeholder="한마디 남겨보세요" aria-label="한마디 입력" />
+                <span class="store-comment-input-viewport">
+                  <input class="store-comment-input" name="body" type="text" maxlength="120" autocomplete="off" placeholder="한마디 남겨보세요" aria-label="한마디 입력" />
+                </span>
                 <button class="store-comment-submit" type="submit">등록</button>
               </div>
               <div class="store-comment-form-meta">
