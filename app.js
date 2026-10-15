@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.1";
+  const BITEBOSS_BUILD = "81.2";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1705,7 +1705,10 @@
   }
 
   async function openStoreDetail(storeId, options = {}){
-    const cached = stores.find(store => String(store.id) === String(storeId));
+    const cached = stores.find(store => String(store.id) === String(storeId))
+      || (options?.storeFallback && String(options.storeFallback.id) === String(storeId)
+        ? options.storeFallback
+        : null);
     if(options?.preserveModal !== true){
       openModal(
         "",
@@ -1763,11 +1766,15 @@
         // biteboss_store_detail is intentionally public-safe and older deployments do not
         // return GPS coordinates. Reuse the same canonical store coordinates already loaded
         // by the store list so the detail mini-map can render without a DB migration.
-        if(!Number.isFinite(Number(data.store.latitude)) && Number.isFinite(Number(cached.latitude))){
-          data.store.latitude = Number(cached.latitude);
+        const detailLat = data.store.latitude == null || data.store.latitude === "" ? NaN : Number(data.store.latitude);
+        const detailLng = data.store.longitude == null || data.store.longitude === "" ? NaN : Number(data.store.longitude);
+        const cachedLat = cached.latitude == null || cached.latitude === "" ? NaN : Number(cached.latitude);
+        const cachedLng = cached.longitude == null || cached.longitude === "" ? NaN : Number(cached.longitude);
+        if(!Number.isFinite(detailLat) && Number.isFinite(cachedLat)){
+          data.store.latitude = cachedLat;
         }
-        if(!Number.isFinite(Number(data.store.longitude)) && Number.isFinite(Number(cached.longitude))){
-          data.store.longitude = Number(cached.longitude);
+        if(!Number.isFinite(detailLng) && Number.isFinite(cachedLng)){
+          data.store.longitude = cachedLng;
         }
       }
 
@@ -2303,7 +2310,8 @@
 
         ${ownerStatusHtml}
 
-        ${Number.isFinite(Number(store.latitude)) && Number.isFinite(Number(store.longitude)) ? `
+        ${store.latitude != null && store.latitude !== "" && store.longitude != null && store.longitude !== "" &&
+          Number.isFinite(Number(store.latitude)) && Number.isFinite(Number(store.longitude)) ? `
           <section class="store-detail-map-section" aria-label="매장 위치">
             <div id="storeDetailMap" class="store-detail-map" aria-label="${escapeAttr(store.name || "매장")} 지도"></div>
           </section>
@@ -2712,8 +2720,8 @@
     const mapEl = $("#storeDetailMap");
     if(!mapEl || typeof L === "undefined") return;
 
-    const lat = Number(store.latitude);
-    const lng = Number(store.longitude);
+    const lat = store.latitude == null || store.latitude === "" ? NaN : Number(store.latitude);
+    const lng = store.longitude == null || store.longitude === "" ? NaN : Number(store.longitude);
     if(!Number.isFinite(lat) || !Number.isFinite(lng)) return;
 
     storeDetailMap = L.map(mapEl, {
@@ -3761,8 +3769,10 @@
       const storeName=String(btn.dataset.pulseName||"").trim();
       const matchedStore = stores.find(store => String(store?.id || "").trim() === rawStoreId)
         || (storeName ? stores.find(store => String(store?.name || "").trim().toLowerCase() === storeName.toLowerCase()) : null);
-      const storeId = String(matchedStore?.id || rawStoreId || "").trim();
-      if(storeId) openStoreDetail(storeId);
+      const bannerStore = (Array.isArray(config.partner_banners) ? config.partner_banners : [])
+        .find(store => String(store?.id || "").trim() === rawStoreId);
+      const storeId = String(matchedStore?.id || bannerStore?.id || rawStoreId || "").trim();
+      if(storeId) openStoreDetail(storeId, { storeFallback:matchedStore || bannerStore || null });
     }));
   }
 
