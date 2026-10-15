@@ -74,6 +74,7 @@
       const status = $("#storeActivationStatus");
       const submit = event.currentTarget.querySelector('button[type="submit"]');
 
+      if(submit?.disabled) return;
       if(!code) return setText("#storeActivationStatus", "활성화 코드를 입력하세요.");
       if(!/^[a-z0-9][a-z0-9._-]{2,31}$/.test(username)) return setText("#storeActivationStatus", "ID는 영문 소문자/숫자/._- 조합 3~32자입니다.");
       if(!/^\d{6}$/.test(pin)) return setText("#storeActivationStatus", "PIN은 숫자 6자리입니다.");
@@ -113,12 +114,15 @@
       const username = String(form.get("store_id") || "").trim().toLowerCase();
       const pin = String(form.get("pin") || "").trim();
       const status = $("#storeLoginStatus");
+      const submit = event.currentTarget.querySelector('button[type="submit"]');
 
+      if(submit?.disabled) return;
       if(!username || !/^\d{6}$/.test(pin)){
         if(status) status.textContent = "ID와 6자리 PIN을 확인하세요.";
         return;
       }
 
+      if(submit) submit.disabled = true;
       if(status) status.textContent = "로그인 중…";
 
       try{
@@ -145,6 +149,8 @@
       }catch(error){
         console.error("BiteBoss store login failed:", error);
         if(status) status.textContent = `로그인 실패 · ${error?.message || "알 수 없는 오류"}`;
+      }finally{
+        if(submit) submit.disabled = false;
       }
     });
   }

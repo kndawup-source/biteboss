@@ -3,26 +3,30 @@ import path from 'node:path';
 
 const root = process.cwd();
 const read = rel => fs.readFileSync(path.join(root, rel), 'utf8');
-const build = '75.20';
 const failures = [];
 
-const checks = [
-  ['index.html', new RegExp(`biteboss-build" content="${build.replace('.', '\\.')}`)],
-  ['index.html', new RegExp(`styles\\.css\\?v=${build.replace('.', '\\.')}`)],
-  ['index.html', new RegExp(`bootstrap\\.js\\?v=${build.replace('.', '\\.')}`)],
-  ['bootstrap.js', new RegExp(`app\\.js\\?v=${build.replace('.', '\\.')}`)],
-  ['service-worker.js', new RegExp(`biteboss-v${build.replace('.', '\\.')}`)],
-  ['app.js', new RegExp(`BITEBOSS_BUILD = "${build.replace('.', '\\.')}"`)]
-];
-
-for (const [file, pattern] of checks) {
-  if (!pattern.test(read(file))) failures.push(`${file}: build/version contract mismatch`);
-}
-
+const index = read('index.html');
 const app = read('app.js');
 const styles = read('styles.css');
-const publicText = `${app}\n${styles}\n${read('index.html')}`;
+const serviceWorker = read('service-worker.js');
+const packageJson = JSON.parse(read('package.json'));
 
+const build = index.match(/meta name="biteboss-build" content="([^"]+)"/)?.[1] || '';
+if (!build) failures.push('index.html: biteboss build meta is missing');
+
+if (build) {
+  const escaped = build.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const checks = [
+    ['index.html styles version', new RegExp(`styles\\.css\\?v=${escaped}`).test(index)],
+    ['index.html bootstrap version', new RegExp(`bootstrap\\.js\\?v=${escaped}`).test(index)],
+    ['app.js build constant', new RegExp(`BITEBOSS_BUILD = "${escaped}"`).test(app)],
+    ['service-worker.js build constant', new RegExp(`const BUILD = "${escaped}"`).test(serviceWorker)],
+    ['package.json version', packageJson.version === `0.${build}`]
+  ];
+  for (const [label, ok] of checks) if (!ok) failures.push(`${label}: build/version contract mismatch`);
+}
+
+const publicText = `${app}\n${styles}\n${index}`;
 if (/\b(TODO|FIXME|HACK|HOTFIX)\b/i.test(publicText)) {
   failures.push('release source still contains temporary-work markers');
 }
@@ -38,10 +42,16 @@ if (!/locallyOwnedStoreIds\.set\(storeId,Date\.now\(\)\)/.test(app)) {
 if (!/TAKEOVER_IDLE_STATES/.test(app) || !/RUNTIME = Object\.freeze/.test(app)) {
   failures.push('runtime constants were not consolidated');
 }
+if (!/resolveStoreDetailCoordinates\(/.test(app) || !/\.from\("biteboss_stores"\)[\s\S]*?\.select\("id,latitude,longitude"\)/.test(app)) {
+  failures.push('store detail coordinates do not have a canonical database fallback');
+}
+if (!/renderStoreDetailMapState\(/.test(app)) {
+  failures.push('store detail map failure state is missing');
+}
 
 if (failures.length) {
   console.error(`Release audit failed (${failures.length})`);
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
-console.log('BiteBoss v75.20 release audit passed.');
+console.log(`BiteBoss v${build} release audit passed.`);

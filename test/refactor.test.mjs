@@ -18,7 +18,13 @@ test('takeover runtime constants are centralized', () => {
   assert.match(app, /RUNTIME\.localOwnershipGraceMs/);
 });
 
-test('release CSS has one canonical avatar fallback block', () => {
-  const selector = '.store-avatar-fallback,.boss-avatar-fallback,.occupied-store-half-fallback,.occupied-boss-half-fallback';
-  assert.equal(css.split(selector).length - 1, 1);
+test('avatar fallback styling has one canonical user/store block', () => {
+  assert.equal(css.split('.store-avatar-fallback,.boss-avatar-fallback{').length - 1, 1);
+  assert.equal(css.split('.boss-avatar-fallback{font-size:17px').length - 1, 1);
+});
+
+test('store detail coordinate and map responsibilities are centralized', () => {
+  assert.equal((app.match(/async function resolveStoreDetailCoordinates\(/g) || []).length, 1);
+  assert.equal((app.match(/function renderStoreDetailMap\(/g) || []).length, 1);
+  assert.equal((app.match(/function renderStoreDetailMapState\(/g) || []).length, 1);
 });

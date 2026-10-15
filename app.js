@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.23";
+  const BITEBOSS_BUILD = "81.24";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -191,6 +191,7 @@
   const storeCommentState = new Map();
   let stores = [];
   const storeDetailFallbackMap = new Map();
+  const storeDetailCoordinateCache = new Map();
   let lastPosition = null;
   let nearbyWatchId = null;
   let nearbyRefreshBusy = false;
@@ -1433,6 +1434,7 @@
       if(!id) return;
       const previous = storeDetailFallbackMap.get(id) || {};
       storeDetailFallbackMap.set(id, { ...previous, ...store });
+      cacheStoreCoordinates(id, store);
     });
   }
 
@@ -1715,6 +1717,65 @@
     `;
   }
 
+  function normalizeStoreCoordinates(source = {}){
+    const latitude = source?.latitude == null || source.latitude === "" ? NaN : Number(source.latitude);
+    const longitude = source?.longitude == null || source.longitude === "" ? NaN : Number(source.longitude);
+    if(!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+    return { latitude, longitude };
+  }
+
+  function cacheStoreCoordinates(storeId, source = {}){
+    const id = String(storeId || source?.id || "").trim();
+    const coordinates = normalizeStoreCoordinates(source);
+    if(!id || !coordinates) return null;
+    storeDetailCoordinateCache.set(id, coordinates);
+    const previous = storeDetailFallbackMap.get(id) || {};
+    storeDetailFallbackMap.set(id, { ...previous, ...coordinates });
+    return coordinates;
+  }
+
+  async function resolveStoreDetailCoordinates(storeId, detailStore = {}, cachedStore = null){
+    const id = String(storeId || detailStore?.id || cachedStore?.id || "").trim();
+    const detailCoordinates = cacheStoreCoordinates(id, detailStore);
+    if(detailCoordinates) return detailCoordinates;
+
+    const memoryCoordinates = storeDetailCoordinateCache.get(id) || normalizeStoreCoordinates(cachedStore);
+    if(memoryCoordinates){
+      cacheStoreCoordinates(id, memoryCoordinates);
+      return memoryCoordinates;
+    }
+
+    try{
+      const { data, error } = await sb
+        .from("biteboss_stores")
+        .select("id,latitude,longitude")
+        .eq("id", id)
+        .maybeSingle();
+
+      if(error) throw error;
+      const directCoordinates = cacheStoreCoordinates(id, data || {});
+      if(directCoordinates) return directCoordinates;
+    }catch(error){
+      console.warn("BiteBoss store coordinates:", error);
+    }
+
+    // Occupied stores are also published through the territory map RPC. This is a
+    // second public-safe source when direct table reads are restricted by RLS.
+    try{
+      const { data, error } = await sb.rpc("biteboss_territory_map");
+      if(error) throw error;
+      const row = (Array.isArray(data) ? data : []).find(item =>
+        String(item?.store_id || item?.id || "").trim() === id
+      );
+      const territoryCoordinates = cacheStoreCoordinates(id, row || {});
+      if(territoryCoordinates) return territoryCoordinates;
+    }catch(error){
+      console.warn("BiteBoss territory coordinates:", error);
+    }
+
+    return null;
+  }
+
   async function openStoreDetail(storeId, options = {}){
     const id = String(storeId);
     const cached = storeDetailFallbackMap.get(id)
@@ -1772,23 +1833,14 @@
       if(growthResult?.error) console.warn("BiteBoss public growth:", growthResult.error);
       if(arenaResult?.error) console.warn("BiteBoss arena:", arenaResult.error);
 
-      if(cached){
-        if(!Number.isFinite(Number(data.store.distance_m)) && Number.isFinite(Number(cached.distance_m))){
-          data.store.distance_m = Number(cached.distance_m);
-        }
-        // biteboss_store_detail is intentionally public-safe and older deployments do not
-        // return GPS coordinates. Reuse the same canonical store coordinates already loaded
-        // by the store list so the detail mini-map can render without a DB migration.
-        const detailLat = data.store.latitude == null || data.store.latitude === "" ? NaN : Number(data.store.latitude);
-        const detailLng = data.store.longitude == null || data.store.longitude === "" ? NaN : Number(data.store.longitude);
-        const cachedLat = cached.latitude == null || cached.latitude === "" ? NaN : Number(cached.latitude);
-        const cachedLng = cached.longitude == null || cached.longitude === "" ? NaN : Number(cached.longitude);
-        if(!Number.isFinite(detailLat) && Number.isFinite(cachedLat)){
-          data.store.latitude = cachedLat;
-        }
-        if(!Number.isFinite(detailLng) && Number.isFinite(cachedLng)){
-          data.store.longitude = cachedLng;
-        }
+      if(cached && !Number.isFinite(Number(data.store.distance_m)) && Number.isFinite(Number(cached.distance_m))){
+        data.store.distance_m = Number(cached.distance_m);
+      }
+
+      const coordinates = await resolveStoreDetailCoordinates(storeId, data.store, cached);
+      if(coordinates){
+        data.store.latitude = coordinates.latitude;
+        data.store.longitude = coordinates.longitude;
       }
 
       activeStoreDetailId = String(storeId);
@@ -2311,14 +2363,13 @@
             </div>` : ""}
         </header>
 
-        ${ownerStatusHtml}
+        <section class="store-detail-map-section" aria-label="매장 위치">
+          <div id="storeDetailMap" class="store-detail-map" aria-label="${escapeAttr(store.name || "매장")} 지도">
+            <div class="store-detail-map-state" role="status">매장 위치를 불러오는 중…</div>
+          </div>
+        </section>
 
-        ${store.latitude != null && store.latitude !== "" && store.longitude != null && store.longitude !== "" &&
-          Number.isFinite(Number(store.latitude)) && Number.isFinite(Number(store.longitude)) ? `
-          <section class="store-detail-map-section" aria-label="매장 위치">
-            <div id="storeDetailMap" class="store-detail-map" aria-label="${escapeAttr(store.name || "매장")} 지도"></div>
-          </section>
-        ` : ""}
+        ${ownerStatusHtml}
 
         ${noticeHtml}
         ${featuredMenuHtml}
@@ -2720,54 +2771,96 @@
     return true;
   }
 
+  function renderStoreDetailMapState(message, { retry = false } = {}){
+    const mapEl = $("#storeDetailMap");
+    if(!mapEl) return;
+    mapEl.innerHTML = `
+      <div class="store-detail-map-state" role="status">
+        <span>${escapeHtml(message)}</span>
+        ${retry ? `<button class="store-detail-map-retry" type="button">다시 시도</button>` : ""}
+      </div>
+    `;
+    if(retry){
+      mapEl.querySelector(".store-detail-map-retry")?.addEventListener("click", async () => {
+        const storeId = String(activeStoreDetailId || "").trim();
+        if(!storeId) return;
+        await openStoreDetail(storeId, { preserveModal:true });
+      });
+    }
+  }
+
   function renderStoreDetailMap(store = {}){
     destroyStoreDetailMap();
 
     const mapEl = $("#storeDetailMap");
-    if(!mapEl || typeof L === "undefined") return;
+    if(!mapEl) return;
 
-    const lat = store.latitude == null || store.latitude === "" ? NaN : Number(store.latitude);
-    const lng = store.longitude == null || store.longitude === "" ? NaN : Number(store.longitude);
-    if(!Number.isFinite(lat) || !Number.isFinite(lng)) return;
-
-    storeDetailMap = L.map(mapEl, {
-      zoomControl:true,
-      attributionControl:true,
-      preferCanvas:true,
-      scrollWheelZoom:false
-    });
-
-    L.tileLayer(
-      "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-      {
-        maxZoom:19,
-        subdomains:"abc",
-        attribution:'&copy; OpenStreetMap contributors'
-      }
-    ).addTo(storeDetailMap);
-
-    storeDetailStorePoint = L.latLng(lat,lng);
-
-    L.circleMarker(storeDetailStorePoint, {
-      radius:8,
-      weight:3,
-      color:"#ffffff",
-      fillColor:"#111111",
-      fillOpacity:1
-    }).addTo(storeDetailMap).bindTooltip(String(store.name || "매장"), {
-      permanent:false,
-      direction:"top",
-      offset:[0,-7]
-    });
-
-    const hasUserLocation = updateStoreDetailUserLocation(lastPosition);
-    if(hasUserLocation){
-      fitStoreDetailMap();
-    }else{
-      storeDetailMap.setView(storeDetailStorePoint,17,{animate:false});
+    const coordinates = normalizeStoreCoordinates(store);
+    if(!coordinates){
+      renderStoreDetailMapState("매장 위치 정보가 없습니다.");
+      return;
     }
 
-    window.requestAnimationFrame(() => storeDetailMap?.invalidateSize());
+    if(typeof L === "undefined" || typeof L.map !== "function"){
+      renderStoreDetailMapState("지도를 불러오지 못했습니다.", { retry:true });
+      return;
+    }
+
+    const { latitude:lat, longitude:lng } = coordinates;
+
+    try{
+      mapEl.innerHTML = "";
+      storeDetailMap = L.map(mapEl, {
+        zoomControl:true,
+        attributionControl:true,
+        preferCanvas:true,
+        scrollWheelZoom:false
+      });
+
+      const tiles = L.tileLayer(
+        "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        {
+          maxZoom:19,
+          subdomains:"abc",
+          attribution:'&copy; OpenStreetMap contributors'
+        }
+      );
+
+      let tileErrorShown = false;
+      tiles.on("tileerror", () => {
+        if(tileErrorShown || !storeDetailMap) return;
+        tileErrorShown = true;
+        console.warn("BiteBoss store map tiles failed to load.");
+      });
+      tiles.addTo(storeDetailMap);
+
+      storeDetailStorePoint = L.latLng(lat,lng);
+
+      L.circleMarker(storeDetailStorePoint, {
+        radius:8,
+        weight:3,
+        color:"#ffffff",
+        fillColor:"#111111",
+        fillOpacity:1
+      }).addTo(storeDetailMap).bindTooltip(String(store.name || "매장"), {
+        permanent:false,
+        direction:"top",
+        offset:[0,-7]
+      });
+
+      const hasUserLocation = updateStoreDetailUserLocation(lastPosition);
+      if(hasUserLocation){
+        fitStoreDetailMap();
+      }else{
+        storeDetailMap.setView(storeDetailStorePoint,17,{animate:false});
+      }
+
+      window.requestAnimationFrame(() => storeDetailMap?.invalidateSize());
+    }catch(error){
+      console.warn("BiteBoss store map:", error);
+      destroyStoreDetailMap();
+      renderStoreDetailMapState("지도를 불러오지 못했습니다.", { retry:true });
+    }
   }
 
 

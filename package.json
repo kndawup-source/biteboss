@@ -1,6 +1,6 @@
 {
   "name": "biteboss",
-  "version": "0.75.22",
+  "version": "0.81.24",
   "private": true,
   "scripts": {
     "preflight": "node scripts/preflight.mjs",
