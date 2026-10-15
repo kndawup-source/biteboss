@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.6";
+  const BITEBOSS_BUILD = "81.7";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -2833,7 +2833,7 @@
             ${shares ? `<p class="store-owner-share">공유 ${shares.toLocaleString("ko-KR")}회</p>` : ""}
           ` : ""}
           <p>매장을 인증하면 방문·도전 현황과 매장 정보를 확인하고 혜택을 직접 관리할 수 있습니다.</p>
-          <button id="detailPartnerRequest" class="claim-store-btn" type="button">${status === "rejected" ? "다시 인증 요청" : "이 매장 관리하기"}</button>
+          <button id="detailPartnerRequest" class="primary-btn claim-store-btn" type="button">${status === "rejected" ? "다시 인증 요청" : "이 매장 관리하기"}</button>
         </div>
       </details>`;
   }
