@@ -213,3 +213,12 @@ test('deleted stores preserve battle history and do not expose dead store naviga
   assert.match(app, /activityStoreAttr = storeDeleted \? ""/);
   assert.match(app, /is-deleted-store/);
 });
+
+test('store manager CTA is independent from gameplay boss ownership and detail entry source', () => {
+  assert.match(app, /const showStoreManagerCard = true;/);
+  assert.doesNotMatch(app, /function shouldShowStoreManagerCard/);
+  assert.doesNotMatch(app, /showStoreManagerCard:false/);
+  assert.doesNotMatch(app, /showStoreManagerCard:!fromProfileBattleLog/);
+  assert.match(app, /playerSession\?\.authenticated\s*\? sb\.rpc\("biteboss_partner_request_status"/);
+  assert.match(app, /이 매장 관리하기/);
+});
