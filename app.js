@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "78.2";
+  const BITEBOSS_BUILD = "78.3";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -279,6 +279,10 @@
     syncViewportMetrics();
     bindUi();
     bindStaticUi();
+    const initialTab = String(location.hash || "").replace(/^#/, "");
+    if(["home","stores","rank","profile"].includes(initialTab) && initialTab !== "home"){
+      queueMicrotask(() => openTab(initialTab));
+    }
     setupNativeUrlListener();
     setupPushListeners();
     updateNetworkState();
@@ -364,8 +368,8 @@
   function bindStaticUi(){
     const privacy = $("#privacyLink");
     const support = $("#supportLink");
-    if(privacy) privacy.href = cfg.privacyUrl || "./privacy-policy.html";
-    if(support) support.href = cfg.supportUrl || "./support.html";
+    if(privacy) privacy.href = cfg.privacyUrl || "./privacy-policy.html?return=profile";
+    if(support) support.href = cfg.supportUrl || "./support.html?return=profile";
 
     window.addEventListener("online", updateNetworkState);
     window.addEventListener("offline", updateNetworkState);
@@ -589,6 +593,10 @@
     $$(".page").forEach(page => page.classList.remove("active"));
     $(`#page-${tab}`)?.classList.add("active");
     $$(".nav-btn").forEach(btn => btn.classList.toggle("active", btn.dataset.tab === tab));
+    if(["home","stores","rank","profile"].includes(tab)){
+      const route = tab === "home" ? `${location.pathname}${location.search}` : `#${tab}`;
+      history.replaceState(history.state, "", route);
+    }
 
     if(isHome){
       window.scrollTo(0, 0);
@@ -1258,7 +1266,9 @@
     const box = $("#storeList");
     if(!box) return;
 
-    storeViewRows = Array.isArray(list) ? list : [];
+    // Challenge is a target list. Stores already owned by the current player
+    // are excluded before the first paint so they cannot flash during async refresh.
+    storeViewRows = (Array.isArray(list) ? list : []).filter(store => !isMyBossStore(store));
     if(options.resetPage) storePage = 1;
     const view = pageSlice(storeViewRows, storePage, STORE_PAGE_SIZE);
     storePage = view.page;
@@ -7797,7 +7807,13 @@
 
     lockModalScroll();
     modal.classList.remove("hidden");
-    window.requestAnimationFrame(() => $("#modalClose")?.focus({preventScroll:true}));
+    const modalCard = modal.querySelector(".modal-card");
+    if(modalCard) modalCard.scrollTop = 0;
+    window.requestAnimationFrame(() => {
+      if(modalCard) modalCard.scrollTop = 0;
+      if(bodyEl) bodyEl.scrollTop = 0;
+      $("#modalClose")?.focus({preventScroll:true});
+    });
   }
 
   function closeModal(){

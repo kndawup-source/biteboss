@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#f1f1f3" />
   <title>BiteBoss · 고객지원</title>
-  <link rel="stylesheet" href="./styles.css?v=75.48" />
+  <link rel="stylesheet" href="./styles.css?v=78.3" />
 </head>
 <body class="user-app biteboss-info-page">
   <main class="legal-page-shell">
@@ -15,7 +15,7 @@
         <h1>고객지원</h1>
         <p>사용 중 문제가 있다면 아래 항목에서 먼저 확인해 주세요.</p>
       </div>
-      <a class="legal-home-button" href="./index.html" aria-label="BiteBoss로 돌아가기">닫기</a>
+      <a class="legal-home-button" href="./index.html#profile" data-return-profile aria-label="프로필로 돌아가기">닫기</a>
     </header>
 
     <section class="support-faq" aria-label="자주 묻는 질문">
@@ -46,9 +46,27 @@
     </section>
 
     <footer class="legal-page-footer">
-      <a class="legal-primary-link" href="./privacy-policy.html">개인정보 처리방침 <span>›</span></a>
-      <a class="legal-text-link" href="./index.html">BiteBoss로 돌아가기</a>
+      <a class="legal-primary-link" href="./privacy-policy.html?return=profile">개인정보 처리방침 <span>›</span></a>
+      <a class="legal-text-link" href="./index.html#profile" data-return-profile>프로필로 돌아가기</a>
     </footer>
   </main>
+<script>
+(() => {
+  const returnToProfile = event => {
+    event.preventDefault();
+    if(document.referrer){
+      try{
+        const ref = new URL(document.referrer);
+        if(ref.origin === location.origin){
+          history.back();
+          return;
+        }
+      }catch{}
+    }
+    location.href = "./index.html#profile";
+  };
+  document.querySelectorAll("[data-return-profile]").forEach(link => link.addEventListener("click", returnToProfile));
+})();
+</script>
 </body>
 </html>

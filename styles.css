@@ -138,7 +138,7 @@ body.user-app #page-home{position:fixed;inset:0;height:auto;min-height:0;padding
 .store-avatar-fallback,.boss-avatar-fallback{
   display:grid;place-items:center;background:#e0e0e2;color:#111;line-height:1;
 }
-.store-avatar-fallback{position:relative;font-size:14px;font-weight:700;letter-spacing:0}
+.store-avatar-fallback{position:relative;font-size:14px;font-weight:830;letter-spacing:0}
 .store-avatar-initial{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;width:100%;height:100%;margin:0;padding:0;line-height:1;text-align:center;letter-spacing:0}
 .boss-avatar-fallback{font-size:17px;font-weight:800}
 
@@ -373,7 +373,7 @@ body.biteboss-info-page{min-height:100dvh;background:var(--bg);color:#111}.info-
 
 .store-comment-form{margin-bottom:5px;padding-bottom:8px;border-bottom:1px solid var(--line,#e8e8eb)}
 .store-comment-input-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
-.store-comment-input{width:100%;min-width:0;height:40px;border:0;border-radius:14px;background:#f3f3f5;color:#111;padding:0 13px;outline:0;font:inherit;font-size:16px}.store-comment-input::placeholder{color:#94949a;font-size:13px;font-weight:500;opacity:1}
+.store-comment-input{width:100%;min-width:0;height:40px;border:0;border-radius:14px;background:#f3f3f5;color:#66666c;padding:0 13px;outline:0;font:inherit;font-size:12px;font-weight:400;line-height:1.4}.store-comment-input::placeholder{color:#94949a;font-size:12px;font-weight:400;opacity:1}
 .store-comment-input:focus{background:#ededf0}
 .store-comment-submit,.store-comment-login{min-height:40px;border:0;border-radius:14px;background:#111;color:#fff;padding:0 16px;font:inherit;font-size:12px;font-weight:850}
 .store-comment-login{width:100%;margin:0 0 7px}
@@ -405,4 +405,4 @@ body.biteboss-info-page{min-height:100dvh;background:var(--bg);color:#111}.info-
 .occupied-store-half{display:block;min-width:0;min-height:100%;overflow:hidden;border-radius:0!important}
 .occupied-store-half img{display:block;width:100%;height:100%;object-fit:cover;border-radius:0!important}
 .occupied-store-half-store{border-right:1px solid rgba(17,17,17,.12)}
-.occupied-store-initial{display:grid;width:100%;height:100%;place-items:center;border-radius:0;background:#e4e4e6;color:#111;font:800 18px/1 var(--font)}
+.occupied-store-initial{display:grid;width:100%;height:100%;place-items:center;border-radius:0;background:#e4e4e6;color:#111;font:830 18px/1 var(--font)}
