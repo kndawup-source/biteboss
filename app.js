@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "80.7";
+  const BITEBOSS_BUILD = "80.9";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -144,6 +144,8 @@
     home_secondary_cta:"내 주변 보스 찾기",
     partner_banner_store_ids:[],
     partner_banner_copy:{},
+    partner_banner_distance_km:{},
+    partner_banner_priority:{},
     crew_qr_invite_hours:72,
     crew_qr_max_uses:30,
     crew_max_members:30,
@@ -3697,16 +3699,74 @@
     const partnerBannerCopy = config.partner_banner_copy && typeof config.partner_banner_copy === "object"
       ? config.partner_banner_copy
       : {};
-    const partnerBannerStore = stores
+    const partnerBannerDistance = config.partner_banner_distance_km && typeof config.partner_banner_distance_km === "object"
+      ? config.partner_banner_distance_km
+      : {};
+    const partnerBannerPriority = config.partner_banner_priority && typeof config.partner_banner_priority === "object"
+      ? config.partner_banner_priority
+      : {};
+
+    let bannerCandidates = stores
       .filter(store => partnerBannerIds.includes(String(store.id)))
-      .filter(store => String(store.status || "active") === "active")
-      .sort((a,b) => localStoreDistance(a) - localStoreDistance(b))[0] || null;
+      .filter(store => String(store.status || "active") === "active");
+
+    // Banner campaigns are independent from the nearby-store cache.
+    // Fetch selected stores directly so an enabled banner cannot disappear just because
+    // that store has not yet entered the user's nearby list.
+    const missingBannerIds = partnerBannerIds.filter(id => !bannerCandidates.some(store => String(store.id) === id));
+    if(missingBannerIds.length){
+      try{
+        const { data: bannerStores, error: bannerStoreError } = await sb
+          .from("biteboss_stores")
+          .select("id,name,photo_url,status,latitude,longitude,partnership_status")
+          .in("id", missingBannerIds)
+          .eq("status", "active");
+        if(!bannerStoreError && Array.isArray(bannerStores)){
+          const seen = new Set(bannerCandidates.map(store => String(store.id)));
+          bannerStores.forEach(store => {
+            if(!seen.has(String(store.id))){
+              seen.add(String(store.id));
+              bannerCandidates.push(store);
+            }
+          });
+        }
+      }catch(error){
+        console.warn("BiteBoss store banner:", error);
+      }
+    }
+
+    const eligibleBannerStores = bannerCandidates.filter(store => {
+      const rawLimit = partnerBannerDistance[String(store.id)];
+      const limitKm = rawLimit === "all" ? Infinity : Math.max(0, Number(rawLimit ?? 5));
+      if(!Number.isFinite(limitKm)) return true;
+      const distanceM = localStoreDistance(store);
+      return Number.isFinite(distanceM) && distanceM <= limitKm * 1000;
+    });
+
+    // Higher priority wins. Stores tied at the same priority rotate every 30 minutes,
+    // while distance is still used to keep the rotation locally relevant.
+    const topPriority = eligibleBannerStores.reduce((max, store) => {
+      return Math.max(max, Number(partnerBannerPriority[String(store.id)] || 3));
+    }, -Infinity);
+    const topBannerStores = eligibleBannerStores
+      .filter(store => Number(partnerBannerPriority[String(store.id)] || 3) === topPriority)
+      .sort((left,right) => localStoreDistance(left) - localStoreDistance(right));
+    const rotationSlot = Math.floor(Date.now() / (30 * 60 * 1000));
+    const partnerBannerStore = topBannerStores.length
+      ? topBannerStores[rotationSlot % topBannerStores.length]
+      : null;
 
     // NEXT TARGET already lives in takeover-command.
     // This surface is reserved for exceptional game signals only, avoiding duplicate hierarchy.
     const items=[];
+    if(newcomer){
+      items.push(`<div class="game-pulse-item is-guide" role="note"><span class="guide-bulb" aria-hidden="true">💡</span><strong>첫 점령 가이드</strong><small>가까운 미점령 매장부터 시작해 보세요.</small></div>`);
+    }
     if(partnerBannerStore){
-      const partnerCopy = String(partnerBannerCopy[String(partnerBannerStore.id)] || "이 매장에서 BiteBoss 혜택을 확인해 보세요.").trim();
+      const defaultBannerCopy = String(partnerBannerStore.partnership_status || "") === "partnered"
+        ? "이 매장에서 BiteBoss 혜택을 확인해 보세요."
+        : "지금 이 매장을 확인해 보세요.";
+      const partnerCopy = String(partnerBannerCopy[String(partnerBannerStore.id)] || defaultBannerCopy).trim();
       const partnerImage = String(
         partnerBannerStore.photo_url
         || partnerBannerStore.cover_photo_url
@@ -3724,9 +3784,7 @@
     if(hot[0]){
       items.push(`<button class="game-pulse-item is-hot" type="button" data-pulse-store="${escapeAttr(hot[0].store_id)}" data-pulse-name="${escapeAttr(hot[0].store_name||"")}"><span class="hot-flame" aria-hidden="true">🔥</span><strong>${escapeHtml(hot[0].store_name||"인기 매장")}</strong><small>가장 치열한 점령지</small></button>`);
     }
-    if(newcomer && !items.length){
-      items.push(`<div class="game-pulse-item is-guide" role="note"><span class="guide-bulb" aria-hidden="true">💡</span><strong>첫 점령 가이드</strong><small>가까운 미점령 매장부터 시작해 보세요.</small></div>`);
-    }
+
 
     if(!items.length){
       box.innerHTML="";

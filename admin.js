@@ -234,6 +234,16 @@
     $("#adminMenuForm")?.addEventListener("submit", saveAdminMenu);
     $("#adminOfferForm")?.addEventListener("submit", saveAdminOffer);
     $("#adminPartnerPromotionForm")?.addEventListener("submit", saveAdminPartnerPromotion);
+    $("#adminPartnerBannerEnabled")?.addEventListener("change", () => {
+      if(!editingStoreBundle?.store) return;
+      const enabled = $("#adminPartnerBannerEnabled").value === "true";
+      const state = bannerOperationalState(editingStoreBundle.store, enabled);
+      const el = $("#adminPartnerBannerOperationalState");
+      if(el){
+        el.className = `admin-banner-operational wide ${state.className}`.trim();
+        el.textContent = state.label;
+      }
+    });
     $("#adminMenuCancel")?.addEventListener("click", resetAdminMenuForm);
     $("#adminOfferCancel")?.addEventListener("click", resetAdminOfferForm);
     $("#adminDeleteStoreBtn")?.addEventListener("click", deleteCurrentStore);
@@ -780,7 +790,7 @@
           <div class="admin-store-summary">
             <div class="admin-store-thumb-wrap">${store.photo_url ? `<img class="admin-store-thumb" src="${escapeAttr(store.photo_url)}" alt="" loading="lazy" decoding="async" />` : `<span class="admin-store-thumb admin-store-thumb-empty" aria-hidden="true"></span>`}</div>
             <div class="admin-store-copy">
-              <div class="admin-store-title-line"><strong>${escapeHtml(store.name)}</strong><span class="partner-badge ${partnershipClass(store.partnership_status)}">${escapeHtml(partnershipLabel(store.partnership_status))}</span><span class="admin-banner-state ${bannerEnabled ? "is-on" : ""}">배너 ${bannerEnabled ? "ON" : "OFF"}</span></div>
+              <div class="admin-store-title-line"><strong>${escapeHtml(store.name)}</strong><span class="partner-badge ${partnershipClass(store.partnership_status)}">${escapeHtml(partnershipLabel(store.partnership_status))}</span>${(() => { const state = bannerOperationalState(store, bannerEnabled); return `<span class="admin-banner-state ${state.className}">${escapeHtml(state.label)}</span>`; })()}</div>
               <p>${escapeHtml(location)} · ${escapeHtml(categoryLabel(store.category))}</p>
               <p class="admin-store-coords">${store.latitude ?? "-"}, ${store.longitude ?? "-"}</p>
             </div>
@@ -850,6 +860,7 @@
           if(error) throw error;
           await loadConfig();
           renderStores();
+          if(editingStoreId === id && editingStoreBundle?.store) renderAdminPartnerPromotion(editingStoreBundle.store);
         }catch(error){
           console.error(error);
           alert(error?.message || "배너 설정을 저장하지 못했습니다.");
@@ -1436,6 +1447,24 @@
       : {};
   }
 
+  function normalizedPartnerBannerDistance(){
+    return appConfig.partner_banner_distance_km && typeof appConfig.partner_banner_distance_km === "object"
+      ? { ...appConfig.partner_banner_distance_km }
+      : {};
+  }
+
+  function normalizedPartnerBannerPriority(){
+    return appConfig.partner_banner_priority && typeof appConfig.partner_banner_priority === "object"
+      ? { ...appConfig.partner_banner_priority }
+      : {};
+  }
+
+  function bannerOperationalState(store = {}, enabled = false){
+    if(!enabled) return { label:"배너 OFF", className:"" };
+    if(String(store.status || "active") !== "active") return { label:"배너 ON · 매장 비활성", className:"is-warning" };
+    return { label:"배너 ON · 노출 가능", className:"is-on" };
+  }
+
   function renderAdminPartnerPromotion(store = {}){
     const section = $("#adminPartnerPromotionSection");
     if(!section) return;
@@ -1443,8 +1472,24 @@
 
     const ids = normalizedPartnerBannerIds();
     const copy = normalizedPartnerBannerCopy();
-    $("#adminPartnerBannerEnabled").value = ids.includes(String(store.id)) ? "true" : "false";
-    $("#adminPartnerBannerCopy").value = String(copy[String(store.id)] || "");
+    const distance = normalizedPartnerBannerDistance();
+    const priority = normalizedPartnerBannerPriority();
+    const id = String(store.id);
+    const enabled = ids.includes(id);
+    $("#adminPartnerBannerEnabled").value = enabled ? "true" : "false";
+    $("#adminPartnerBannerDistance").value = String(distance[id] ?? 5);
+    $("#adminPartnerBannerPriority").value = String(priority[id] ?? 3);
+    const defaultCopy = String(store.partnership_status || "") === "partnered"
+      ? "이 매장에서 BiteBoss 혜택을 확인해 보세요."
+      : "지금 이 매장을 확인해 보세요.";
+    $("#adminPartnerBannerCopy").placeholder = defaultCopy;
+    $("#adminPartnerBannerCopy").value = String(copy[id] || "");
+    const operational = bannerOperationalState(store, enabled);
+    const operationalEl = $("#adminPartnerBannerOperationalState");
+    if(operationalEl){
+      operationalEl.className = `admin-banner-operational wide ${operational.className}`.trim();
+      operationalEl.textContent = operational.label;
+    }
     setStatusText($("#adminPartnerPromotionStatus"), "");
   }
 
@@ -1454,13 +1499,19 @@
     const store = editingStoreBundle.store;
     const enabled = $("#adminPartnerBannerEnabled")?.value === "true";
     const copyText = String($("#adminPartnerBannerCopy")?.value || "").trim();
+    const distanceValue = String($("#adminPartnerBannerDistance")?.value || "5");
+    const priorityValue = Math.min(5, Math.max(1, Number($("#adminPartnerBannerPriority")?.value || 3)));
     const id = String(editingStoreId);
     const ids = normalizedPartnerBannerIds().filter(item => item !== id);
     const copy = normalizedPartnerBannerCopy();
+    const distance = normalizedPartnerBannerDistance();
+    const priority = normalizedPartnerBannerPriority();
 
     if(enabled) ids.push(id);
     if(copyText) copy[id] = copyText;
     else delete copy[id];
+    distance[id] = distanceValue === "all" ? "all" : Number(distanceValue || 5);
+    priority[id] = priorityValue;
 
     const submit = event.currentTarget.querySelector('button[type="submit"]');
     if(submit) submit.disabled = true;
@@ -1470,7 +1521,9 @@
       const now = new Date().toISOString();
       const rows = [
         { key:"partner_banner_store_ids", value:[...new Set(ids)], updated_by:session.user.id, updated_at:now },
-        { key:"partner_banner_copy", value:copy, updated_by:session.user.id, updated_at:now }
+        { key:"partner_banner_copy", value:copy, updated_by:session.user.id, updated_at:now },
+        { key:"partner_banner_distance_km", value:distance, updated_by:session.user.id, updated_at:now },
+        { key:"partner_banner_priority", value:priority, updated_by:session.user.id, updated_at:now }
       ];
       const { error } = await adminSb.from("biteboss_app_config").upsert(rows, { onConflict:"key" });
       if(error) throw error;

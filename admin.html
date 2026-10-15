@@ -7,7 +7,7 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <title>BiteBoss Admin</title>
   <link rel="stylesheet" href="./styles.css?v=76.3" />
-  <link rel="stylesheet" href="./admin.css?v=80.7" />
+  <link rel="stylesheet" href="./admin.css?v=80.9" />
   <script src="./app-config.js?v=76.3"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -384,12 +384,19 @@
       </section>
 
       <section id="adminPartnerPromotionSection" class="admin-edit-section hidden">
-        <div class="section-head"><h3>매장 노출</h3><span>배너</span></div>
+        <div class="section-head"><h3>매장 노출</h3><span>도전 페이지 배너</span></div>
         <form id="adminPartnerPromotionForm" class="form-grid admin-form compact-admin-form">
           <label>매장 배너 노출<select id="adminPartnerBannerEnabled" class="input"><option value="false">OFF</option><option value="true">ON</option></select></label>
-          <label class="wide">한 줄 문구<input id="adminPartnerBannerCopy" class="input" maxlength="56" placeholder="이 매장에서 BiteBoss 혜택을 확인해 보세요." /></label>
-          <div class="admin-partner-promo-note wide">주변 매장 목록 위에서 ‘첫 점령 가이드’와 동일한 크기·위계로 노출됩니다. 여러 매장이 ON이면 사용자와 가까운 매장을 우선 표시합니다.</div>
-          <button class="secondary-btn wide" type="submit">제휴 노출 저장</button>
+          <label>노출 거리<select id="adminPartnerBannerDistance" class="input">
+            <option value="1">1km 이내</option><option value="3">3km 이내</option><option value="5">5km 이내</option><option value="10">10km 이내</option><option value="all">제한 없음</option>
+          </select></label>
+          <label>노출 우선순위<select id="adminPartnerBannerPriority" class="input">
+            <option value="5">1순위 · 최우선</option><option value="4">2순위</option><option value="3">3순위 · 기본</option><option value="2">4순위</option><option value="1">5순위</option>
+          </select></label>
+          <label class="wide">한 줄 문구<input id="adminPartnerBannerCopy" class="input" maxlength="56" placeholder="지금 이 매장을 확인해 보세요." /></label>
+          <div id="adminPartnerBannerOperationalState" class="admin-banner-operational wide" aria-live="polite"></div>
+          <div class="admin-partner-promo-note wide">도전 페이지 상단 배너 영역에 노출됩니다. 같은 우선순위의 매장이 여러 곳이면 30분 단위로 순환하며, 설정한 거리 밖의 사용자에게는 노출되지 않습니다.</div>
+          <button class="secondary-btn wide" type="submit">배너 설정 저장</button>
           <p id="adminPartnerPromotionStatus" class="asset-status wide" aria-live="polite"></p>
         </form>
       </section>
@@ -441,6 +448,6 @@
   </section>
 </div>
 
-<script src="./admin.js?v=80.7"></script>
+<script src="./admin.js?v=80.9"></script>
 </body>
 </html>
