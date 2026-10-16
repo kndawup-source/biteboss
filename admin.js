@@ -691,12 +691,9 @@
       const tone = activityTone(type);
       return `
         <article class="admin-activity-row">
-          <span class="admin-activity-dot ${escapeAttr(tone)}" aria-hidden="true"></span>
-          <div class="admin-activity-copy">
-            <strong>${escapeHtml(label)}</strong>
-            <span>${escapeHtml(store)}</span>
-          </div>
           <time>${escapeHtml(formatActivityTime(row.created_at))}</time>
+          <strong>${escapeHtml(label)}</strong>
+          <span>${escapeHtml(store)}</span>
         </article>
       `;
     }).join("") || `<div class="admin-activity-empty">아직 기록된 활동이 없습니다.</div>`;
@@ -2097,7 +2094,7 @@
     const {data,error}=await adminSb.rpc("biteboss_admin_ad_analytics_v8179",{p_days:days});
     if(error){
       console.warn("BiteBoss ad analytics:",error);
-      chart.innerHTML='<div class="analytics-empty">광고 성과 데이터를 불러오지 못했습니다. v81.81 SQL 적용 여부를 확인하세요.</div>';
+      chart.innerHTML='<div class="analytics-empty">광고 성과 데이터를 불러오지 못했습니다. v81.83 SQL 적용 여부를 확인하세요.</div>';
       return;
     }
     renderAdAnalytics(data || {});

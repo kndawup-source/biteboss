@@ -1,500 +1,454 @@
-<!doctype html>
+<!DOCTYPE html>
+
 <html lang="ko">
 <head>
-  <meta charset="utf-8" />
-  <meta name="robots" content="noindex,nofollow,noarchive" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  <title>BiteBoss Admin</title>
-  <link rel="stylesheet" href="./styles.css?v=76.3" />
-  <link rel="stylesheet" href="./admin.css?v=81.81" />
-  <script src="./app-config.js?v=76.3"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<meta charset="utf-8"/>
+<meta content="noindex,nofollow,noarchive" name="robots"/>
+<meta content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" name="viewport"/>
+<meta content="yes" name="mobile-web-app-capable"/>
+<title>BiteBoss Admin</title>
+<link href="./styles.css?v=76.3" rel="stylesheet"/>
+<link href="./admin.css?v=81.83" rel="stylesheet"/>
+<script src="./app-config.js?v=76.3"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="admin-app">
-<div id="adminAuthGate" class="auth-gate">
-  <form id="adminLoginForm" class="auth-panel">
-    <span>BITEBOSS / ADMIN</span><h1>슈퍼 어드민</h1>
-    <p>운영자 ID와 6자리 PIN으로 로그인하세요.</p>
-    <input class="input" name="admin_id" type="text" placeholder="Admin ID" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="40" required />
-    <input class="input" name="pin" type="password" placeholder="6-digit PIN" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="current-password" required />
-    <button class="primary-btn" type="submit">로그인</button>
-    <small id="adminLoginStatus"></small>
-  </form>
+<div class="auth-gate" id="adminAuthGate">
+<form class="auth-panel" id="adminLoginForm">
+<span>BITEBOSS / ADMIN</span><h1>슈퍼 어드민</h1>
+<p>운영자 ID와 6자리 PIN으로 로그인하세요.</p>
+<input autocapitalize="none" autocomplete="username" class="input" maxlength="40" name="admin_id" placeholder="Admin ID" required="" spellcheck="false" type="text"/>
+<input autocomplete="current-password" class="input" inputmode="numeric" maxlength="6" name="pin" pattern="[0-9]{6}" placeholder="6-digit PIN" required="" type="password"/>
+<button class="primary-btn" type="submit">로그인</button>
+<small id="adminLoginStatus"></small>
+</form>
 </div>
-
-<div id="adminApp" class="admin-layout hidden">
-  <aside class="admin-side">
-    <div class="admin-mobile-head">
-      <div class="admin-brand">
-        <span>운영 콘솔</span>
-        <strong>BiteBoss</strong>
-      </div>
-      <span id="adminRole" class="admin-role">ADMIN</span>
-    </div>
-
-    <nav class="admin-primary-nav" aria-label="관리자 주요 메뉴">
-      <button class="admin-primary-nav-btn active" data-admin-group="overview" data-admin-default="dashboard" type="button">
-        <span>현황</span>
-      </button>
-      <button class="admin-primary-nav-btn" data-admin-group="stores" data-admin-default="stores" type="button">
-        <span>매장</span>
-      </button>
-      <button class="admin-primary-nav-btn" data-admin-group="game" data-admin-default="gameops" type="button">
-        <span>게임</span>
-      </button>
-      <button class="admin-primary-nav-btn" data-admin-group="settings" data-admin-default="assets" type="button">
-        <span>설정</span>
-      </button>
-    </nav>
-
-    <nav class="admin-secondary-nav" aria-label="관리자 세부 메뉴">
-      <button class="admin-section-nav active" data-admin="dashboard" data-admin-group="overview" type="button">현황</button>
-
-      <button class="admin-section-nav hidden" data-admin="stores" data-admin-group="stores" type="button">매장 관리</button>
-      <button class="admin-section-nav hidden" data-admin="partner-requests" data-admin-group="stores" type="button">제휴 신청</button>
-      <button class="admin-section-nav hidden" data-admin="comments" data-admin-group="stores" type="button">한마디</button>
-      <button class="admin-section-nav hidden" data-admin="qr" data-admin-group="stores" type="button">QR</button>
-
-      <button class="admin-section-nav hidden" data-admin="gameops" data-admin-group="game" type="button">게임 운영</button>
-      <button class="admin-section-nav hidden" data-admin="rules" data-admin-group="game" type="button">게임 규칙</button>
-      <button class="admin-section-nav hidden" data-admin="users" data-admin-group="game" type="button">사용자</button>
-
-      <button class="admin-section-nav hidden" data-admin="assets" data-admin-group="settings" type="button">앱 설정</button>
-      <button class="admin-section-nav hidden" data-admin="ads" data-admin-group="settings" type="button">광고</button>
-      <button class="admin-section-nav hidden" data-admin="maintenance" data-admin-group="settings" type="button">유지보수</button>
-    </nav>
-
-    <div class="admin-side-actions">
-      <a class="admin-side-link" href="./index.html">사용자 앱</a>
-      <a class="admin-side-link" href="./store-admin.html">매장 어드민</a>
-      <button id="adminLogoutBtn" class="admin-side-link" type="button">로그아웃</button>
-    </div>
-  </aside>
-
-  <main class="admin-main">
-    <section class="admin-page active" id="admin-dashboard">
-      <div class="admin-page-head simple-head"><div><span class="eyebrow">현황</span><h2>오늘</h2><p>지금 확인해야 할 서비스 상태와 최근 변화를 먼저 보여줍니다.</p></div></div>
-
-      <section class="ops-summary">
-        <div><span>오늘 방문</span><strong id="statScans">0</strong></div>
-        <div><span>오늘 점령</span><strong id="statClaims">0</strong></div>
-        <div><span>활성 매장</span><strong id="statStores">0</strong></div>
-        <div><span>차단/이상</span><strong id="statSuspicious">0</strong></div>
-      </section>
-
-      <section class="admin-dashboard-section admin-performance-inline">
-        <div class="section-head"><h3>성과</h3><span>기간별 사용자 행동 · 제휴 효과</span></div>
-        <section class="analytics-toolbar admin-section-card" aria-label="성과 기간 설정">
-        <div class="analytics-presets" id="analyticsPresets">
-        <button type="button" data-analytics-range="today">오늘</button>
-        <button type="button" data-analytics-range="7d" class="active">7일</button>
-        <button type="button" data-analytics-range="30d">30일</button>
-        <button type="button" data-analytics-range="this_month">이번 달</button>
-        <button type="button" data-analytics-range="last_month">지난달</button>
-        <button type="button" data-analytics-range="this_year">올해</button>
-        <button type="button" data-analytics-range="last_year">작년</button>
-        <button type="button" data-analytics-range="custom">직접설정</button>
-        </div>
-        <div class="analytics-custom hidden" id="analyticsCustomRange">
-        <input id="analyticsFrom" class="input" type="date" aria-label="시작일" />
-        <span>—</span>
-        <input id="analyticsTo" class="input" type="date" aria-label="종료일" />
-        <button id="analyticsApplyCustom" class="secondary-btn" type="button">적용</button>
-        </div>
-        <div class="analytics-compare-row">
-        <strong id="analyticsPeriodLabel">최근 7일</strong>
-        <select id="analyticsCompareMode" class="input" aria-label="비교 기준"><option value="previous">이전 기간 대비</option><option value="year">전년 동기 대비</option></select>
-        </div>
-        </section>
-
-        <section class="analytics-kpis" aria-label="핵심 성과">
-        <article><span>활성 사용자</span><strong id="analyticsActiveUsers">0</strong><small id="analyticsActiveUsersDelta">—</small></article>
-        <article><span>인증 방문</span><strong id="analyticsVisits">0</strong><small id="analyticsVisitsDelta">—</small></article>
-        <article><span>도전</span><strong id="analyticsChallenges">0</strong><small id="analyticsChallengesDelta">—</small></article>
-        <article><span>점령</span><strong id="analyticsCaptures">0</strong><small id="analyticsCapturesDelta">—</small></article>
-        <article><span>재방문율</span><strong id="analyticsRepeatRate">0%</strong><small id="analyticsRepeatRateDelta">—</small></article>
-        </section>
-
-        <section class="analytics-grid">
-        <article class="analytics-panel analytics-panel-wide">
-        <div class="section-head"><h3>인증 방문 추이</h3><span id="analyticsTrendMeta">기간별</span></div>
-        <div id="analyticsVisitChart" class="analytics-vbar-chart" aria-label="인증 방문 추이 그래프"></div>
-        </article>
-        <article class="analytics-panel">
-        <div class="section-head"><h3>제휴 효과</h3><span>매장당 평균 · 같은 기간</span></div>
-        <div id="analyticsPartnerChart" class="analytics-partner-chart"></div>
-        <p class="analytics-note">현재 제휴 매장과 미제휴 매장의 동일 기간 평균입니다.</p>
-        </article>
-        <article class="analytics-panel">
-        <div class="section-head"><h3>제휴 우위</h3><span>미제휴 대비</span></div>
-        <div id="analyticsPartnerLift" class="analytics-lift"></div>
-        </article>
-        </section>
-      </section>
-
-      <section class="ops-recent admin-dashboard-section admin-section-card">
-        <div class="section-head"><h3>최근 활동</h3><span>서비스 이벤트</span></div>
-        <div id="adminLogs" class="admin-activity-list"></div>
-      </section>
-    </section>
-
-
-    <section class="admin-page" id="admin-stores">
-      <div class="admin-page-head"><div><span class="eyebrow">매장</span><h2>매장 관리</h2><p>새 매장을 등록하고, 등록된 매장의 정보·사진·메뉴·혜택을 수정합니다.</p></div></div>
-
-      <details class="admin-section-card admin-create-store admin-collapsible">
-        <summary class="admin-collapse-summary"><div><h3>새 매장 등록</h3><p>필요할 때만 열어 직접 등록합니다.</p></div><span>열기</span></summary>
-        <form id="storeForm" class="form-grid admin-form admin-form-embedded">
-          <label>매장명<input name="name" class="input" required /></label>
-          <label>브랜드명<input name="brand_name" class="input" /></label>
-          <label>카테고리<select name="category" class="input"><option value="restaurant">식당</option><option value="cafe">카페</option><option value="dessert">디저트</option><option value="bakery">베이커리</option><option value="fastfood">패스트푸드</option><option value="pub">펍</option></select></label>
-          <label>도시<input name="city" class="input" placeholder="서울" /></label>
-          <label>지역<input name="district" class="input" placeholder="성수동" /></label>
-          <label class="wide">주소<input name="address" class="input" /></label>
-          <label>위도<input name="latitude" class="input" type="number" step="any" placeholder="37.000000" required /></label>
-          <label>경도<input name="longitude" class="input" type="number" step="any" placeholder="127.000000" required /></label>
-          <div class="geo-tools wide">
-            <button id="useCurrentLocationBtn" class="secondary-btn" type="button">현재 위치 입력</button>
-            <span id="locationStatus" class="geo-status" aria-live="polite">GPS 또는 직접 입력</span>
-          </div>
-          <label>등록 유형<input class="input" value="비제휴 · GPS 자동점령" readonly /></label>
-          <label>대표 이미지 URL<input name="photo_url" class="input" placeholder="https://" /></label>
-          <div class="admin-form-actions wide"><button class="primary-btn" type="submit">매장 등록</button></div>
-          <p id="storeCreateStatus" class="asset-status wide" aria-live="polite"></p>
-        </form>
-      </details>
-
-      <section class="admin-section-card admin-store-requests">
-        <div class="admin-section-title admin-section-title-row">
-          <div><h3>매장 등록 요청</h3><p>사용자가 현장에서 요청한 매장을 확인한 뒤 승인하거나 반려합니다.</p></div>
-          <span id="adminStoreRequestCount" class="admin-count-chip">0</span>
-        </div>
-        <div id="adminStoreRequestList" class="partner-request-list"></div>
-        <nav id="adminStoreRequestPagination" class="list-pagination hidden" aria-label="매장 등록 요청 페이지"></nav>
-      </section>
-
-      <section class="admin-section-card admin-registered-stores">
-        <div class="admin-section-title admin-section-title-row">
-          <div><h3>등록된 매장</h3><p>매장을 선택하면 기본 정보부터 사진·메뉴·혜택까지 수정할 수 있습니다.</p></div>
-          <span id="adminStoreCount" class="admin-count-chip">0</span>
-        </div>
-        <div class="admin-store-toolbar">
-          <input id="adminStoreSearch" class="input" type="search" placeholder="매장명 · 지역 검색" autocomplete="off" />
-          <div id="adminStoreFilters" class="admin-store-filters" aria-label="매장 필터">
-            <button type="button" class="active" data-store-filter="all">전체</button>
-            <button type="button" data-store-filter="partner">제휴매장</button>
-            <button type="button" data-store-filter="banner">배너 노출</button>
-          </div>
-        </div>
-        <div id="adminStoreList" class="store-list admin-store-list"></div>
-        <nav id="adminStorePagination" class="list-pagination hidden" aria-label="매장 목록 페이지"></nav>
-      </section>
-    </section>
-
-    <section class="admin-page" id="admin-partner-requests">
-      <div class="admin-page-head"><div><span class="eyebrow">매장</span><h2>제휴 신청</h2><p>매장 관리자 인증 신청을 확인합니다.</p></div></div>
-      <div id="partnerRequestCounters" class="partner-request-counters"><div><span>대기</span><strong id="partnerCountPending">0</strong></div><div><span>승인</span><strong id="partnerCountApproved">0</strong></div><div><span>반려</span><strong id="partnerCountRejected">0</strong></div></div>
-      <div class="partner-request-toolbar">
-        <select id="partnerRequestFilter" class="input"><option value="pending">확인 대기</option><option value="approved">승인 완료</option><option value="rejected">거절</option><option value="all">전체</option></select>
-        <button id="refreshPartnerRequests" class="secondary-btn" type="button">새로고침</button>
-      </div>
-      <div id="partnerRequestList" class="partner-request-list"></div>
-      <nav id="partnerRequestPagination" class="list-pagination hidden" aria-label="제휴 신청 페이지"></nav>
-    </section>
-
-    <section class="admin-page" id="admin-comments">
-      <div class="admin-page-head"><div><span class="eyebrow">매장</span><h2>한마디 관리</h2><p>전체 매장의 신고·고정·숨김 상태를 관리합니다.</p></div></div>
-      <section class="admin-section-card admin-comments-card">
-        <div class="admin-compact-toolbar"><span id="adminCommentCount" class="admin-count-chip">0개</span><button id="refreshAdminComments" class="secondary-btn admin-small-btn" type="button">새로고침</button></div>
-        <div class="admin-comment-filters" id="adminCommentFilters" aria-label="한마디 상태 필터">
-          <button type="button" class="active" data-comment-filter="all">전체</button>
-          <button type="button" data-comment-filter="reported">신고 있음</button>
-          <button type="button" data-comment-filter="hidden">숨김</button>
-          <button type="button" data-comment-filter="pinned">고정</button>
-        </div>
-        <div id="adminCommentList" class="admin-comment-list"></div>
-        <nav id="adminCommentPagination" class="list-pagination hidden" aria-label="한마디 페이지"></nav>
-      </section>
-    </section>
-
-    <section class="admin-page" id="admin-qr">
-      <div class="admin-page-head"><div><span class="eyebrow">매장</span><h2>QR 관리</h2><p>제휴 매장의 방문 점령 QR을 관리합니다.</p></div></div>
-      <div id="qrList" class="store-list"></div>
-    </section>
-
-    <section class="admin-page" id="admin-rules">
-      <div class="admin-page-head"><div><span class="eyebrow">게임</span><h2>게임 규칙</h2><p>현재 규칙은 유지하고, 변경이 필요할 때만 편집합니다.</p></div></div>
-      <details class="admin-section-card admin-collapsible admin-rules-editor">
-        <summary class="admin-collapse-summary"><div><h3>규칙 편집</h3><p>점령 · GPS · 파워 · 크루 설정</p></div><span>열기</span></summary>
-      <form id="rulesForm" class="form-grid admin-form">
-        <label>보호시간(분)<input name="protect_minutes" class="input" type="number" min="1" required /></label>
-        <label>점령 간격(분)<input name="capture_cooldown_minutes" class="input" type="number" min="0" required /></label>
-        <label>재점령 쿨다운(분)<input name="reclaim_cooldown_minutes" class="input" type="number" min="0" required /></label>
-        <label>GPS 허용 반경(m)<input name="gps_radius_m" class="input" type="number" min="1" required /></label>
-        <label>최대 GPS 오차(m)<input name="max_location_accuracy_m" class="input" type="number" min="1" required /></label>
-        <label>GPS 체류시간(초)<input name="gps_dwell_seconds" class="input" type="number" min="30" required /></label>
-        <label>GPS 확인간격(초)<input name="gps_presence_ping_seconds" class="input" type="number" min="5" required /></label>
-        <label>하루 매장별 점령 제한<input name="daily_store_limit" class="input" type="number" min="1" required /></label>
-        <label>주변 매장 반경(m)<input name="nearby_radius_m" class="input" type="number" min="100" required /></label>
-        <label>주변 매장 표시 수<input name="nearby_limit" class="input" type="number" min="1" max="100" required /></label>
-        <label>랭킹<select name="feature_ranking" class="input"><option value="true">ON</option><option value="false">OFF</option></select></label>
-        <label>매장 혜택<select name="feature_offers" class="input"><option value="true">ON</option><option value="false">OFF</option></select></label>
-
-        <div class="admin-rule-divider wide">플레이어 · 매장 파워</div>
-        <label>레벨당 XP<input name="xp_per_level" class="input" type="number" min="1" required /></label>
-        <label>방문 XP<input name="xp_visit" class="input" type="number" min="0" required /></label>
-        <label>보스 승리 XP<input name="xp_boss_win" class="input" type="number" min="0" required /></label>
-        <label>크루 XP<input name="xp_crew" class="input" type="number" min="0" required /></label>
-        <label>방어 성공 XP<input name="xp_defense_success" class="input" type="number" min="0" required /></label>
-        <label>보너스 +1 방문수<input name="store_bonus_visits_per_point" class="input" type="number" min="1" required /></label>
-        <label>매장 보너스 최대<input name="store_bonus_max" class="input" type="number" min="0" required /></label>
-        <label>도전 쿨다운(분)<input name="challenge_cooldown_minutes" class="input" type="number" min="0" required /></label>
-
-        <div class="admin-rule-divider wide">방어력 감소</div>
-        <label>1차 감소 시작일<input name="defense_decay_day_1" class="input" type="number" min="1" required /></label>
-        <label>1차 감소값<input name="defense_decay_value_1" class="input" type="number" min="0" required /></label>
-        <label>2차 감소 시작일<input name="defense_decay_day_2" class="input" type="number" min="1" required /></label>
-        <label>2차 감소값<input name="defense_decay_value_2" class="input" type="number" min="0" required /></label>
-        <label>3차 감소 시작일<input name="defense_decay_day_3" class="input" type="number" min="1" required /></label>
-        <label>3차 감소값<input name="defense_decay_value_3" class="input" type="number" min="0" required /></label>
-        <label>4차 감소 시작일<input name="defense_decay_day_4" class="input" type="number" min="1" required /></label>
-        <label>4차 감소값<input name="defense_decay_value_4" class="input" type="number" min="0" required /></label>
-
-        <div class="admin-rule-divider wide">크루 운영</div>
-        <label>일반 탈퇴 XP 차감(%)<input name="organization_leave_xp_percent" class="input" type="number" min="0" max="100" required /></label>
-        <label>일반 탈퇴 쿨다운(일)<input name="organization_leave_cooldown_days" class="input" type="number" min="0" required /></label>
-        <label>조직장 탈퇴 XP 차감(%)<input name="organization_leader_leave_xp_percent" class="input" type="number" min="0" max="100" required /></label>
-        <label>조직장 탈퇴 쿨다운(일)<input name="organization_leader_leave_cooldown_days" class="input" type="number" min="0" required /></label>
-        <label>초대 유효기간(일)<input name="organization_invite_days" class="input" type="number" min="1" required /></label>
-
-        <button class="primary-btn wide" type="submit">규칙 저장</button>
-      </form>
-      </details>
-    </section>
-
-    
-    <section class="admin-page" id="admin-users"><div class="admin-page-head"><div><span class="eyebrow">게임</span><h2>사용자</h2><p>회원 검색과 계정 상태를 확인합니다.</p></div></div><section class="admin-section-card"><div class="admin-list-toolbar"><input id="userSearch" class="input" type="search" placeholder="닉네임 검색" autocomplete="off" /></div><div id="userList" class="store-list admin-list-gap"></div><nav id="userPagination" class="list-pagination hidden" aria-label="사용자 페이지"></nav></section></section>
-
-    <section class="admin-page" id="admin-gameops">
-      <div class="admin-page-head"><div><span class="eyebrow">게임</span><h2>게임 운영</h2><p>점령과 크루의 현재 상태를 한 화면에서 확인하고 운영합니다.</p></div></div>
-
-      <div id="gameOpsSummary" class="gameops-summary"></div>
-
-      <section class="admin-section-card gameops-section">
-        <div class="admin-section-title admin-section-title-row">
-          <div><h3>점령 매장</h3><p>현재 보스와 보호 상태를 확인합니다. 강제 해제는 보스 지위만 제거합니다.</p></div>
-          <span id="gameOpsStoreCount" class="admin-count-chip">0</span>
-        </div>
-        <div id="gameOpsStores" class="gameops-list"></div>
-        <nav id="gameOpsStorePagination" class="list-pagination hidden" aria-label="점령 매장 페이지"></nav>
-      </section>
-
-      <section class="admin-section-card gameops-section">
-        <div class="admin-section-title admin-section-title-row">
-          <div><h3>크루 현황</h3><p>크루별 멤버와 현재 점령지를 확인합니다.</p></div>
-          <span id="gameOpsOrganizationCount" class="admin-count-chip">0</span>
-        </div>
-        <div id="gameOpsOrganizations" class="gameops-list"></div>
-        <nav id="gameOpsOrganizationPagination" class="list-pagination hidden" aria-label="크루 현황 페이지"></nav>
-      </section>
-    </section>
-
-    <section class="admin-page" id="admin-assets">
-      <div class="admin-page-head"><div><span class="eyebrow">설정</span><h2>앱 설정</h2><p>사용자 앱의 메인 이미지와 첫 화면 문구를 관리합니다.</p></div></div>
-      <div class="panel">
-        <h3>메인 히어로 이미지</h3><p class="admin-helper">사용자 홈 전체에 표시되는 교체형 이미지입니다. 세로 9:16 이미지를 권장합니다.</p>
-        <div class="asset-preview"><div id="splashPreview" class="splash-preview"><span>SPLASH</span></div></div>
-        <form id="splashForm" class="form-grid">
-          <input id="splashFile" class="input wide" type="file" accept="image/png,image/jpeg,image/webp" required />
-          <button class="primary-btn wide" type="submit">메인 이미지 저장</button>
-        </form>
-        <p id="splashStatus" class="asset-status"></p>
-
-        <div class="admin-asset-divider"></div>
-        <h3>기본 프로필 이미지</h3>
-        <p class="admin-helper">개인 프로필 사진을 등록하지 않은 사용자에게 즉시 표시되는 공통 이미지입니다. 정사각형 이미지를 권장합니다.</p>
-        <div class="asset-preview"><div id="defaultProfilePreview" class="default-profile-preview"><span>PROFILE</span></div></div>
-        <form id="defaultProfileForm" class="form-grid">
-          <input id="defaultProfileFile" class="input wide" type="file" accept="image/png,image/jpeg,image/webp" required />
-          <button class="primary-btn wide" type="submit">기본 프로필 이미지 저장</button>
-        </form>
-        <p id="defaultProfileStatus" class="asset-status"></p>
-
-        <div class="admin-asset-divider"></div>
-        <form id="homeCopyForm" class="form-grid admin-home-copy-form">
-          <label>훅 문구 노출<select id="homeHookEnabled" class="input"><option value="true">ON</option><option value="false">OFF</option></select></label>
-          <label class="wide">첫 화면 훅 문구<input id="homeHookText" class="input" maxlength="48" placeholder="찍고, 점령하고, 보스가 돼." /></label>
-          <label>1차 버튼<input id="homePrimaryCta" class="input" maxlength="24" placeholder="QR 스캔하기" /></label>
-          <label>2차 버튼<input id="homeSecondaryCta" class="input" maxlength="24" placeholder="내 주변 보스 찾기" /></label>
-          <button class="primary-btn wide" type="submit">첫 화면 문구 저장</button>
-        </form>
-        <div id="homeCopyPreview" class="admin-home-copy-preview" aria-live="polite"></div>
-        <p id="homeCopyStatus" class="asset-status"></p>
-      </div>
-    </section>
-
-
-    <section class="admin-page" id="admin-ads">
-      <div class="admin-page-head"><div><span class="eyebrow">설정</span><h2>광고</h2><p>광고가 실제 매장 관심과 방문·점령으로 이어지는지 확인하고 캠페인을 관리합니다.</p></div></div>
-
-      <section class="admin-ad-performance">
-        <div class="admin-section-title admin-section-title-row">
-          <div><h3>광고 성과</h3><p>선택한 기간의 전체 캠페인 성과입니다.</p></div>
-          <select id="adAnalyticsDays" class="input admin-ad-period" aria-label="광고 성과 기간">
-            <option value="7">7일</option><option value="30" selected>30일</option><option value="90">90일</option>
-          </select>
-        </div>
-        <div class="admin-ad-kpis">
-          <article><span>노출</span><strong id="adKpiImpressions">0</strong><small>광고가 표시된 횟수</small></article>
-          <article><span>클릭</span><strong id="adKpiClicks">0</strong><small>광고 반응</small></article>
-          <article><span>CTR</span><strong id="adKpiCtr">0%</strong><small>노출 대비 클릭</small></article>
-          <article><span>매장 방문</span><strong id="adKpiVisits">0</strong><small>광고 이후 인증 방문</small></article>
-          <article><span>점령 전환</span><strong id="adKpiCaptures">0</strong><small>광고 이후 점령</small></article>
-        </div>
-        <div class="admin-ad-chart-panel">
-          <div class="section-head"><h3>일별 성과</h3><span>노출 · 클릭 · 방문 · 점령</span></div>
-          <div id="adAnalyticsChart" class="admin-ad-chart"><div class="analytics-loading">불러오는 중…</div></div>
-        </div>
-        <div class="admin-ad-funnel" id="adAnalyticsFunnel" aria-label="광고 전환 퍼널"></div>
-      </section>
-
-      <section class="admin-ad-campaigns-section">
-        <div class="admin-section-title"><div><h3>캠페인</h3><p>캠페인별 성과를 비교하고 수정합니다.</p></div></div>
-        <div id="adCampaignList" class="admin-ad-list"></div>
-      </section>
-
-      <details id="adCampaignEditor" class="admin-ad-editor-section admin-collapsible">
-        <summary class="admin-collapse-summary"><div><h3>캠페인 등록·수정</h3><p>새 캠페인을 만들거나 기존 캠페인을 수정합니다.</p></div><span>열기</span></summary>
-        <form id="adCampaignForm" class="form-grid admin-form admin-ad-form">
-          <input id="adCampaignId" type="hidden" />
-          <label>광고주명<input id="adAdvertiserName" class="input" maxlength="120" required /></label>
-          <label>캠페인명<input id="adCampaignName" class="input" maxlength="160" required /></label>
-          <label class="wide">대상 매장<select id="adTargetStore" class="input"><option value="">브랜드/일반 광고 · 매장 지정 안 함</option></select><small class="field-help">매장을 지정하면 광고 이후 해당 매장의 방문·점령 전환을 집계합니다.</small></label>
-          <label class="wide">배너 이미지<input id="adImageFile" class="input" type="file" accept="image/png,image/jpeg,image/webp" /></label>
-          <label class="wide">클릭 URL<input id="adClickUrl" class="input" type="url" placeholder="https://" /></label>
-          <label>시작일시<input id="adStartsAt" class="input" type="datetime-local" required /></label>
-          <label>종료일시<input id="adEndsAt" class="input" type="datetime-local" /></label>
-          <label>상태<select id="adIsActive" class="input"><option value="true">활성</option><option value="false">비활성</option></select></label>
-          <label>우선순위<input id="adSortOrder" class="input" type="number" value="0" step="1" /><small class="field-help">숫자가 높을수록 우선 노출됩니다.</small></label>
-          <label>노출 위치<select id="adPlacement" class="input"><option value="both">홈 + 점령 대기</option><option value="home">홈만</option><option value="takeover">점령 대기만</option></select></label>
-          <label>타게팅<select id="adTargetType" class="input"><option value="all">전체</option><option value="region">지역</option></select></label>
-          <label id="adTargetRegionField" class="wide hidden">지역<input id="adTargetRegion" class="input" maxlength="40" placeholder="예: 서울 강남구" /></label>
-          <div class="admin-form-actions wide"><button class="primary-btn" type="submit">캠페인 저장</button><button id="adCampaignCancel" class="text-btn hidden" type="button">수정 취소</button></div>
-          <p id="adCampaignStatus" class="asset-status wide" aria-live="polite"></p>
-        </form>
-        <div class="admin-ad-guide"><span>권장 비율 3:1 · 1200×400</span><span>같은 우선순위는 랜덤 노출됩니다.</span></div>
-      </details>
-    </section>
-
-    <section class="admin-page" id="admin-maintenance">
-      <div class="admin-page-head"><div><span class="eyebrow">설정</span><h2>유지보수</h2><p>초기화처럼 위험도가 높은 작업만 모아둡니다.</p></div></div>
-      <section class="admin-danger-zone">
-        <div class="admin-maintenance-row"><div><strong>점령 기록 초기화</strong><p>Boss 점령과 보호 상태만 삭제합니다.</p></div><button class="secondary-btn danger-outline" data-reset-mode="claims" type="button">점령 초기화</button></div>
-        <div class="admin-maintenance-row"><div><strong>방문 기록 초기화</strong><p>방문/체크인 기록만 삭제합니다.</p></div><button class="secondary-btn danger-outline" data-reset-mode="checkins" type="button">방문 초기화</button></div>
-        <div class="admin-maintenance-row"><div><strong>게임 기록 전체 초기화</strong><p>점령, 방문, GPS 체류 세션과 게임 로그를 초기화합니다. 매장과 회원은 유지됩니다.</p></div><button class="secondary-btn danger-outline" data-reset-mode="game" type="button">게임 초기화</button></div>
-        <div class="admin-maintenance-row admin-maintenance-critical"><div><strong>BiteBoss 운영 데이터 초기화</strong><p>매장, 회원, 점령, 방문, 메뉴, 사진 메타데이터, 혜택을 삭제합니다. 최고관리자 계정과 설정은 유지됩니다.</p></div><button class="secondary-btn danger-outline" data-reset-mode="factory" type="button">전체 초기화</button></div>
-        <p id="maintenanceStatus" class="asset-status" aria-live="polite"></p>
-      </section>
-    </section>
-  </main>
+<div class="admin-layout hidden" id="adminApp">
+<aside class="admin-side">
+<div class="admin-mobile-head">
+<div class="admin-brand">
+<span>운영 콘솔</span>
+<strong>BiteBoss</strong>
 </div>
-
-<div id="adminStoreEditor" class="admin-editor hidden" aria-hidden="true">
-  <div class="admin-editor-backdrop" data-close-store-editor></div>
-  <section class="admin-editor-panel" role="dialog" aria-modal="true" aria-labelledby="adminStoreEditorTitle">
-    <header class="admin-editor-head">
-      <div><span>매장 수정</span><h2 id="adminStoreEditorTitle">매장</h2><p id="adminStoreEditorMeta"></p></div>
-      <button class="x-btn admin-editor-close" data-close-store-editor type="button" aria-label="닫기">&times;</button>
-    </header>
-
-    <div id="adminStoreEditorLoading" class="admin-editor-loading">불러오는 중…</div>
-    <div id="adminStoreEditorBody" class="hidden">
-      <section class="admin-edit-section">
-        <div class="section-head"><h3>기본 정보</h3></div>
-        <form id="adminStoreEditForm" class="form-grid admin-form compact-admin-form">
-          <label>매장명<input name="name" class="input" required /></label>
-          <label>브랜드명<input name="brand_name" class="input" /></label>
-          <label>카테고리<select name="category" class="input"><option value="restaurant">식당</option><option value="cafe">카페</option><option value="dessert">디저트</option><option value="bakery">베이커리</option><option value="fastfood">패스트푸드</option><option value="pub">펍</option></select></label>
-          <label>상태<select name="status" class="input"><option value="active">활성</option><option value="inactive">비활성</option></select></label>
-          <label>도시<input name="city" class="input" /></label>
-          <label>지역<input name="district" class="input" /></label>
-          <label class="wide">주소<input name="address" class="input" /></label>
-          <label>위도<input name="latitude" class="input" type="number" step="any" required /></label>
-          <label>경도<input name="longitude" class="input" type="number" step="any" required /></label>
-          <label>영업시간<input name="hours" class="input" placeholder="11:00 - 22:00" /></label>
-          <label>전화번호<input name="phone" class="input" /></label>
-          <label class="wide">공지<textarea name="notice" class="input"></textarea></label>
-          <button class="primary-btn wide" type="submit">매장 정보 저장</button>
-          <p id="adminStoreEditStatus" class="asset-status wide" aria-live="polite"></p>
-        </form>
-      </section>
-
-      <section id="adminPartnerPromotionSection" class="admin-edit-section hidden">
-        <div class="section-head"><h3>매장 노출</h3><span>도전 페이지 배너</span></div>
-        <form id="adminPartnerPromotionForm" class="form-grid admin-form compact-admin-form">
-          <label>매장 배너 노출<select id="adminPartnerBannerEnabled" class="input"><option value="false">OFF</option><option value="true">ON</option></select></label>
-          <label>노출 거리<select id="adminPartnerBannerDistance" class="input">
-            <option value="1">1km 이내</option><option value="3">3km 이내</option><option value="5">5km 이내</option><option value="10">10km 이내</option><option value="all">제한 없음</option>
-          </select></label>
-          <label>노출 우선순위<select id="adminPartnerBannerPriority" class="input">
-            <option value="5">1순위 · 최우선</option><option value="4">2순위</option><option value="3">3순위 · 기본</option><option value="2">4순위</option><option value="1">5순위</option>
-          </select></label>
-          <label class="wide">배너 문구<input id="adminPartnerBannerCopy" class="input" maxlength="56" placeholder="지금 이 매장을 확인해 보세요." /><small class="field-help">비워두면 매장 유형에 맞는 기본 문구가 사용됩니다.</small></label>
-          <div id="adminPartnerBannerOperationalState" class="admin-banner-operational wide" aria-live="polite"></div>
-          <div class="admin-partner-promo-note wide">도전 페이지 상단 배너 영역에 노출됩니다. 같은 우선순위의 매장이 여러 곳이면 30분 단위로 순환하며, 설정한 거리 밖의 사용자에게는 노출되지 않습니다.</div>
-          <button class="secondary-btn wide" type="submit">배너 설정 저장</button>
-          <p id="adminPartnerPromotionStatus" class="asset-status wide" aria-live="polite"></p>
-        </form>
-      </section>
-
-      <section class="admin-edit-section">
-        <div class="section-head"><h3>사진</h3></div>
-        <form id="adminPhotoForm" class="admin-inline-form">
-          <input id="adminPhotoFile" type="file" accept="image/png,image/jpeg,image/webp" />
-          <input id="adminPhotoUrl" class="input" type="url" placeholder="또는 이미지 URL" />
-          <label class="admin-check"><input id="adminPhotoCover" type="checkbox" /> 대표 사진</label>
-          <button class="secondary-btn" type="submit">사진 추가</button>
-        </form>
-        <p id="adminPhotoStatus" class="asset-status" aria-live="polite"></p>
-        <div id="adminPhotoList" class="admin-media-list"></div>
-      </section>
-
-      <section class="admin-edit-section">
-        <div class="section-head"><h3>메뉴</h3></div>
-        <form id="adminMenuForm" class="form-grid admin-form compact-admin-form">
-          <input id="adminMenuId" type="hidden" />
-          <label>메뉴명<input id="adminMenuName" class="input" required /></label>
-          <label>가격<input id="adminMenuPrice" class="input" type="number" min="0" inputmode="numeric" /></label>
-          <label class="wide">설명<input id="adminMenuDescription" class="input" /></label>
-          <label>대표 메뉴<select id="adminMenuSignature" class="input"><option value="false">일반 메뉴</option><option value="true">대표 메뉴</option></select></label>
-          <div class="admin-form-actions wide"><button class="secondary-btn" type="submit">메뉴 저장</button><button id="adminMenuCancel" class="text-btn hidden" type="button">수정 취소</button></div>
-        </form>
-        <div id="adminMenuList" class="admin-data-list"></div>
-      </section>
-
-
-      <section class="admin-edit-section">
-        <div class="section-head"><h3>제휴 혜택</h3><span>리워드</span></div>
-        <form id="adminOfferForm" class="form-grid admin-form compact-admin-form">
-          <input id="adminOfferId" type="hidden" />
-          <label>혜택명<input id="adminOfferTitle" class="input" required /></label>
-          <label>상태<select id="adminOfferStatus" class="input"><option value="active">진행중</option><option value="draft">준비중</option><option value="ended">종료</option></select></label>
-          <label class="wide">설명<input id="adminOfferDescription" class="input" /></label>
-          <label>혜택 대상<select id="adminOfferMinimumRole" class="input"><option value="visitor">전체 방문자</option><option value="crew">크루원 + 보스</option><option value="boss">보스만</option></select></label>
-          <div class="admin-form-actions wide"><button class="secondary-btn" type="submit">혜택 저장</button><button id="adminOfferCancel" class="text-btn hidden" type="button">수정 취소</button></div>
-        </form>
-        <div id="adminOfferList" class="admin-data-list"></div>
-      </section>
-
-      <section class="admin-edit-section admin-editor-danger">
-        <div class="section-head"><h3>위험 영역</h3></div>
-        <button id="adminDeleteStoreBtn" class="secondary-btn danger-outline" type="button">이 매장 삭제</button>
-      </section>
-    </div>
-  </section>
+<span class="admin-role" id="adminRole">ADMIN</span>
 </div>
+<nav aria-label="관리자 주요 메뉴" class="admin-primary-nav">
+<button class="admin-primary-nav-btn active" data-admin-default="dashboard" data-admin-group="overview" type="button">
+<span>현황</span>
+</button>
+<button class="admin-primary-nav-btn" data-admin-default="stores" data-admin-group="stores" type="button">
+<span>매장</span>
+</button>
+<button class="admin-primary-nav-btn" data-admin-default="gameops" data-admin-group="game" type="button">
+<span>게임</span>
+</button>
+<button class="admin-primary-nav-btn" data-admin-default="assets" data-admin-group="settings" type="button">
+<span>설정</span>
+</button>
+</nav>
+<nav aria-label="관리자 세부 메뉴" class="admin-secondary-nav">
+<button class="admin-section-nav active" data-admin="dashboard" data-admin-group="overview" type="button">현황</button>
+<button class="admin-section-nav hidden" data-admin="stores" data-admin-group="stores" type="button">매장 관리</button>
+<button class="admin-section-nav hidden" data-admin="partner-requests" data-admin-group="stores" type="button">제휴 신청</button>
+<button class="admin-section-nav hidden" data-admin="comments" data-admin-group="stores" type="button">한마디</button>
+<button class="admin-section-nav hidden" data-admin="qr" data-admin-group="stores" type="button">QR</button>
+<button class="admin-section-nav hidden" data-admin="gameops" data-admin-group="game" type="button">게임 운영</button>
+<button class="admin-section-nav hidden" data-admin="rules" data-admin-group="game" type="button">게임 규칙</button>
+<button class="admin-section-nav hidden" data-admin="users" data-admin-group="game" type="button">사용자</button>
+<button class="admin-section-nav hidden" data-admin="assets" data-admin-group="settings" type="button">앱 설정</button>
+<button class="admin-section-nav hidden" data-admin="ads" data-admin-group="settings" type="button">광고</button>
+<button class="admin-section-nav hidden" data-admin="maintenance" data-admin-group="settings" type="button">유지보수</button>
+</nav>
+<div class="admin-side-actions">
+<a class="admin-side-link" href="./index.html">사용자 앱</a>
+<a class="admin-side-link" href="./store-admin.html">매장 어드민</a>
+<button class="admin-side-link" id="adminLogoutBtn" type="button">로그아웃</button>
+</div>
+</aside>
+<main class="admin-main">
+<section class="admin-page active" id="admin-dashboard">
+<div class="admin-page-head"><div><span class="eyebrow">현황</span><h2>오늘</h2><p>지금 확인해야 할 서비스 상태와 최근 변화를 먼저 보여줍니다.</p></div></div><div class="admin-page-body"><section class="admin-section-card admin-page-section admin-summary-section"><section class="ops-summary">
+<div><span>오늘 방문</span><strong id="statScans">0</strong></div>
+<div><span>오늘 점령</span><strong id="statClaims">0</strong></div>
+<div><span>활성 매장</span><strong id="statStores">0</strong></div>
+<div><span>차단/이상</span><strong id="statSuspicious">0</strong></div>
+</section></section>
 
-<script src="./admin.js?v=81.81"></script>
+<section class="admin-section-card admin-dashboard-section admin-performance-inline">
+<div class="section-head"><h3>성과</h3><span>기간별 사용자 행동 · 제휴 효과</span></div>
+<section aria-label="성과 기간 설정" class="analytics-toolbar admin-section-card">
+<div class="analytics-presets" id="analyticsPresets">
+<button data-analytics-range="today" type="button">오늘</button>
+<button class="active" data-analytics-range="7d" type="button">7일</button>
+<button data-analytics-range="30d" type="button">30일</button>
+<button data-analytics-range="this_month" type="button">이번 달</button>
+<button data-analytics-range="last_month" type="button">지난달</button>
+<button data-analytics-range="this_year" type="button">올해</button>
+<button data-analytics-range="last_year" type="button">작년</button>
+<button data-analytics-range="custom" type="button">직접설정</button>
+</div>
+<div class="analytics-custom hidden" id="analyticsCustomRange">
+<input aria-label="시작일" class="input" id="analyticsFrom" type="date"/>
+<span>—</span>
+<input aria-label="종료일" class="input" id="analyticsTo" type="date"/>
+<button class="secondary-btn" id="analyticsApplyCustom" type="button">적용</button>
+</div>
+<div class="analytics-compare-row">
+<strong id="analyticsPeriodLabel">최근 7일</strong>
+<select aria-label="비교 기준" class="input" id="analyticsCompareMode"><option value="previous">이전 기간 대비</option><option value="year">전년 동기 대비</option></select>
+</div>
+</section>
+<section aria-label="핵심 성과" class="analytics-kpis">
+<article><span>활성 사용자</span><strong id="analyticsActiveUsers">0</strong><small id="analyticsActiveUsersDelta">—</small></article>
+<article><span>인증 방문</span><strong id="analyticsVisits">0</strong><small id="analyticsVisitsDelta">—</small></article>
+<article><span>도전</span><strong id="analyticsChallenges">0</strong><small id="analyticsChallengesDelta">—</small></article>
+<article><span>점령</span><strong id="analyticsCaptures">0</strong><small id="analyticsCapturesDelta">—</small></article>
+<article><span>재방문율</span><strong id="analyticsRepeatRate">0%</strong><small id="analyticsRepeatRateDelta">—</small></article>
+</section>
+<section class="analytics-grid">
+<article class="analytics-panel analytics-panel-wide">
+<div class="section-head"><h3>인증 방문 추이</h3><span id="analyticsTrendMeta">기간별</span></div>
+<div aria-label="인증 방문 추이 그래프" class="analytics-vbar-chart" id="analyticsVisitChart"></div>
+</article>
+<article class="analytics-panel">
+<div class="section-head"><h3>제휴 효과</h3><span>매장당 평균 · 같은 기간</span></div>
+<div class="analytics-partner-chart" id="analyticsPartnerChart"></div>
+<p class="analytics-note">현재 제휴 매장과 미제휴 매장의 동일 기간 평균입니다.</p>
+</article>
+<article class="analytics-panel">
+<div class="section-head"><h3>제휴 우위</h3><span>미제휴 대비</span></div>
+<div class="analytics-lift" id="analyticsPartnerLift"></div>
+</article>
+</section>
+</section>
+<section class="ops-recent admin-dashboard-section admin-section-card">
+<div class="section-head"><h3>최근 활동</h3><span>서비스 이벤트</span></div>
+<div class="admin-activity-list" id="adminLogs"></div>
+</section>
+</div></section>
+<section class="admin-page" id="admin-stores">
+<div class="admin-page-head"><div><span class="eyebrow">매장</span><h2>매장 관리</h2><p>새 매장을 등록하고, 등록된 매장의 정보·사진·메뉴·혜택을 수정합니다.</p></div></div><div class="admin-page-body">
+<details class="admin-section-card admin-create-store admin-collapsible">
+<summary class="admin-collapse-summary"><div><h3>새 매장 등록</h3><p>필요할 때만 열어 직접 등록합니다.</p></div><span>열기</span></summary>
+<form class="form-grid admin-form admin-form-embedded" id="storeForm">
+<label>매장명<input class="input" name="name" required=""/></label>
+<label>브랜드명<input class="input" name="brand_name"/></label>
+<label>카테고리<select class="input" name="category"><option value="restaurant">식당</option><option value="cafe">카페</option><option value="dessert">디저트</option><option value="bakery">베이커리</option><option value="fastfood">패스트푸드</option><option value="pub">펍</option></select></label>
+<label>도시<input class="input" name="city" placeholder="서울"/></label>
+<label>지역<input class="input" name="district" placeholder="성수동"/></label>
+<label class="wide">주소<input class="input" name="address"/></label>
+<label>위도<input class="input" name="latitude" placeholder="37.000000" required="" step="any" type="number"/></label>
+<label>경도<input class="input" name="longitude" placeholder="127.000000" required="" step="any" type="number"/></label>
+<div class="geo-tools wide">
+<button class="secondary-btn" id="useCurrentLocationBtn" type="button">현재 위치 입력</button>
+<span aria-live="polite" class="geo-status" id="locationStatus">GPS 또는 직접 입력</span>
+</div>
+<label>등록 유형<input class="input" readonly="" value="비제휴 · GPS 자동점령"/></label>
+<label>대표 이미지 URL<input class="input" name="photo_url" placeholder="https://"/></label>
+<div class="admin-form-actions wide"><button class="primary-btn" type="submit">매장 등록</button></div>
+<p aria-live="polite" class="asset-status wide" id="storeCreateStatus"></p>
+</form>
+</details>
+<section class="admin-section-card admin-store-requests">
+<div class="admin-section-title admin-section-title-row">
+<div><h3>매장 등록 요청</h3><p>사용자가 현장에서 요청한 매장을 확인한 뒤 승인하거나 반려합니다.</p></div>
+<span class="admin-count-chip" id="adminStoreRequestCount">0</span>
+</div>
+<div class="partner-request-list" id="adminStoreRequestList"></div>
+<nav aria-label="매장 등록 요청 페이지" class="list-pagination hidden" id="adminStoreRequestPagination"></nav>
+</section>
+<section class="admin-section-card admin-registered-stores">
+<div class="admin-section-title admin-section-title-row">
+<div><h3>등록된 매장</h3><p>매장을 선택하면 기본 정보부터 사진·메뉴·혜택까지 수정할 수 있습니다.</p></div>
+<span class="admin-count-chip" id="adminStoreCount">0</span>
+</div>
+<div class="admin-store-toolbar">
+<input autocomplete="off" class="input" id="adminStoreSearch" placeholder="매장명 · 지역 검색" type="search"/>
+<div aria-label="매장 필터" class="admin-store-filters" id="adminStoreFilters">
+<button class="active" data-store-filter="all" type="button">전체</button>
+<button data-store-filter="partner" type="button">제휴매장</button>
+<button data-store-filter="banner" type="button">배너 노출</button>
+</div>
+</div>
+<div class="store-list admin-store-list" id="adminStoreList"></div>
+<nav aria-label="매장 목록 페이지" class="list-pagination hidden" id="adminStorePagination"></nav>
+</section>
+</div></section>
+<section class="admin-page" id="admin-partner-requests">
+<div class="admin-page-head"><div><span class="eyebrow">매장</span><h2>제휴 신청</h2><p>매장 관리자 인증 신청을 확인합니다.</p></div></div><div class="admin-page-body">
+<section class="admin-section-card admin-page-section">
+<div class="partner-request-counters" id="partnerRequestCounters"><div><span>대기</span><strong id="partnerCountPending">0</strong></div><div><span>승인</span><strong id="partnerCountApproved">0</strong></div><div><span>반려</span><strong id="partnerCountRejected">0</strong></div></div>
+<div class="partner-request-toolbar">
+<select class="input" id="partnerRequestFilter"><option value="pending">확인 대기</option><option value="approved">승인 완료</option><option value="rejected">거절</option><option value="all">전체</option></select>
+<button class="secondary-btn" id="refreshPartnerRequests" type="button">새로고침</button>
+</div>
+<div class="partner-request-list" id="partnerRequestList"></div>
+<nav aria-label="제휴 신청 페이지" class="list-pagination hidden" id="partnerRequestPagination"></nav>
+</section>
+</div></section>
+<section class="admin-page" id="admin-comments">
+<div class="admin-page-head"><div><span class="eyebrow">매장</span><h2>한마디 관리</h2><p>전체 매장의 신고·고정·숨김 상태를 관리합니다.</p></div></div><div class="admin-page-body">
+<section class="admin-section-card admin-comments-card">
+<div class="admin-compact-toolbar"><span class="admin-count-chip" id="adminCommentCount">0개</span><button class="secondary-btn admin-small-btn" id="refreshAdminComments" type="button">새로고침</button></div>
+<div aria-label="한마디 상태 필터" class="admin-comment-filters" id="adminCommentFilters">
+<button class="active" data-comment-filter="all" type="button">전체</button>
+<button data-comment-filter="reported" type="button">신고 있음</button>
+<button data-comment-filter="hidden" type="button">숨김</button>
+<button data-comment-filter="pinned" type="button">고정</button>
+</div>
+<div class="admin-comment-list" id="adminCommentList"></div>
+<nav aria-label="한마디 페이지" class="list-pagination hidden" id="adminCommentPagination"></nav>
+</section>
+</div></section>
+<section class="admin-page" id="admin-qr">
+<div class="admin-page-head"><div><span class="eyebrow">매장</span><h2>QR 관리</h2><p>제휴 매장의 방문 점령 QR을 관리합니다.</p></div></div><div class="admin-page-body">
+<section class="admin-section-card admin-page-section"><div class="admin-section-title"><div><h3>제휴 매장</h3><p>방문 점령 QR을 확인하고 관리합니다.</p></div></div>
+<div class="store-list" id="qrList"></div>
+</section>
+</div></section>
+<section class="admin-page" id="admin-rules">
+<div class="admin-page-head"><div><span class="eyebrow">게임</span><h2>게임 규칙</h2><p>현재 규칙은 유지하고, 변경이 필요할 때만 편집합니다.</p></div></div><div class="admin-page-body">
+<details class="admin-section-card admin-collapsible admin-rules-editor">
+<summary class="admin-collapse-summary"><div><h3>규칙 편집</h3><p>점령 · GPS · 파워 · 크루 설정</p></div><span>열기</span></summary>
+<form class="form-grid admin-form" id="rulesForm">
+<label>보호시간(분)<input class="input" min="1" name="protect_minutes" required="" type="number"/></label>
+<label>점령 간격(분)<input class="input" min="0" name="capture_cooldown_minutes" required="" type="number"/></label>
+<label>재점령 쿨다운(분)<input class="input" min="0" name="reclaim_cooldown_minutes" required="" type="number"/></label>
+<label>GPS 허용 반경(m)<input class="input" min="1" name="gps_radius_m" required="" type="number"/></label>
+<label>최대 GPS 오차(m)<input class="input" min="1" name="max_location_accuracy_m" required="" type="number"/></label>
+<label>GPS 체류시간(초)<input class="input" min="30" name="gps_dwell_seconds" required="" type="number"/></label>
+<label>GPS 확인간격(초)<input class="input" min="5" name="gps_presence_ping_seconds" required="" type="number"/></label>
+<label>하루 매장별 점령 제한<input class="input" min="1" name="daily_store_limit" required="" type="number"/></label>
+<label>주변 매장 반경(m)<input class="input" min="100" name="nearby_radius_m" required="" type="number"/></label>
+<label>주변 매장 표시 수<input class="input" max="100" min="1" name="nearby_limit" required="" type="number"/></label>
+<label>랭킹<select class="input" name="feature_ranking"><option value="true">ON</option><option value="false">OFF</option></select></label>
+<label>매장 혜택<select class="input" name="feature_offers"><option value="true">ON</option><option value="false">OFF</option></select></label>
+<div class="admin-rule-divider wide">플레이어 · 매장 파워</div>
+<label>레벨당 XP<input class="input" min="1" name="xp_per_level" required="" type="number"/></label>
+<label>방문 XP<input class="input" min="0" name="xp_visit" required="" type="number"/></label>
+<label>보스 승리 XP<input class="input" min="0" name="xp_boss_win" required="" type="number"/></label>
+<label>크루 XP<input class="input" min="0" name="xp_crew" required="" type="number"/></label>
+<label>방어 성공 XP<input class="input" min="0" name="xp_defense_success" required="" type="number"/></label>
+<label>보너스 +1 방문수<input class="input" min="1" name="store_bonus_visits_per_point" required="" type="number"/></label>
+<label>매장 보너스 최대<input class="input" min="0" name="store_bonus_max" required="" type="number"/></label>
+<label>도전 쿨다운(분)<input class="input" min="0" name="challenge_cooldown_minutes" required="" type="number"/></label>
+<div class="admin-rule-divider wide">방어력 감소</div>
+<label>1차 감소 시작일<input class="input" min="1" name="defense_decay_day_1" required="" type="number"/></label>
+<label>1차 감소값<input class="input" min="0" name="defense_decay_value_1" required="" type="number"/></label>
+<label>2차 감소 시작일<input class="input" min="1" name="defense_decay_day_2" required="" type="number"/></label>
+<label>2차 감소값<input class="input" min="0" name="defense_decay_value_2" required="" type="number"/></label>
+<label>3차 감소 시작일<input class="input" min="1" name="defense_decay_day_3" required="" type="number"/></label>
+<label>3차 감소값<input class="input" min="0" name="defense_decay_value_3" required="" type="number"/></label>
+<label>4차 감소 시작일<input class="input" min="1" name="defense_decay_day_4" required="" type="number"/></label>
+<label>4차 감소값<input class="input" min="0" name="defense_decay_value_4" required="" type="number"/></label>
+<div class="admin-rule-divider wide">크루 운영</div>
+<label>일반 탈퇴 XP 차감(%)<input class="input" max="100" min="0" name="organization_leave_xp_percent" required="" type="number"/></label>
+<label>일반 탈퇴 쿨다운(일)<input class="input" min="0" name="organization_leave_cooldown_days" required="" type="number"/></label>
+<label>조직장 탈퇴 XP 차감(%)<input class="input" max="100" min="0" name="organization_leader_leave_xp_percent" required="" type="number"/></label>
+<label>조직장 탈퇴 쿨다운(일)<input class="input" min="0" name="organization_leader_leave_cooldown_days" required="" type="number"/></label>
+<label>초대 유효기간(일)<input class="input" min="1" name="organization_invite_days" required="" type="number"/></label>
+<button class="primary-btn wide" type="submit">규칙 저장</button>
+</form>
+</details>
+</div></section>
+<section class="admin-page" id="admin-users"><div class="admin-page-head"><div><span class="eyebrow">게임</span><h2>사용자</h2><p>회원 검색과 계정 상태를 확인합니다.</p></div></div><div class="admin-page-body"><section class="admin-section-card"><div class="admin-section-title"><div><h3>회원 목록</h3><p>닉네임으로 회원을 찾고 계정 상태를 확인합니다.</p></div></div><div class="admin-list-toolbar"><input autocomplete="off" class="input" id="userSearch" placeholder="닉네임 검색" type="search"/></div><div class="store-list admin-list-gap" id="userList"></div><nav aria-label="사용자 페이지" class="list-pagination hidden" id="userPagination"></nav></section></div></section>
+<section class="admin-page" id="admin-gameops">
+<div class="admin-page-head"><div><span class="eyebrow">게임</span><h2>게임 운영</h2><p>점령과 크루의 현재 상태를 한 화면에서 확인하고 운영합니다.</p></div></div><div class="admin-page-body"><section class="admin-section-card admin-page-section"><div class="gameops-summary" id="gameOpsSummary"></div></section>
+
+<section class="admin-section-card gameops-section">
+<div class="admin-section-title admin-section-title-row">
+<div><h3>점령 매장</h3><p>현재 보스와 보호 상태를 확인합니다. 강제 해제는 보스 지위만 제거합니다.</p></div>
+<span class="admin-count-chip" id="gameOpsStoreCount">0</span>
+</div>
+<div class="gameops-list" id="gameOpsStores"></div>
+<nav aria-label="점령 매장 페이지" class="list-pagination hidden" id="gameOpsStorePagination"></nav>
+</section>
+<section class="admin-section-card gameops-section">
+<div class="admin-section-title admin-section-title-row">
+<div><h3>크루 현황</h3><p>크루별 멤버와 현재 점령지를 확인합니다.</p></div>
+<span class="admin-count-chip" id="gameOpsOrganizationCount">0</span>
+</div>
+<div class="gameops-list" id="gameOpsOrganizations"></div>
+<nav aria-label="크루 현황 페이지" class="list-pagination hidden" id="gameOpsOrganizationPagination"></nav>
+</section>
+</div></section>
+<section class="admin-page" id="admin-assets">
+<div class="admin-page-head"><div><span class="eyebrow">설정</span><h2>앱 설정</h2><p>사용자 앱의 메인 이미지와 첫 화면 문구를 관리합니다.</p></div></div><div class="admin-page-body">
+<section class="admin-section-card admin-page-section admin-assets-section">
+<div class="admin-setting-block"><div class="admin-setting-head"><h3>메인 히어로 이미지</h3><p class="admin-helper">사용자 홈 전체에 표시되는 교체형 이미지입니다. 세로 9:16 이미지를 권장합니다.</p></div>
+<div class="asset-preview"><div class="splash-preview" id="splashPreview"><span>SPLASH</span></div></div>
+<form class="form-grid" id="splashForm">
+<input accept="image/png,image/jpeg,image/webp" class="input wide" id="splashFile" required="" type="file"/>
+<button class="primary-btn wide" type="submit">메인 이미지 저장</button>
+</form>
+<p class="asset-status" id="splashStatus"></p></div>
+<div class="admin-setting-block"><div class="admin-setting-head"><h3>기본 프로필 이미지</h3>
+<p class="admin-helper">개인 프로필 사진을 등록하지 않은 사용자에게 즉시 표시되는 공통 이미지입니다. 정사각형 이미지를 권장합니다.</p></div>
+<div class="asset-preview"><div class="default-profile-preview" id="defaultProfilePreview"><span>PROFILE</span></div></div>
+<form class="form-grid" id="defaultProfileForm">
+<input accept="image/png,image/jpeg,image/webp" class="input wide" id="defaultProfileFile" required="" type="file"/>
+<button class="primary-btn wide" type="submit">기본 프로필 이미지 저장</button>
+</form>
+<p class="asset-status" id="defaultProfileStatus"></p></div>
+<div class="admin-setting-block"><div class="admin-setting-head"><h3>첫 화면 문구</h3><p class="admin-helper">홈의 훅 문구와 주요 버튼 문구를 관리합니다.</p></div>
+<form class="form-grid admin-home-copy-form" id="homeCopyForm">
+<label>훅 문구 노출<select class="input" id="homeHookEnabled"><option value="true">ON</option><option value="false">OFF</option></select></label>
+<label class="wide">첫 화면 훅 문구<input class="input" id="homeHookText" maxlength="48" placeholder="찍고, 점령하고, 보스가 돼."/></label>
+<label>1차 버튼<input class="input" id="homePrimaryCta" maxlength="24" placeholder="QR 스캔하기"/></label>
+<label>2차 버튼<input class="input" id="homeSecondaryCta" maxlength="24" placeholder="내 주변 보스 찾기"/></label>
+<button class="primary-btn wide" type="submit">첫 화면 문구 저장</button>
+</form>
+<div aria-live="polite" class="admin-home-copy-preview" id="homeCopyPreview"></div>
+<p class="asset-status" id="homeCopyStatus"></p></div>
+</section>
+</div></section>
+<section class="admin-page" id="admin-ads">
+<div class="admin-page-head"><div><span class="eyebrow">설정</span><h2>광고</h2><p>광고가 실제 매장 관심과 방문·점령으로 이어지는지 확인하고 캠페인을 관리합니다.</p></div></div><div class="admin-page-body">
+<section class="admin-section-card admin-ad-performance">
+<div class="admin-section-title admin-section-title-row">
+<div><h3>광고 성과</h3><p>선택한 기간의 전체 캠페인 성과입니다.</p></div>
+<select aria-label="광고 성과 기간" class="input admin-ad-period" id="adAnalyticsDays">
+<option value="7">7일</option><option selected="" value="30">30일</option><option value="90">90일</option>
+</select>
+</div>
+<div class="admin-ad-kpis">
+<article><span>노출</span><strong id="adKpiImpressions">0</strong><small>광고가 표시된 횟수</small></article>
+<article><span>클릭</span><strong id="adKpiClicks">0</strong><small>광고 반응</small></article>
+<article><span>CTR</span><strong id="adKpiCtr">0%</strong><small>노출 대비 클릭</small></article>
+<article><span>매장 방문</span><strong id="adKpiVisits">0</strong><small>광고 이후 인증 방문</small></article>
+<article><span>점령 전환</span><strong id="adKpiCaptures">0</strong><small>광고 이후 점령</small></article>
+</div>
+<div class="admin-ad-chart-panel">
+<div class="section-head"><h3>일별 성과</h3><span>노출 · 클릭 · 방문 · 점령</span></div>
+<div class="admin-ad-chart" id="adAnalyticsChart"><div class="analytics-loading">불러오는 중…</div></div>
+</div>
+<div aria-label="광고 전환 퍼널" class="admin-ad-funnel" id="adAnalyticsFunnel"></div>
+</section>
+<section class="admin-section-card admin-ad-campaigns-section">
+<div class="admin-section-title"><div><h3>캠페인</h3><p>캠페인별 성과를 비교하고 수정합니다.</p></div></div>
+<div class="admin-ad-list" id="adCampaignList"></div>
+</section>
+<details class="admin-section-card admin-ad-editor-section admin-collapsible" id="adCampaignEditor">
+<summary class="admin-collapse-summary"><div><h3>캠페인 등록·수정</h3><p>새 캠페인을 만들거나 기존 캠페인을 수정합니다.</p></div><span>열기</span></summary>
+<form class="form-grid admin-form admin-ad-form" id="adCampaignForm">
+<input id="adCampaignId" type="hidden"/>
+<label>광고주명<input class="input" id="adAdvertiserName" maxlength="120" required=""/></label>
+<label>캠페인명<input class="input" id="adCampaignName" maxlength="160" required=""/></label>
+<label class="wide">대상 매장<select class="input" id="adTargetStore"><option value="">브랜드/일반 광고 · 매장 지정 안 함</option></select><small class="field-help">매장을 지정하면 광고 이후 해당 매장의 방문·점령 전환을 집계합니다.</small></label>
+<label class="wide">배너 이미지<input accept="image/png,image/jpeg,image/webp" class="input" id="adImageFile" type="file"/></label>
+<label class="wide">클릭 URL<input class="input" id="adClickUrl" placeholder="https://" type="url"/></label>
+<label>시작일시<input class="input" id="adStartsAt" required="" type="datetime-local"/></label>
+<label>종료일시<input class="input" id="adEndsAt" type="datetime-local"/></label>
+<label>상태<select class="input" id="adIsActive"><option value="true">활성</option><option value="false">비활성</option></select></label>
+<label>우선순위<input class="input" id="adSortOrder" step="1" type="number" value="0"/><small class="field-help">숫자가 높을수록 우선 노출됩니다.</small></label>
+<label>노출 위치<select class="input" id="adPlacement"><option value="both">홈 + 점령 대기</option><option value="home">홈만</option><option value="takeover">점령 대기만</option></select></label>
+<label>타게팅<select class="input" id="adTargetType"><option value="all">전체</option><option value="region">지역</option></select></label>
+<label class="wide hidden" id="adTargetRegionField">지역<input class="input" id="adTargetRegion" maxlength="40" placeholder="예: 서울 강남구"/></label>
+<div class="admin-form-actions wide"><button class="primary-btn" type="submit">캠페인 저장</button><button class="text-btn hidden" id="adCampaignCancel" type="button">수정 취소</button></div>
+<p aria-live="polite" class="asset-status wide" id="adCampaignStatus"></p>
+</form>
+<div class="admin-ad-guide"><span>권장 비율 3:1 · 1200×400</span><span>같은 우선순위는 랜덤 노출됩니다.</span></div>
+</details>
+</div></section>
+<section class="admin-page" id="admin-maintenance">
+<div class="admin-page-head"><div><span class="eyebrow">설정</span><h2>유지보수</h2><p>초기화처럼 위험도가 높은 작업만 모아둡니다.</p></div></div><div class="admin-page-body">
+<section class="admin-section-card admin-danger-zone">
+<div class="admin-maintenance-row"><div><strong>점령 기록 초기화</strong><p>Boss 점령과 보호 상태만 삭제합니다.</p></div><button class="secondary-btn danger-outline" data-reset-mode="claims" type="button">점령 초기화</button></div>
+<div class="admin-maintenance-row"><div><strong>방문 기록 초기화</strong><p>방문/체크인 기록만 삭제합니다.</p></div><button class="secondary-btn danger-outline" data-reset-mode="checkins" type="button">방문 초기화</button></div>
+<div class="admin-maintenance-row"><div><strong>게임 기록 전체 초기화</strong><p>점령, 방문, GPS 체류 세션과 게임 로그를 초기화합니다. 매장과 회원은 유지됩니다.</p></div><button class="secondary-btn danger-outline" data-reset-mode="game" type="button">게임 초기화</button></div>
+<div class="admin-maintenance-row admin-maintenance-critical"><div><strong>BiteBoss 운영 데이터 초기화</strong><p>매장, 회원, 점령, 방문, 메뉴, 사진 메타데이터, 혜택을 삭제합니다. 최고관리자 계정과 설정은 유지됩니다.</p></div><button class="secondary-btn danger-outline" data-reset-mode="factory" type="button">전체 초기화</button></div>
+<p aria-live="polite" class="asset-status" id="maintenanceStatus"></p>
+</section>
+</div></section>
+</main>
+</div>
+<div aria-hidden="true" class="admin-editor hidden" id="adminStoreEditor">
+<div class="admin-editor-backdrop" data-close-store-editor=""></div>
+<section aria-labelledby="adminStoreEditorTitle" aria-modal="true" class="admin-editor-panel" role="dialog">
+<header class="admin-editor-head">
+<div><span>매장 수정</span><h2 id="adminStoreEditorTitle">매장</h2><p id="adminStoreEditorMeta"></p></div>
+<button aria-label="닫기" class="x-btn admin-editor-close" data-close-store-editor="" type="button">×</button>
+</header>
+<div class="admin-editor-loading" id="adminStoreEditorLoading">불러오는 중…</div>
+<div class="hidden" id="adminStoreEditorBody">
+<section class="admin-edit-section">
+<div class="section-head"><h3>기본 정보</h3></div>
+<form class="form-grid admin-form compact-admin-form" id="adminStoreEditForm">
+<label>매장명<input class="input" name="name" required=""/></label>
+<label>브랜드명<input class="input" name="brand_name"/></label>
+<label>카테고리<select class="input" name="category"><option value="restaurant">식당</option><option value="cafe">카페</option><option value="dessert">디저트</option><option value="bakery">베이커리</option><option value="fastfood">패스트푸드</option><option value="pub">펍</option></select></label>
+<label>상태<select class="input" name="status"><option value="active">활성</option><option value="inactive">비활성</option></select></label>
+<label>도시<input class="input" name="city"/></label>
+<label>지역<input class="input" name="district"/></label>
+<label class="wide">주소<input class="input" name="address"/></label>
+<label>위도<input class="input" name="latitude" required="" step="any" type="number"/></label>
+<label>경도<input class="input" name="longitude" required="" step="any" type="number"/></label>
+<label>영업시간<input class="input" name="hours" placeholder="11:00 - 22:00"/></label>
+<label>전화번호<input class="input" name="phone"/></label>
+<label class="wide">공지<textarea class="input" name="notice"></textarea></label>
+<button class="primary-btn wide" type="submit">매장 정보 저장</button>
+<p aria-live="polite" class="asset-status wide" id="adminStoreEditStatus"></p>
+</form>
+</section>
+<section class="admin-edit-section hidden" id="adminPartnerPromotionSection">
+<div class="section-head"><h3>매장 노출</h3><span>도전 페이지 배너</span></div>
+<form class="form-grid admin-form compact-admin-form" id="adminPartnerPromotionForm">
+<label>매장 배너 노출<select class="input" id="adminPartnerBannerEnabled"><option value="false">OFF</option><option value="true">ON</option></select></label>
+<label>노출 거리<select class="input" id="adminPartnerBannerDistance">
+<option value="1">1km 이내</option><option value="3">3km 이내</option><option value="5">5km 이내</option><option value="10">10km 이내</option><option value="all">제한 없음</option>
+</select></label>
+<label>노출 우선순위<select class="input" id="adminPartnerBannerPriority">
+<option value="5">1순위 · 최우선</option><option value="4">2순위</option><option value="3">3순위 · 기본</option><option value="2">4순위</option><option value="1">5순위</option>
+</select></label>
+<label class="wide">배너 문구<input class="input" id="adminPartnerBannerCopy" maxlength="56" placeholder="지금 이 매장을 확인해 보세요."/><small class="field-help">비워두면 매장 유형에 맞는 기본 문구가 사용됩니다.</small></label>
+<div aria-live="polite" class="admin-banner-operational wide" id="adminPartnerBannerOperationalState"></div>
+<div class="admin-partner-promo-note wide">도전 페이지 상단 배너 영역에 노출됩니다. 같은 우선순위의 매장이 여러 곳이면 30분 단위로 순환하며, 설정한 거리 밖의 사용자에게는 노출되지 않습니다.</div>
+<button class="secondary-btn wide" type="submit">배너 설정 저장</button>
+<p aria-live="polite" class="asset-status wide" id="adminPartnerPromotionStatus"></p>
+</form>
+</section>
+<section class="admin-edit-section">
+<div class="section-head"><h3>사진</h3></div>
+<form class="admin-inline-form" id="adminPhotoForm">
+<input accept="image/png,image/jpeg,image/webp" id="adminPhotoFile" type="file"/>
+<input class="input" id="adminPhotoUrl" placeholder="또는 이미지 URL" type="url"/>
+<label class="admin-check"><input id="adminPhotoCover" type="checkbox"/> 대표 사진</label>
+<button class="secondary-btn" type="submit">사진 추가</button>
+</form>
+<p aria-live="polite" class="asset-status" id="adminPhotoStatus"></p>
+<div class="admin-media-list" id="adminPhotoList"></div>
+</section>
+<section class="admin-edit-section">
+<div class="section-head"><h3>메뉴</h3></div>
+<form class="form-grid admin-form compact-admin-form" id="adminMenuForm">
+<input id="adminMenuId" type="hidden"/>
+<label>메뉴명<input class="input" id="adminMenuName" required=""/></label>
+<label>가격<input class="input" id="adminMenuPrice" inputmode="numeric" min="0" type="number"/></label>
+<label class="wide">설명<input class="input" id="adminMenuDescription"/></label>
+<label>대표 메뉴<select class="input" id="adminMenuSignature"><option value="false">일반 메뉴</option><option value="true">대표 메뉴</option></select></label>
+<div class="admin-form-actions wide"><button class="secondary-btn" type="submit">메뉴 저장</button><button class="text-btn hidden" id="adminMenuCancel" type="button">수정 취소</button></div>
+</form>
+<div class="admin-data-list" id="adminMenuList"></div>
+</section>
+<section class="admin-edit-section">
+<div class="section-head"><h3>제휴 혜택</h3><span>리워드</span></div>
+<form class="form-grid admin-form compact-admin-form" id="adminOfferForm">
+<input id="adminOfferId" type="hidden"/>
+<label>혜택명<input class="input" id="adminOfferTitle" required=""/></label>
+<label>상태<select class="input" id="adminOfferStatus"><option value="active">진행중</option><option value="draft">준비중</option><option value="ended">종료</option></select></label>
+<label class="wide">설명<input class="input" id="adminOfferDescription"/></label>
+<label>혜택 대상<select class="input" id="adminOfferMinimumRole"><option value="visitor">전체 방문자</option><option value="crew">크루원 + 보스</option><option value="boss">보스만</option></select></label>
+<div class="admin-form-actions wide"><button class="secondary-btn" type="submit">혜택 저장</button><button class="text-btn hidden" id="adminOfferCancel" type="button">수정 취소</button></div>
+</form>
+<div class="admin-data-list" id="adminOfferList"></div>
+</section>
+<section class="admin-edit-section admin-editor-danger">
+<div class="section-head"><h3>위험 영역</h3></div>
+<button class="secondary-btn danger-outline" id="adminDeleteStoreBtn" type="button">이 매장 삭제</button>
+</section>
+</div>
+</section>
+</div>
+<script src="./admin.js?v=81.83"></script>
 </body>
 </html>
