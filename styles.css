@@ -462,18 +462,18 @@ body.biteboss-info-page{min-height:100dvh;background:var(--bg);color:#111}.info-
 .modal-compact:has(.takeover-choice-list) .modal-card{padding:24px 20px calc(22px + var(--safe-bottom))}
 .modal-compact:has(.takeover-choice-list) .modal-card>h3{margin:0 48px 10px 0;font-size:22px;line-height:1.08;font-weight:860;letter-spacing:-.045em}
 .modal-compact:has(.takeover-choice-list) .x-btn{top:16px;right:16px;width:34px;height:34px}
-.takeover-choice-copy{margin:0 0 16px;color:#77777d;font-size:14px;line-height:1.45;letter-spacing:-.02em}
-.takeover-choice-list{display:grid;gap:8px}
-.takeover-choice-card{display:grid;grid-template-columns:minmax(0,1fr) 34px;align-items:center;gap:6px;min-height:70px;padding:7px 8px 7px 7px;border:1px solid #e3e3e6;border-radius:18px;background:#fff}
-.takeover-choice-select{display:grid;grid-template-columns:48px minmax(0,1fr);align-items:center;gap:12px;min-width:0;padding:0;text-align:left;background:transparent;color:#111}
-.takeover-choice-thumb{display:grid;width:48px;height:48px;place-items:center;overflow:hidden;border-radius:50%;background:#ededf0}
-.takeover-choice-thumb img{width:100%;height:100%;object-fit:cover}
-.takeover-choice-thumb-fallback{display:grid;width:100%;height:100%;place-items:center;color:#9a9aa0;font-size:17px;font-weight:820}
-.takeover-choice-info{display:grid;gap:4px;min-width:0}
-.takeover-choice-info strong{display:block;overflow:hidden;text-overflow:ellipsis;font-size:16px;line-height:1.22;font-weight:820;letter-spacing:-.035em;white-space:nowrap}
-.takeover-choice-info>span{display:block;color:#8a8a90;font-size:13px;line-height:1.2;font-weight:650}
-.takeover-choice-dismiss{display:grid;width:32px;height:32px;place-items:center;padding:0;border:0;border-radius:50%;background:transparent;color:#a0a0a5;font-size:20px;line-height:1;font-weight:500}
-.takeover-choice-dismiss:active{background:#f0f0f2;color:#111}
-.takeover-choice-more{padding:10px 2px 0;color:#9a9aa0;font-size:12px;line-height:1.4}
-@media(max-width:480px){.modal-compact:has(.takeover-choice-list) .modal-card{padding-left:20px;padding-right:20px}.takeover-choice-card{min-height:68px}.takeover-choice-select{grid-template-columns:46px minmax(0,1fr);gap:11px}.takeover-choice-thumb{width:46px;height:46px}.takeover-choice-info strong{font-size:15px}}
+.takeover-choice-copy{margin:0 0 14px;color:#77777d;font-size:14px;line-height:1.45;letter-spacing:-.02em}
+.takeover-choice-list{display:grid;gap:0}
+.takeover-choice-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;border-top:1px solid #e5e5e7}
+.takeover-choice-row:last-child{border-bottom:1px solid #e5e5e7}
+.takeover-choice-store{display:block;width:100%;min-width:0;padding:0;background:transparent;color:inherit;text-align:left}
+.takeover-choice-store .store-card{padding:11px 0;background:transparent;border:0;border-radius:0;box-shadow:none;pointer-events:none}
+.takeover-choice-store .store-card-main{gap:12px}
+.takeover-choice-store .store-card-photo{width:54px;height:54px;min-width:54px;flex-basis:54px}
+.takeover-choice-store .store-card-name{font-size:13px}
+.takeover-choice-store .store-card-meta,.takeover-choice-store .store-card-status{font-size:9px}
+.takeover-choice-dismiss{min-width:38px;min-height:32px;padding:0 2px;border:0;background:transparent;color:#9a9aa0;font-size:10px;line-height:1;font-weight:750;letter-spacing:-.02em}
+.takeover-choice-dismiss:active{color:#111}
+.takeover-choice-more{padding:10px 0 0;color:#9a9aa0;font-size:12px;line-height:1.4}
+@media(max-width:480px){.modal-compact:has(.takeover-choice-list) .modal-card{padding-left:20px;padding-right:20px}.takeover-choice-store .store-card-photo{width:50px;height:50px;min-width:50px;flex-basis:50px}.takeover-choice-store .store-card-name{font-size:12.5px}}
 
