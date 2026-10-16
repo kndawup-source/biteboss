@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.51";
+  const BITEBOSS_BUILD = "81.52";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -3602,7 +3602,7 @@
     const checkins = Number(data.checkin_count || 0);
     const claims = Number(data.claim_count || 0);
     const xp = Math.max(0, Number(data.xp || 0));
-    const level = Math.max(1, Number(data.level || 1));
+    const level = levelProgressFromXp(xp).level;
 
     setText("#homeBossCount", bossCount);
     setText("#myBossCount", bossCount);
@@ -8570,17 +8570,45 @@
     });
   }
 
-  function updateRankMeter(xp = 0){
-    const target = 500;
-    const current = Math.max(0, Number(xp) || 0);
-    const inLevel = current % target;
-    const value = inLevel === 0 && current > 0 ? target : inLevel;
+  // Canonical level curve. Keep this in sync with sql/biteboss-level-curve-v8152.sql.
+  // XP is cumulative; only the requirement for the next level grows.
+  function xpRequiredForNextLevel(level = 1){
+    const lv = Math.max(1, Math.floor(Number(level) || 1));
+    if(lv <= 4) return [500,650,800,1000][lv - 1];
+    if(lv <= 10) return Math.round((1200 + (lv - 5) * (800 / 5)) / 50) * 50;
+    if(lv <= 30) return Math.round((2000 + (lv - 10) * 150) / 50) * 50;
+    return Math.round((5000 + (lv - 30) * 150) / 50) * 50;
+  }
 
+  function levelProgressFromXp(xp = 0){
+    const totalXp = Math.max(0, Math.floor(Number(xp) || 0));
+    let level = 1;
+    let floorXp = 0;
+    let target = xpRequiredForNextLevel(level);
+
+    // A hard guard protects rendering even if a malformed XP value reaches the client.
+    while(level < 1000 && totalXp >= floorXp + target){
+      floorXp += target;
+      level += 1;
+      target = xpRequiredForNextLevel(level);
+    }
+
+    return {
+      level,
+      current:Math.max(0, totalXp - floorXp),
+      target,
+      floorXp,
+      totalXp
+    };
+  }
+
+  function updateRankMeter(xp = 0){
+    const progress = levelProgressFromXp(xp);
     const valueEl = $("#rankMeterValue");
     const barEl = $("#rankMeterBar");
-    const percent = Math.max(0, Math.min(100, (value / target) * 100));
+    const percent = Math.max(0, Math.min(100, (progress.current / progress.target) * 100));
 
-    if(valueEl) valueEl.textContent = `${value} / ${target} XP`;
+    if(valueEl) valueEl.textContent = `${progress.current} / ${progress.target} XP`;
     if(barEl) barEl.style.width = `${percent}%`;
   }
 

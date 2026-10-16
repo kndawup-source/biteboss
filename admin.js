@@ -975,7 +975,7 @@
     const numeric = new Set([
       "protect_minutes","reclaim_cooldown_minutes","capture_cooldown_minutes","gps_radius_m","max_location_accuracy_m",
       "gps_dwell_seconds","gps_presence_ping_seconds","daily_store_limit","nearby_radius_m","nearby_limit",
-      "xp_per_level","xp_visit","xp_boss_win","xp_crew","xp_defense_success",
+      "xp_visit","xp_boss_win","xp_crew","xp_defense_success",
       "store_bonus_visits_per_point","store_bonus_max","challenge_cooldown_minutes",
       "defense_decay_day_1","defense_decay_day_2","defense_decay_day_3","defense_decay_day_4",
       "defense_decay_value_1","defense_decay_value_2","defense_decay_value_3","defense_decay_value_4",
