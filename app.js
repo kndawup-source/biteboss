@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.64";
+  const BITEBOSS_BUILD = "81.65";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -239,7 +239,7 @@
   let nearbyLastRefreshAt = 0;
   let scanner = null;
   let currentRank = "players";
-  let currentRankPeriod = "month";
+  let currentRankPeriod = "week";
   let rankLoadSeq = 0;
   let storePage = 1;
   const STORE_PAGE_SIZE = 8;
@@ -641,7 +641,7 @@
     });
     $$("[data-rank-period]").forEach(btn => {
       btn.addEventListener("click", async () => {
-        currentRankPeriod = String(btn.dataset.rankPeriod || "month");
+        currentRankPeriod = String(btn.dataset.rankPeriod || "week");
         $$("[data-rank-period]").forEach(item => item.classList.toggle("active", item === btn));
         await loadRank();
       });
@@ -5081,7 +5081,7 @@
       return;
     }
 
-    const period = ["week","month","all"].includes(currentRankPeriod) ? currentRankPeriod : "month";
+    const period = ["week","month","all"].includes(currentRankPeriod) ? currentRankPeriod : "week";
     const usePeriodRanking = (requestedRank === "players" || requestedRank === "organizations") && period !== "all";
     const rankingRequest = usePeriodRanking
       ? sb.rpc("biteboss_period_rank_v8160", { p_scope:requestedRank, p_period:period, p_limit:50 })
