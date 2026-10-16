@@ -1,5 +1,5 @@
 /* BiteBoss Super Admin — editorial console */
-body.admin-app{--admin-gutter:20px;--admin-space-1:8px;--admin-space-2:12px;--admin-space-3:20px;--admin-space-4:32px;--admin-control-h:44px;--admin-control-radius:10px;--admin-line:#e8e8eb;--admin-muted:#8f8f96}
+body.admin-app{--admin-gutter:20px;--admin-space-1:8px;--admin-space-2:12px;--admin-space-3:20px;--admin-space-4:32px;--admin-control-h:44px;--admin-control-radius:10px;--admin-line:#e8e8eb;--admin-muted:#8f8f96--admin-control-height:42px;}
 body.admin-app{min-height:100dvh;margin:0;overflow-x:hidden;background:#fff;color:#111}.admin-app,.admin-app *{box-sizing:border-box}.admin-app img,.admin-app svg,.admin-app video,.admin-app canvas{max-width:100%}
 .admin-app .auth-gate{min-height:100dvh;display:grid;place-items:center;padding:24px}
 .admin-app .auth-panel{width:min(100%,420px);display:grid;gap:14px;padding:24px 20px;border-radius:0;background:#fff;box-shadow:none}
@@ -248,11 +248,17 @@ body.admin-app{min-height:100dvh;margin:0;overflow-x:hidden;background:#fff;colo
   overflow:hidden;
   -webkit-appearance:none;
   appearance:none;
+  padding-top:0;
+  padding-bottom:0;
+  line-height:var(--admin-control-height);
+  text-align:left;
 }
 .admin-app input[type="date"].input::-webkit-date-and-time-value,
 .admin-app input[type="time"].input::-webkit-date-and-time-value,
 .admin-app input[type="datetime-local"].input::-webkit-date-and-time-value{
   min-width:0;
+  height:100%;
+  line-height:var(--admin-control-height);
   text-align:left;
 }
 .admin-app .admin-ad-guide{max-width:760px;margin:16px 0 24px;padding:12px 0;border-top:1px solid #e8e8eb;border-bottom:1px solid #e8e8eb;display:flex;justify-content:space-between;gap:14px;color:#8f8f96;font-size:9px}
@@ -293,7 +299,7 @@ body.admin-app{min-height:100dvh;margin:0;overflow-x:hidden;background:#fff;colo
 .default-profile-preview{display:grid;width:96px;height:96px;place-items:center;overflow:hidden;border-radius:50%;background:#e3e3e5;color:#8a8a90;font-size:10px;font-weight:800;letter-spacing:.08em}
 .default-profile-preview img{display:block;width:100%;height:100%;object-fit:cover}
 
-/* v81.85 advertising business dashboard */
+/* v81.86 advertising business dashboard */
 .admin-ad-performance,.admin-ad-campaigns-section,.admin-ad-editor-section{margin:0 0 var(--admin-space-4)}
 .admin-ad-period{width:auto;min-width:92px}
 .admin-ad-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px;border-top:1px solid #e8e8eb;margin:14px 0 24px}
