@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.74";
+  const BITEBOSS_BUILD = "81.75";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -6016,34 +6016,42 @@
 
   async function openMemberStoreForm(){
     if(!playerSession?.authenticated) return openMemberLogin();
+
     const pos = await getPositionSafe(true);
     const lat = pos?.coords?.latitude;
     const lng = pos?.coords?.longitude;
-    openModal("매장 등록", `
+    const hasLocation = Number.isFinite(lat) && Number.isFinite(lng);
+
+    openModal("매장 등록 요청", `
       <div class="form-grid member-store-form">
+        <div class="wide member-store-request-note">주변 검색에 없는 실제 매장만 요청해 주세요. 요청한 매장은 확인 후 BiteBoss에 등록됩니다.</div>
         <label class="wide">매장명<input id="memberStoreName" class="input" maxlength="120" placeholder="매장명" /></label>
         <label>카테고리<select id="memberStoreCategory" class="input"><option value="restaurant">음식점</option><option value="cafe">카페</option><option value="dessert">디저트</option><option value="bakery">베이커리</option><option value="fastfood">패스트푸드</option><option value="pub">펍</option></select></label>
-        <label>도시<input id="memberStoreCity" class="input" maxlength="120" placeholder="Seoul" /></label>
-        <label>지역<input id="memberStoreDistrict" class="input" maxlength="120" placeholder="Gangnam" /></label>
+        <label>도시<input id="memberStoreCity" class="input" maxlength="120" placeholder="서울" /></label>
+        <label>지역<input id="memberStoreDistrict" class="input" maxlength="120" placeholder="강남구" /></label>
         <label class="wide">주소<input id="memberStoreAddress" class="input" maxlength="300" placeholder="주소 (선택)" /></label>
-        <div class="wide member-location-state" id="memberStoreLocation">${Number.isFinite(lat) && Number.isFinite(lng) ? `현재 위치 확인됨 · ${lat.toFixed(5)}, ${lng.toFixed(5)}` : "현재 위치를 확인하지 못했습니다."}</div>
-        <button id="memberStoreSubmit" class="primary-btn wide" type="button" ${Number.isFinite(lat) && Number.isFinite(lng) ? "" : "disabled"}>매장 등록</button>
+        <div class="wide member-location-state" id="memberStoreLocation">${hasLocation ? `현재 위치 확인됨 · ${lat.toFixed(5)}, ${lng.toFixed(5)}` : "현재 위치를 확인하지 못했습니다."}</div>
+        <button id="memberStoreSubmit" class="primary-btn wide" type="button" ${hasLocation ? "" : "disabled"}>등록 요청</button>
         <p id="memberStoreStatus" class="inline-status wide" aria-live="polite"></p>
       </div>
     `);
-    $("#memberStoreSubmit").onclick = () => submitMemberStore(lat, lng);
+
+    $("#memberStoreSubmit").onclick = () => submitMemberStoreRequest(lat, lng);
   }
 
-  async function submitMemberStore(latitude, longitude){
+  async function submitMemberStoreRequest(latitude, longitude){
     const name = String($("#memberStoreName")?.value || "").trim();
     const status = $("#memberStoreStatus");
     const button = $("#memberStoreSubmit");
+
     if(!name) return setStatus(status, "매장명을 입력하세요.");
     if(!Number.isFinite(latitude) || !Number.isFinite(longitude)) return setStatus(status, "현재 위치가 필요합니다.");
+
     if(button) button.disabled = true;
-    setStatus(status, "등록 중…");
+    setStatus(status, "요청을 보내는 중…");
+
     try{
-      const { data, error } = await sb.rpc("biteboss_member_create_store", {
+      const { data, error } = await sb.rpc("biteboss_member_request_store", {
         p_name:name,
         p_category:String($("#memberStoreCategory")?.value || "restaurant"),
         p_city:String($("#memberStoreCity")?.value || "").trim(),
@@ -6052,13 +6060,24 @@
         p_latitude:latitude,
         p_longitude:longitude
       });
+
       if(error) throw error;
-      if(!data?.ok) throw new Error(data?.error || "STORE_CREATE_FAILED");
+      if(!data?.ok) throw new Error(data?.error || "STORE_REQUEST_FAILED");
+
       closeModal();
-      toast(`${data.store?.name || name} 등록 완료. 비제휴 매장은 현장 체류로 자동 점령됩니다.`);
-      await loadStores();
+      toast(data?.duplicate_store
+        ? "이미 등록된 매장입니다. 매장 검색에서 확인해 주세요."
+        : data?.already_pending
+          ? "이미 확인 중인 등록 요청이 있습니다."
+          : `${name} 등록 요청을 보냈습니다.`);
     }catch(error){
-      setStatus(status, String(error?.message || error).includes("MEMBER_LOGIN_REQUIRED") ? "회원 로그인이 필요합니다." : "매장을 등록하지 못했습니다.");
+      const code = String(error?.message || error);
+      const message = code.includes("MEMBER_LOGIN_REQUIRED")
+        ? "회원 로그인이 필요합니다."
+        : code.includes("TOO_FAR_FROM_CURRENT")
+          ? "현재 위치와 너무 먼 매장은 요청할 수 없습니다."
+          : "매장 등록 요청을 보내지 못했습니다.";
+      setStatus(status, message);
     }finally{
       if(button) button.disabled = false;
     }

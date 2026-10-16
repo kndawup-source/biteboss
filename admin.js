@@ -28,6 +28,7 @@
   let editingStoreBundle = null;
   let adCampaigns = [];
   let partnerRequests = [];
+  let storeRequests = [];
   let analyticsRange = "7d";
   let analyticsCompareMode = "previous";
   let adminCommentPage = 1;
@@ -35,6 +36,7 @@
   let adminStorePage = 1;
   let adminStoreFilter = "all";
   let partnerRequestPage = 1;
+  let storeRequestPage = 1;
   let adminUserPage = 1;
   let bossPage = 1;
   let gameOpsStorePage = 1;
@@ -333,7 +335,7 @@
     // Store banner state depends on appConfig.partner_banners. Resolve config first
     // so the first store render cannot race against configuration loading.
     await loadConfig();
-    await Promise.all([loadDashboard(), loadAnalytics(), loadStores(), loadBosses(), loadUsers(), loadGameOps(), loadAssets(), loadAds(), loadPartnerRequests(), loadAdminComments()]);
+    await Promise.all([loadDashboard(), loadAnalytics(), loadStores(), loadStoreRequests(), loadBosses(), loadUsers(), loadGameOps(), loadAssets(), loadAds(), loadPartnerRequests(), loadAdminComments()]);
     renderRules();
   }
 
@@ -341,7 +343,11 @@
     if(page === "dashboard"){
       await Promise.all([loadDashboard(), loadAnalytics(), loadBosses()]);
     }
-    if(page === "stores" || page === "qr"){
+    if(page === "stores"){
+      await loadConfig();
+      await Promise.all([loadStores(), loadStoreRequests()]);
+    }
+    if(page === "qr"){
       await loadConfig();
       await loadStores();
     }
@@ -693,6 +699,96 @@
         </article>
       `;
     }).join("") || `<div class="admin-activity-empty">아직 기록된 활동이 없습니다.</div>`;
+  }
+
+  async function loadStoreRequests(){
+    const box = $("#adminStoreRequestList");
+    if(!box) return;
+
+    const { data, error } = await adminSb.rpc("biteboss_admin_store_requests", {
+      p_status:"pending",
+      p_limit:1000
+    });
+
+    if(error){
+      console.warn("BiteBoss store requests:", error);
+      box.innerHTML = `<div class="timeline-item muted">매장 등록 요청을 불러오지 못했습니다.</div>`;
+      return;
+    }
+
+    storeRequests = Array.isArray(data) ? data : [];
+    setText("#adminStoreRequestCount", storeRequests.length);
+    renderStoreRequests();
+  }
+
+  function renderStoreRequests(){
+    const box = $("#adminStoreRequestList");
+    const nav = $("#adminStoreRequestPagination");
+    if(!box) return;
+
+    const total = storeRequests.length;
+    const totalPages = Math.max(1, Math.ceil(total / ADMIN_PAGE_SIZE));
+    storeRequestPage = Math.min(Math.max(1, storeRequestPage), totalPages);
+    const startIndex = (storeRequestPage - 1) * ADMIN_PAGE_SIZE;
+    const rows = storeRequests.slice(startIndex, startIndex + ADMIN_PAGE_SIZE);
+
+    box.innerHTML = rows.length ? rows.map(row => `
+      <article class="partner-request-row">
+        <div class="partner-request-row-head">
+          <div>
+            <span>STORE REQUEST</span>
+            <strong>${escapeHtml(row.name || "매장")}</strong>
+            <p>${escapeHtml(row.address || [row.city,row.district].filter(Boolean).join(" "))}</p>
+          </div>
+          <time>${escapeHtml(formatDate(row.created_at))}</time>
+        </div>
+        <div class="partner-request-grid">
+          <div><span>카테고리</span><strong>${escapeHtml(categoryLabel(row.category))}</strong></div>
+          <div><span>요청자</span><strong>${escapeHtml(row.requester_nickname || "-")}</strong></div>
+          <div><span>위도</span><strong>${Number(row.latitude).toFixed(6)}</strong></div>
+          <div><span>경도</span><strong>${Number(row.longitude).toFixed(6)}</strong></div>
+        </div>
+        <div class="partner-request-actions">
+          <button class="primary-btn" data-store-request-approve="${escapeAttr(row.id)}" type="button">등록 승인</button>
+          <button class="secondary-btn" data-store-request-reject="${escapeAttr(row.id)}" type="button">반려</button>
+        </div>
+      </article>
+    `).join("") : `<div class="timeline-item muted">확인할 매장 등록 요청이 없습니다.</div>`;
+
+    $$("[data-store-request-approve]").forEach(button => {
+      button.onclick = () => reviewStoreRequest(button.dataset.storeRequestApprove, "approve", button);
+    });
+    $$("[data-store-request-reject]").forEach(button => {
+      button.onclick = () => reviewStoreRequest(button.dataset.storeRequestReject, "reject", button);
+    });
+
+    renderPagination(nav, storeRequestPage, total, ADMIN_PAGE_SIZE, next => {
+      storeRequestPage = next;
+      renderStoreRequests();
+      box.scrollIntoView({ block:"start", behavior:"auto" });
+    });
+  }
+
+  async function reviewStoreRequest(requestId, decision, button){
+    if(!requestId) return;
+    if(decision === "reject" && !confirm("이 매장 등록 요청을 반려할까요?")) return;
+
+    if(button) button.disabled = true;
+    try{
+      const { data, error } = await adminSb.rpc("biteboss_admin_review_store_request", {
+        p_request_id:requestId,
+        p_decision:decision
+      });
+      if(error) throw error;
+      if(!data?.ok) throw new Error(data?.message || data?.error || "STORE_REQUEST_REVIEW_FAILED");
+
+      await Promise.all([loadStoreRequests(), loadStores(), loadDashboard()]);
+    }catch(error){
+      console.warn("BiteBoss store request review:", error);
+      alert(error?.message || "처리하지 못했습니다.");
+    }finally{
+      if(button) button.disabled = false;
+    }
   }
 
   async function loadStores(){
