@@ -2027,12 +2027,12 @@
             <div class="store-card-title-row">
               <strong class="store-card-name">${escapeHtml(store.name)}</strong>
               ${badges.length ? `<div class="store-status-tags">${badges.map(tag => `<span class="store-status-tag ${tag.cls}">${tag.label}</span>`).join("")}</div>` : ""}
+              ${action ? `<div class="store-card-title-action">${action}</div>` : ""}
             </div>
             ${details ? `<div class="store-card-meta">${escapeHtml(details)}</div>` : ""}
             ${status ? `<div class="store-card-status ${protectedNow ? "is-protected" : ""}" ${ownedByMe && reclaimAt && !presence?.status ? `data-store-reclaim-at="${escapeAttr(reclaimAt)}"` : ""}>${escapeHtml(status)}</div>` : ""}
           </div>
         </div>
-        ${action}
       </article>
     `;
   }
@@ -4441,15 +4441,22 @@
 
   function partnerBannerMarkup(banner){
     if(!banner) return "";
-    const defaultCopy = String(banner.partnership_status || "") === "partnered"
+    const bannerStoreId=String(banner.id || banner.store_id || "").trim();
+    const registeredStore=bannerStoreId
+      ? stores.find(store=>String(store.id)===bannerStoreId) || null
+      : null;
+    const storeName=String(registeredStore?.name || banner.name || "매장").trim();
+    const defaultCopy = String(banner.partnership_status || registeredStore?.partnership_status || "") === "partnered"
       ? "이 매장에서 BiteBoss 혜택을 확인해 보세요."
       : "지금 이 매장을 확인해 보세요.";
     const copy = String(banner.copy || defaultCopy).trim();
-    const image = String(banner.photo_url || "").trim();
+    // The partner banner avatar must use the store's current registered photo.
+    // Banner config photo_url is retained only as a fallback for legacy records.
+    const image = String(registeredStore?.photo_url || banner.photo_url || "").trim();
     const visual = image
       ? `<span class="partner-banner-thumb" aria-hidden="true"><img src="${escapeAttr(image)}" alt="" loading="eager" decoding="async" fetchpriority="high" /></span>`
-      : `<span class="partner-banner-thumb partner-banner-fallback" aria-hidden="true">${escapeHtml(String(banner.name || "P").trim().charAt(0) || "P")}</span>`;
-    return `<button class="game-pulse-item is-partner-banner" type="button" data-pulse-store="${escapeAttr(banner.id)}" data-pulse-name="${escapeAttr(banner.name || "")}">${visual}<strong>${escapeHtml(banner.name || "매장")}</strong><small>${escapeHtml(copy)}</small></button>`;
+      : `<span class="partner-banner-thumb partner-banner-fallback" aria-hidden="true">${escapeHtml(Array.from(storeName)[0] || "P")}</span>`;
+    return `<button class="game-pulse-item is-partner-banner" type="button" data-pulse-store="${escapeAttr(bannerStoreId)}" data-pulse-name="${escapeAttr(storeName)}">${visual}<strong>${escapeHtml(storeName)}</strong><small>${escapeHtml(copy)}</small></button>`;
   }
 
   function bindGamePulseStoreLinks(box){
