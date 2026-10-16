@@ -387,9 +387,9 @@
     // In particular, #rank used to render the HTML 0 / 500 XP placeholder for one frame.
     if(["stores","rank","profile"].includes(initialTab)) openTab(initialTab, { historyMode:"replace" });
 
-    // Load server state in parallel. Location must not block first paint.
-    await Promise.all([
-      loadConfig(),
+    // Only config is critical for the first location/store query.
+    await loadConfig();
+    void Promise.allSettled([
       loadMyOrganization(),
       loadGameActivity(),
       loadCaptureCooldownStatus()
@@ -2175,106 +2175,84 @@
   }
 
   async function openStoreDetail(storeId, options = {}){
-    const cached = stores.find(store => String(store.id) === String(storeId))
-      || (options?.storeFallback && String(options.storeFallback.id) === String(storeId)
-        ? options.storeFallback
-        : null);
+    const cached=stores.find(store=>String(store.id)===String(storeId))
+      || (options?.storeFallback && String(options.storeFallback.id)===String(storeId) ? options.storeFallback : null);
     const cachedDetail=readCachedStoreDetail(storeId);
     if(cachedDetail){
       activeStoreDetailId=String(storeId);
-      if(options?.preserveModal !== true) openModal("", "", { type:"store-detail" });
+      if(options?.preserveModal!==true) openModal("","",{type:"store-detail"});
       renderStoreDetail(cachedDetail,options);
       preloadStoreDetailPhotos(cachedDetail);
       return;
     }
-
-    if(options?.preserveModal !== true){
-      openModal(
-        "",
-        `<div class="app-state">매장 정보를 불러오는 중…</div>`,
-        { type:"store-detail" }
-      );
+    if(options?.preserveModal!==true){
+      openModal("",`<div class="app-state">매장 정보를 불러오는 중…</div>`,{type:"store-detail"});
     }
-
     try{
-      const [detailResult, statusResult, orgResult, offerResult, partnerRequestResult, growthResult, arenaResult, historyResult] = await Promise.all([
-        sb.rpc("biteboss_store_detail", { p_store_id:storeId }),
-        sb.rpc("biteboss_my_store_status", { p_store_id:storeId }),
-        sb.rpc("biteboss_store_organization_status", { p_store_id:storeId }),
-        sb.rpc("biteboss_store_offer_access", { p_store_id:storeId }),
-        playerSession?.authenticated && options?.showStoreManagerCard !== false
-          ? sb.rpc("biteboss_partner_request_status", { p_store_id:storeId })
-          : Promise.resolve({ data:null, error:null }),
-        sb.rpc("biteboss_store_public_growth_v63", { p_store_id:storeId, p_days:30 }),
-        sb.rpc("biteboss_store_game_board_v631", { p_store_id:storeId }),
-        sb.rpc("biteboss_store_history_v71", { p_store_id:storeId, p_limit:12 })
+      const detailPromise=sb.rpc("biteboss_store_detail",{p_store_id:storeId});
+      const statusPromise=sb.rpc("biteboss_my_store_status",{p_store_id:storeId});
+      const orgPromise=sb.rpc("biteboss_store_organization_status",{p_store_id:storeId});
+      const offerPromise=sb.rpc("biteboss_store_offer_access",{p_store_id:storeId});
+      const secondaryPromise=Promise.all([
+        playerSession?.authenticated && options?.showStoreManagerCard!==false
+          ? sb.rpc("biteboss_partner_request_status",{p_store_id:storeId})
+          : Promise.resolve({data:null,error:null}),
+        sb.rpc("biteboss_store_public_growth_v63",{p_store_id:storeId,p_days:30}),
+        sb.rpc("biteboss_store_game_board_v631",{p_store_id:storeId}),
+        sb.rpc("biteboss_store_history_v71",{p_store_id:storeId,p_limit:12})
       ]);
-
+      const [detailResult,statusResult,orgResult,offerResult]=await Promise.all([
+        detailPromise,statusPromise,orgPromise,offerPromise
+      ]);
       if(detailResult.error) throw detailResult.error;
       if(!detailResult.data?.store) throw new Error("STORE_NOT_FOUND");
+      if(statusResult.error) console.warn("BiteBoss store battle status:",statusResult.error);
+      if(orgResult.error) console.warn("BiteBoss store organization status:",orgResult.error);
+      if(offerResult.error) console.warn("BiteBoss store offer access:",offerResult.error);
 
-      if(statusResult.error){
-        console.warn("BiteBoss store battle status:", statusResult.error);
-      }
-      if(orgResult.error){
-        console.warn("BiteBoss store organization status:", orgResult.error);
-      }
-      if(offerResult.error){
-        console.warn("BiteBoss store offer access:", offerResult.error);
-      }
-
-      const data = detailResult.data;
+      const data=detailResult.data;
       preloadStoreDetailPhotos(data);
-      data.game = statusResult.error ? null : (statusResult.data || null);
-      data.organization = orgResult.error ? null : (orgResult.data || null);
-      data.offerAccess = offerResult.error ? null : (offerResult.data || null);
-      data.partnerRequest = partnerRequestResult?.error ? null : (partnerRequestResult?.data || null);
-      data.publicGrowth = growthResult?.error ? null : (growthResult?.data || null);
-      data.arena = arenaResult?.error ? null : (arenaResult?.data || null);
-      data.history = historyResult?.error || !Array.isArray(historyResult?.data) ? [] : historyResult.data;
-      const cachedReclaim = getCachedStoreReclaimState(storeId);
-      data.reclaim = cachedReclaim?.data || deriveOptimisticStoreReclaimState(data.history, String(data.game?.my_role || "visitor") === "boss");
-      if(historyResult?.error && !String(historyResult.error.message||"").includes("biteboss_store_history_v71")) console.warn("BiteBoss conquest history:", historyResult.error);
-      if(partnerRequestResult?.error) console.warn("BiteBoss partner request status:", partnerRequestResult.error);
-      if(growthResult?.error) console.warn("BiteBoss public growth:", growthResult.error);
-      if(arenaResult?.error) console.warn("BiteBoss arena:", arenaResult.error);
-
+      data.game=statusResult.error ? null : (statusResult.data || null);
+      data.organization=orgResult.error ? null : (orgResult.data || null);
+      data.offerAccess=offerResult.error ? null : (offerResult.data || null);
+      data.partnerRequest=null; data.publicGrowth=null; data.arena=null; data.history=[];
+      const cachedReclaim=getCachedStoreReclaimState(storeId);
+      data.reclaim=cachedReclaim?.data || deriveOptimisticStoreReclaimState([],String(data.game?.my_role||"visitor")==="boss");
       if(cached && !Number.isFinite(Number(data.store.distance_m)) && Number.isFinite(Number(cached.distance_m))){
-        data.store.distance_m = Number(cached.distance_m);
+        data.store.distance_m=Number(cached.distance_m);
       }
-
-      // Store detail RPCs on older deployments may omit coordinates. This must not make
-      // "내 점령지" different from any other store detail: resolve the same canonical
-      // store coordinates by id before rendering the shared detail map.
       const directCoords=cacheStoreCoordinates(String(storeId),data.store)
         || cacheStoreCoordinates(String(storeId),cached)
-        || storeDetailCoordinateCache.get(String(storeId))
-        || null;
+        || storeDetailCoordinateCache.get(String(storeId)) || null;
       if(directCoords){
         data.store.latitude=directCoords.latitude;
         data.store.longitude=directCoords.longitude;
       }
-
       cacheStoreDetail(storeId,data);
-      activeStoreDetailId = String(storeId);
-      renderStoreDetail(data, options);
-
+      activeStoreDetailId=String(storeId);
+      renderStoreDetail(data,options);
       if(!directCoords){
         void resolveStoreDetailCoordinates(data.store,cached).then(()=>{
           cacheStoreDetail(storeId,data);
           if(activeStoreDetailId===String(storeId)) renderStoreDetail(data,options);
         });
       }
-
-      if(playerSession?.authenticated && String(data.game?.my_role || "visitor") === "boss" && !cachedReclaim?.fresh){
+      void secondaryPromise.then(([partnerRequestResult,growthResult,arenaResult,historyResult])=>{
+        data.partnerRequest=partnerRequestResult?.error ? null : (partnerRequestResult?.data||null);
+        data.publicGrowth=growthResult?.error ? null : (growthResult?.data||null);
+        data.arena=arenaResult?.error ? null : (arenaResult?.data||null);
+        data.history=historyResult?.error || !Array.isArray(historyResult?.data) ? [] : historyResult.data;
+        const reclaimCache=getCachedStoreReclaimState(storeId);
+        data.reclaim=reclaimCache?.data || deriveOptimisticStoreReclaimState(data.history,String(data.game?.my_role||"visitor")==="boss");
+        cacheStoreDetail(storeId,data);
+        if(activeStoreDetailId===String(storeId)) renderStoreDetail(data,options);
+      }).catch(error=>console.warn("BiteBoss store detail secondary:",error));
+      if(playerSession?.authenticated && String(data.game?.my_role||"visitor")==="boss" && !cachedReclaim?.fresh){
         void refreshOwnStoreReclaimState(storeId);
       }
     }catch(error){
-      console.warn("BiteBoss store detail:", error);
-      const body = $("#modalBody");
-      setRetryState(body, "매장 정보를 불러오지 못했습니다.", async () => {
-        await openStoreDetail(storeId, options);
-      });
+      console.warn("BiteBoss store detail:",error);
+      setRetryState($("#modalBody"),"매장 정보를 불러오지 못했습니다.",async()=>openStoreDetail(storeId,options));
     }
   }
 
@@ -2637,7 +2615,7 @@
                 </div>
                 ${eligible
                   ? `<button class="text-btn benefit-use-btn" type="button" data-benefit-offer="${escapeAttr(item.id)}">혜택 사용</button>`
-                  : `<small>${minimumRole === "boss" ? "보스가 되면 사용할 수 있습니다" : "크루가 되면 사용할 수 있습니다"}</small>`}
+                  : ""}
               </article>
             `;
           }).join("") : `<div class="store-detail-empty">현재 사용 가능한 혜택이 없습니다.</div>`}
