@@ -9,7 +9,7 @@
   <meta property="og:title" content="BiteBoss" />
   <meta property="og:description" content="주변 매장을 발견하고 도전해 보스를 차지하세요." />
   <meta property="og:type" content="website" />
-  <meta name="biteboss-build" content="81.67" />
+  <meta name="biteboss-build" content="81.68" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -21,8 +21,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet" />
-  <link rel="manifest" href="./manifest.webmanifest?v=81.67" />
-  <link rel="stylesheet" href="./styles.css?v=81.67" />
+  <link rel="manifest" href="./manifest.webmanifest?v=81.68" />
+  <link rel="stylesheet" href="./styles.css?v=81.68" />
 </head>
 <body class="user-app home-active">
 <div id="app" class="app-shell">
@@ -117,9 +117,9 @@
         
       </div>
       <div id="rankPeriodTabs" class="rank-tabs rank-period-tabs" role="group" aria-label="순위 기간">
-        <button class="chip" data-rank-period="week" type="button">이번 주</button>
-        <button class="chip active" data-rank-period="month" type="button">이번 달</button>
-        <button class="chip" data-rank-period="all" type="button">전체</button>
+        <button class="chip active" data-rank-period="week" type="button" aria-pressed="true">이번 주</button>
+        <button class="chip" data-rank-period="month" type="button" aria-pressed="false">이번 달</button>
+        <button class="chip" data-rank-period="all" type="button" aria-pressed="false">전체</button>
       </div>
 
       <section id="territoryMapSection" class="territory-map-section hidden" aria-label="현재 점령 지도">
@@ -265,6 +265,6 @@
   </div>
 </div>
 
-<script src="./bootstrap.js?v=81.67"></script>
+<script src="./bootstrap.js?v=81.68"></script>
 </body>
 </html>
