@@ -274,21 +274,37 @@ body.admin-app{min-height:100dvh;margin:0;overflow-x:hidden;background:#fff;colo
 }
 @media(max-width:430px){
   .admin-app .admin-datetime-control{
-    display:grid;
-    grid-template-columns:minmax(0,1fr)!important;
-    grid-auto-flow:row;
-    gap:8px;
+    display:block;
     width:100%;
     min-width:0;
-    max-width:100%
+    max-width:100%;
+    overflow:hidden
   }
   .admin-app .admin-datetime-control>.admin-picker-input{
-    grid-column:1/-1;
+    display:block;
     width:100%!important;
     min-width:0!important;
     max-width:100%!important;
     margin:0!important;
     font-size:16px
+  }
+  .admin-app .admin-datetime-control>.admin-date-part{
+    -webkit-appearance:none;
+    appearance:none;
+    overflow:hidden;
+    text-overflow:clip
+  }
+  .admin-app .admin-datetime-control>.admin-date-part::-webkit-date-and-time-value{
+    min-width:0;
+    width:100%;
+    text-align:left
+  }
+  .admin-app .admin-datetime-control>.admin-date-part::-webkit-datetime-edit{
+    min-width:0;
+    padding:0
+  }
+  .admin-app .admin-datetime-control>.admin-time-part{
+    margin-top:8px!important
   }
 }
 .admin-app .admin-ad-guide{max-width:760px;margin:16px 0 24px;padding:12px 0;border-top:1px solid #e8e8eb;border-bottom:1px solid #e8e8eb;display:flex;justify-content:space-between;gap:14px;color:#8f8f96;font-size:9px}
@@ -327,7 +343,7 @@ body.admin-app{min-height:100dvh;margin:0;overflow-x:hidden;background:#fff;colo
 .default-profile-preview{display:grid;width:96px;height:96px;place-items:center;overflow:hidden;border-radius:50%;background:#e3e3e5;color:#8a8a90;font-size:10px;font-weight:800;letter-spacing:.08em}
 .default-profile-preview img{display:block;width:100%;height:100%;object-fit:cover}
 
-/* v81.96 advertising business dashboard */
+/* v81.97 advertising business dashboard */
 .admin-ad-performance,.admin-ad-campaigns-section,.admin-ad-editor-section{margin:0 0 var(--admin-space-4)}
 .admin-ad-period{width:auto;min-width:92px}
 .admin-ad-kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px;border-top:1px solid #e8e8eb;margin:14px 0 24px}
