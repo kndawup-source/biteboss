@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.28";
+  const BITEBOSS_BUILD = "81.44";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -252,6 +252,7 @@
   const VISIT_PAGE_SIZE = 8;
   let visitRows = [];
   let summary = null;
+  let homeLoadPromise = null;
   let storeSearchTimer = null;
   let storeSearchSeq = 0;
   let presenceTimer = null;
@@ -334,9 +335,6 @@
     bindUi();
     bindStaticUi();
     const initialTab = String(location.hash || "").replace(/^#/, "");
-    if(["home","stores","rank","profile"].includes(initialTab) && initialTab !== "home"){
-      queueMicrotask(() => openTab(initialTab));
-    }
     setupNativeUrlListener();
     setupPushListeners();
     updateNetworkState();
@@ -351,6 +349,18 @@
     await ensureUserSession();
     await restorePlayerSession();
     await ensureProfile();
+
+    // Paint persisted member values before config/organization/network refreshes begin.
+    // This makes the next-level number and bar available on the first rank frame.
+    if(playerSession?.authenticated){
+      const cachedMemberSummary = readCachedMemberSummary();
+      if(cachedMemberSummary) paintMemberSummary(cachedMemberSummary);
+      else restoreRankMeter(); // legacy cache fallback; migrated on the next successful summary refresh
+    }
+
+    // Do not activate a deep-linked primary tab before auth/profile cache restoration.
+    // In particular, #rank used to render the HTML 0 / 500 XP placeholder for one frame.
+    if(["stores","rank","profile"].includes(initialTab)) openTab(initialTab);
 
     // Load server state in parallel. Location must not block first paint.
     await Promise.all([
@@ -671,8 +681,9 @@
       void loadGamePulse();
     }
     if(tab === "rank"){
-      // Reuse the last confirmed XP immediately instead of waiting for the home summary RPC.
-      restoreRankMeter();
+      // Paint synchronously from memory. Persistent storage is only a cold-start fallback.
+      if(summary && Number.isFinite(Number(summary.xp))) updateRankMeter(summary.xp);
+      else restoreRankMeter();
       syncTerritoryMapVisibility();
       loadRank();
       if(currentRank === "territory") loadTerritoryMap();
@@ -3455,12 +3466,71 @@
     return playerId ? `biteboss-rank-meter:${playerId}` : "";
   }
 
+  function summaryCacheKey(){
+    const playerId = String(
+      playerSession?.player_user_id ||
+      profile?.user_id ||
+      authUser?.id ||
+      ""
+    ).trim();
+    return playerId ? `biteboss-summary:${playerId}` : "";
+  }
+
   function cacheRankMeterXp(xp){
     const key = rankMeterCacheKey();
     if(!key) return;
     try{
-      sessionStorage.setItem(key, String(Math.max(0, Number(xp) || 0)));
+      localStorage.setItem(key, String(Math.max(0, Number(xp) || 0)));
     }catch{}
+  }
+
+  function cacheMemberSummary(data){
+    const key = summaryCacheKey();
+    if(!key || !data || typeof data !== "object") return;
+    try{
+      localStorage.setItem(key, JSON.stringify(data));
+    }catch{}
+  }
+
+  function readCachedMemberSummary(){
+    const key = summaryCacheKey();
+    if(!key) return null;
+    try{
+      const value = JSON.parse(localStorage.getItem(key) || "null");
+      return value && typeof value === "object" ? value : null;
+    }catch{
+      return null;
+    }
+  }
+
+  function paintMemberSummary(data, { cache = false } = {}){
+    if(!data || typeof data !== "object") return false;
+    summary = data;
+    const bossCount = Number(data.active_boss_count || 0);
+    const crewCount = Number(data.crew_count || 0);
+    const checkins = Number(data.checkin_count || 0);
+    const claims = Number(data.claim_count || 0);
+    const xp = Math.max(0, Number(data.xp || 0));
+    const level = Math.max(1, Number(data.level || 1));
+
+    setText("#homeBossCount", bossCount);
+    setText("#myBossCount", bossCount);
+    setText("#myCrewCount", crewCount);
+    setText("#myLevel", `Lv ${level}`);
+    setText("#homeCheckinCount", checkins);
+    setText("#myCheckinCount", checkins);
+    setText("#homeStreakCount", claims);
+    setText("#homeXp", `Lv ${level} · ${xp} XP`);
+    renderOrganizationUi();
+    updateHomeProtectionMeter(data);
+    updateProfileMeter(bossCount);
+    updateRankMeter(xp);
+
+    if(cache){
+      cacheRankMeterXp(xp);
+      cacheMemberSummary(data);
+    }
+    return true;
   }
 
   function restoreRankMeter(){
@@ -3469,10 +3539,18 @@
       updateRankMeter(liveXp);
       return true;
     }
+
+    const cachedSummary = readCachedMemberSummary();
+    const summaryXp = Number(cachedSummary?.xp);
+    if(Number.isFinite(summaryXp) && summaryXp >= 0){
+      updateRankMeter(summaryXp);
+      return true;
+    }
+
     const key = rankMeterCacheKey();
     if(!key) return false;
     try{
-      const raw = sessionStorage.getItem(key);
+      const raw = localStorage.getItem(key) ?? sessionStorage.getItem(key);
       if(raw === null) return false;
       const cached = Number(raw);
       if(Number.isFinite(cached) && cached >= 0){
@@ -3489,35 +3567,32 @@
       return;
     }
 
-    const { data, error } = await sb.rpc("biteboss_my_summary");
-    if(error){
-      console.warn(error);
-      return;
+    // Warm paint first. Read persistent state only when there is no in-memory summary.
+    // paintMemberSummary already paints the rank meter, so avoid the old duplicate restore pass.
+    if(!summary){
+      const cachedMemberSummary = readCachedMemberSummary();
+      if(cachedMemberSummary) paintMemberSummary(cachedMemberSummary);
+      else restoreRankMeter(); // compatibility with pre-summary-cache builds
+    }else{
+      updateRankMeter(summary.xp);
     }
 
-    summary = data || {};
-    const bossCount = Number(summary.active_boss_count || 0);
-    const crewCount = Number(summary.crew_count || 0);
-    const checkins = Number(summary.checkin_count || 0);
-    const claims = Number(summary.claim_count || 0);
-    const xp = Number(summary.xp || 0);
-    const level = Math.max(1, Number(summary.level || 1));
+    // Many actions refresh home/rank together. Share one in-flight summary RPC instead of
+    // issuing duplicate requests that compete with ranking and store requests.
+    if(homeLoadPromise) return homeLoadPromise;
 
-    setText("#homeBossCount", bossCount);
-    setText("#myBossCount", bossCount);
-    setText("#myCrewCount", crewCount);
-    setText("#myLevel", `Lv ${level}`);
-    setText("#homeCheckinCount", checkins);
-    setText("#myCheckinCount", checkins);
-    setText("#homeStreakCount", claims);
-    setText("#homeXp", `Lv ${level} · ${xp} XP`);
-    renderOrganizationUi();
+    homeLoadPromise = (async () => {
+      const { data, error } = await sb.rpc("biteboss_my_summary");
+      if(error){
+        console.warn(error);
+        return;
+      }
+      paintMemberSummary(data || {}, { cache:true });
+    })().finally(() => {
+      homeLoadPromise = null;
+    });
 
-    updateHomeProtectionMeter(summary);
-    updateProfileMeter(bossCount);
-    updateRankMeter(xp);
-    cacheRankMeterXp(xp);
-    await loadHistory();
+    return homeLoadPromise;
   }
 
   function updateHomeProtectionMeter(data){
