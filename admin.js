@@ -690,16 +690,27 @@
   }
 
   async function loadStores(){
-    const { data, error } = await adminSb
-      .from("biteboss_stores")
-      .select("*")
-      .order("created_at", { ascending:false });
+    const pageSize = 1000;
+    const allStores = [];
 
-    if(error){
-      console.warn(error);
-      return;
+    for(let from = 0; ; from += pageSize){
+      const { data, error } = await adminSb
+        .from("biteboss_stores")
+        .select("*")
+        .order("created_at", { ascending:false })
+        .range(from, from + pageSize - 1);
+
+      if(error){
+        console.warn(error);
+        return;
+      }
+
+      const rows = Array.isArray(data) ? data : [];
+      allStores.push(...rows);
+      if(rows.length < pageSize) break;
     }
-    stores = data || [];
+
+    stores = allStores;
     renderStores();
     await renderQr();
   }
