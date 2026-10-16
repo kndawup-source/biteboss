@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.65";
+  const BITEBOSS_BUILD = "81.67";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -10,6 +10,16 @@
   const $$ = q => [...document.querySelectorAll(q)];
 
   const cfg = window.BITEBOSS_CONFIG || {};
+
+  async function ensureRuntimeDependency(name){
+    try{
+      if(window.BiteBossDeps?.ensure) await window.BiteBossDeps.ensure(name);
+      return true;
+    }catch(error){
+      console.warn(`BiteBoss dependency ${name}:`, error);
+      return false;
+    }
+  }
 
   const DEFAULT_NICKNAME_AREAS = Object.freeze(["명동","성수","홍대","연남","을지로","종로","강남","잠실","신촌","이태원","망원","합정","한남","청담","압구정","건대","문래","익선","서촌","해방촌","일산","가로수길","용산","마포","여의도","광화문","동대문","신사","혜화","상수"]);
   const DEFAULT_NICKNAME_TITLES = Object.freeze(["먹깨비","먹짱","맛대장","한입왕","밥도둑","맛도깨비","냠냠왕","먹보스","맛보스","쩝쩝박사","한그릇왕","두그릇왕","맛집사냥꾼","메뉴정복자","골목미식가","야식대장","간식대장","국밥대장","면치기왕","고기대장","디저트왕","커피대장","빵순례자","밥친구","맛탐험가","먹방대장","맛부장","냠냠대장","식도락왕","한입대장","배부른왕","맛고수","먹고수","맛수집가","끼니대장","메뉴헌터","맛집대장","먹대장","맛짱","푸드파이터"]);
@@ -159,8 +169,7 @@
     takeover_grace_seconds:3,
     takeover_cancel_outside_seconds:12,
     hot_store_challenges_24h:5,
-    new_player_protection_claims:5,
-    season_days:30
+    new_player_protection_claims:5
   };
 
   const DEFAULT_PROFILE_IMAGE_CACHE_KEY = "biteboss-default-profile-image-v1";
@@ -240,6 +249,11 @@
   let scanner = null;
   let currentRank = "players";
   let currentRankPeriod = "week";
+  const RANK_PERIODS = new Set(["week","month","all"]);
+  function normalizeRankPeriod(value){
+    const period = String(value || "").trim();
+    return RANK_PERIODS.has(period) ? period : "week";
+  }
   let rankLoadSeq = 0;
   let storePage = 1;
   const STORE_PAGE_SIZE = 8;
@@ -641,7 +655,7 @@
     });
     $$("[data-rank-period]").forEach(btn => {
       btn.addEventListener("click", async () => {
-        currentRankPeriod = String(btn.dataset.rankPeriod || "week");
+        currentRankPeriod = normalizeRankPeriod(btn.dataset.rankPeriod);
         $$("[data-rank-period]").forEach(item => item.classList.toggle("active", item === btn));
         await loadRank();
       });
@@ -1054,16 +1068,6 @@
     };
     image.onerror = () => { banner.classList.add("hidden"); image.removeAttribute("src"); };
     trackAdEvent(homeCampaign.id, "impression");
-  }
-
-  function hideBanner(){
-    activeBanner = null;
-    const banner = $("#homeAdBanner");
-    const image = $("#homeAdImage");
-    banner?.classList.add("hidden");
-    if(banner){ banner.removeAttribute("href"); banner.onclick = null; }
-    if(image){ image.removeAttribute("src"); image.onerror = null; }
-    hideTakeoverAd();
   }
 
   function hideTakeoverAd(){
@@ -1775,7 +1779,7 @@
     image.src = src;
   }
 
-  function occupiedStoreAvatarMarkup(store, className = "store-card-photo"){
+  function occupiedStoreAvatarMarkup(store, className = "store-card-photo", { priority = false } = {}){
     const photoUrl = String(store?.photo_url || "").trim();
     const storeName = String(store?.name || "매장").trim();
     const occupierCustomUrl = String(
@@ -1800,14 +1804,15 @@
       return storeAvatarMarkup(photoUrl, storeName, className);
     }
 
-    preloadOccupiedAvatar(occupierUrl);
+    const imageLoading = priority ? `loading="eager" fetchpriority="high"` : `loading="lazy"`;
+    if(priority) preloadOccupiedAvatar(occupierUrl);
     const storeSide = photoUrl
-      ? `<img src="${escapeAttr(photoUrl)}" alt="" loading="eager" fetchpriority="high" decoding="async" />`
+      ? `<img src="${escapeAttr(photoUrl)}" alt="" ${imageLoading} decoding="async" />`
       : `<span class="occupied-store-initial" aria-hidden="true">${escapeHtml(Array.from(storeName)[0] || "B")}</span>`;
 
     return `<span class="${escapeAttr(className)} occupied-store-avatar" role="img" aria-label="${escapeAttr(storeName)} 점령 매장">
       <span class="occupied-store-half occupied-store-half-store">${storeSide}</span>
-      <span class="occupied-store-half occupied-store-half-boss"><img src="${escapeAttr(occupierUrl)}" alt="" loading="eager" fetchpriority="high" decoding="async" /></span>
+      <span class="occupied-store-half occupied-store-half-boss"><img src="${escapeAttr(occupierUrl)}" alt="" ${imageLoading} decoding="async" /></span>
     </span>`;
   }
 
@@ -1817,7 +1822,7 @@
     const url = customUrl || defaultUrl;
     const name = String(nickname || "보스").trim();
     if(url){
-      const criticalAvatar = !customUrl || /(?:crew-rank-avatar|crew-profile-avatar|organization-member-avatar|organization-detail-member-avatar|nearby-avatar|rank-player-avatar|my-rank-avatar)/.test(String(className));
+      const criticalAvatar = !customUrl || /(?:arena-boss-avatar|boss-focus-avatar|my-rank-avatar)/.test(String(className));
       if(criticalAvatar) preloadOccupiedAvatar(url);
       const loading = criticalAvatar
         ? `loading="eager" fetchpriority="high"`
@@ -2173,11 +2178,6 @@
     if(String(activeStoreDetailId || "") === key) applyOwnerReclaimState(data);
   }
 
-  function invalidateStoreReclaimState(storeId){
-    const key = String(storeId || "").trim();
-    if(key) storeReclaimCache.delete(key);
-  }
-
   function renderStoreDetail(data, options = {}){
     const store = data.store || {};
     const game = data.game || {};
@@ -2264,7 +2264,7 @@
       <section class="store-detail-section">
         <h4>사진</h4>
         <div class="store-detail-gallery">
-          ${photos.map(photo => `<img src="${escapeAttr(photo.image_url)}" alt="${escapeAttr(photo.caption || store.name || "Store photo")}" />`).join("")}
+          ${photos.map(photo => `<img src="${escapeAttr(photo.image_url)}" alt="${escapeAttr(photo.caption || store.name || "Store photo")}" loading="lazy" decoding="async" />`).join("")}
         </div>
       </section>` : "";
 
@@ -2527,7 +2527,7 @@
       <div class="store-detail store-detail-v635">
         <header class="store-detail-head compact-store-head store-detail-identity">
           <div class="store-detail-primary-identity">
-            ${occupiedStoreAvatarMarkup(store, "store-detail-avatar")}
+            ${occupiedStoreAvatarMarkup(store, "store-detail-avatar", { priority:true })}
             <div class="store-detail-identity-copy">
               <strong>${escapeHtml(store.name || "매장")}</strong>
               ${detailLine ? `<p>${escapeHtml(detailLine)}</p>` : ""}
@@ -2651,7 +2651,7 @@
       </div>
     `;
 
-    renderStoreDetailMap(store);
+    void renderStoreDetailMap(store);
     bindStoreComments(store.id);
 
     if(ownerClaimHtml){
@@ -2967,11 +2967,13 @@
     return true;
   }
 
-  function renderStoreDetailMap(store = {}){
+  async function renderStoreDetailMap(store = {}){
     destroyStoreDetailMap();
 
     const mapEl = $("#storeDetailMap");
-    if(!mapEl || typeof L === "undefined") return;
+    if(!mapEl) return;
+    if(!window.L && !await ensureRuntimeDependency("leaflet")) return;
+    if(!document.body.contains(mapEl) || typeof L === "undefined") return;
 
     const lat = store.latitude == null || store.latitude === "" ? NaN : Number(store.latitude);
     const lng = store.longitude == null || store.longitude === "" ? NaN : Number(store.longitude);
@@ -4755,12 +4757,11 @@
     if(!section || !mapEl) return;
     section.classList.remove("hidden");
 
-    if(!window.L){
+    if(summaryEl) summaryEl.textContent = "점령지 불러오는 중…";
+    if(!window.L && !await ensureRuntimeDependency("leaflet")){
       if(summaryEl) summaryEl.textContent = "지도를 불러올 수 없습니다";
       return;
     }
-
-    if(summaryEl) summaryEl.textContent = "점령지 불러오는 중…";
 
     const { data, error } = await sb.rpc("biteboss_territory_map");
 
@@ -4986,15 +4987,51 @@
     }
   }
 
-  function compactSeasonRegionName(city, district){
-    const shortCity = String(city || "")
-      .trim()
-      .replace(/특별자치시$/u, "")
-      .replace(/특별자치도$/u, "")
-      .replace(/특별시$/u, "")
-      .replace(/광역시$/u, "")
-      .replace(/도$/u, "");
-    return [shortCity, String(district || "").trim()].filter(Boolean).join(" ") || "지역";
+  function crewLeaderName(row = {}, members = []){
+    const direct = [row.leader_name, row.founder_name, row.founder_nickname]
+      .map(value => String(value || "").trim())
+      .find(Boolean);
+    if(direct) return direct;
+
+    const leader = (Array.isArray(members) ? members : []).find(member =>
+      String(member?.role || "").toLowerCase() === "leader"
+    );
+    return String(leader?.nickname || leader?.username || "").trim();
+  }
+
+  async function hydrateCrewLeaderNames(rows = [], idKeys = ["id"]){
+    const source = Array.isArray(rows) ? rows : [];
+    const missingIds = [...new Set(source
+      .filter(row => !crewLeaderName(row))
+      .map(row => idKeys.map(key => String(row?.[key] || "").trim()).find(Boolean) || "")
+      .filter(Boolean))];
+    if(!missingIds.length) return source;
+
+    try{
+      const { data, error } = await sb.rpc("biteboss_crew_leader_names_v8167", {
+        p_organization_ids:missingIds
+      });
+      if(error) throw error;
+      const names = new Map((Array.isArray(data) ? data : []).map(row => [
+        String(row.organization_id || ""),
+        String(row.leader_name || "").trim()
+      ]));
+      return source.map(row => {
+        if(crewLeaderName(row)) return row;
+        const id = idKeys.map(key => String(row?.[key] || "").trim()).find(Boolean) || "";
+        const leaderName = names.get(id) || "";
+        return leaderName ? {...row, leader_name:leaderName, founder_name:leaderName} : row;
+      });
+    }catch(error){
+      console.warn("BiteBoss crew leader names:", error);
+      return source;
+    }
+  }
+
+  function crewMetaMarkup(row = {}, members = []){
+    const leaderName = crewLeaderName(row, members);
+    const memberCount = Number(row.member_count || 0);
+    return escapeHtml([leaderName ? `개설자 ${leaderName}` : "", `멤버 ${memberCount}명`].filter(Boolean).join(" · "));
   }
 
   function syncRankPeriodVisibility(){
@@ -5051,7 +5088,9 @@
         return;
       }
 
-      const rows = Array.isArray(data) ? data : [];
+      let rows = Array.isArray(data) ? data : [];
+      rows = await hydrateCrewLeaderNames(rows, ["crew_id", "id"]);
+      if(!isCurrentRequest()) return;
       if(!commitRankView()) return;
       setRankItems(rows.map((row,index)=>`
           <article class="rank-card local-crew-rank-card">
@@ -5070,7 +5109,7 @@
                 data-organization-profile="${escapeAttr(row.crew_id || "")}"
                 role="button"
                 tabindex="0">${escapeHtml(row.crew_name || "크루")}</strong>
-              <div class="rank-meta meta">개설자 ${escapeHtml(row.founder_name || "—")} · 멤버 ${Number(row.member_count || 0)}명</div>
+              <div class="rank-meta meta">${crewMetaMarkup(row)}</div>
             </div>
             <div class="rank-result">
               <b>${Number(row.territory_count || 0)}</b>
@@ -5081,7 +5120,7 @@
       return;
     }
 
-    const period = ["week","month","all"].includes(currentRankPeriod) ? currentRankPeriod : "week";
+    const period = normalizeRankPeriod(currentRankPeriod);
     const usePeriodRanking = (requestedRank === "players" || requestedRank === "organizations") && period !== "all";
     const rankingRequest = usePeriodRanking
       ? sb.rpc("biteboss_period_rank_v8160", { p_scope:requestedRank, p_period:period, p_limit:50 })
@@ -5097,6 +5136,10 @@
     }
 
     let rows = Array.isArray(data) ? data : [];
+    if(requestedRank === "organizations"){
+      rows = await hydrateCrewLeaderNames(rows, ["id"]);
+      if(!isCurrentRequest()) return;
+    }
 
     if(requestedRank === "organizations"){
       if(!commitRankView()) return;
@@ -5109,7 +5152,9 @@
         const me = myOrganizationIndex >= 0 ? rows[myOrganizationIndex] : organization;
         const myCrewName = String(me?.name || organization?.name || "내 크루").trim();
         const myCrewAvatar = String(me?.avatar_url || organization?.avatar_url || "").trim();
-        const myCrewLeader = String(me?.leader_name || organization?.leader_name || profile?.nickname || "").trim();
+        const myCrewLeader = crewLeaderName(me, organizationMembers)
+          || crewLeaderName(organization, organizationMembers)
+          || (organization?.is_leader ? String(profile?.nickname || "").trim() : "");
         const myCrewMembers = Number(me?.member_count ?? organization?.member_count ?? 0);
         const myCrewTerritories = Number(me?.territory_count ?? organization?.territory_count ?? 0);
 
@@ -5152,7 +5197,7 @@
               data-organization-profile="${escapeAttr(row.id || "")}"
               role="button"
               tabindex="0">${escapeHtml(row.name || "크루")}</strong>
-            <div class="rank-meta meta">개설자 ${escapeHtml(row.leader_name || "—")} · 멤버 ${Number(row.member_count || 0)}명</div>
+            <div class="rank-meta meta">${crewMetaMarkup(row)}</div>
           </div>
           <div class="rank-result">
             <b>${Number(usePeriodRanking ? row.score : (row.territory_count || 0)).toLocaleString("ko-KR")}</b>
@@ -5295,6 +5340,10 @@
 
   async function scanPrompt(){
     if(!playerSession?.authenticated) return openMemberLogin();
+    if(!window.Html5Qrcode && !await ensureRuntimeDependency("scanner")){
+      toast("QR 스캐너를 불러오지 못했습니다.");
+      return;
+    }
     openModal("QR 스캔", `
       <div class="scan-direct">
         <div id="qrReader" class="scanner-box"></div>
@@ -5985,7 +6034,7 @@
           </div>
           <label class="profile-image-picker" for="profilePhotoInput">
             <span class="profile-image-picker-preview">
-              ${avatarUrl ? `<img src="${escapeAttr(avatarUrl)}" alt="" />` : `<span aria-hidden="true"></span>`}
+              ${avatarUrl ? `<img src="${escapeAttr(avatarUrl)}" alt="" loading="lazy" decoding="async" />` : `<span aria-hidden="true"></span>`}
             </span>
             <span class="profile-image-picker-copy">
               <strong>이미지 선택</strong>
@@ -6123,7 +6172,7 @@
         <div class="crew-profile-editor-hero">
           <div class="crew-avatar-editor-preview">
             ${currentUrl
-              ? `<img src="${escapeAttr(currentUrl)}" alt="${escapeAttr(crewName)} 크루 프로필" />`
+              ? `<img src="${escapeAttr(currentUrl)}" alt="${escapeAttr(crewName)} 크루 프로필" loading="lazy" decoding="async" />`
               : `<span aria-hidden="true">${escapeHtml(fallback)}</span>`}
           </div>
           <div class="crew-profile-hero-copy">
@@ -7222,6 +7271,7 @@
     );
     const sortedTerritories = [...allTerritories].sort((a,b) => territoryRecencyValue(b) - territoryRecencyValue(a));
     const publicTerritories = sortedTerritories.slice(0,3);
+    const leaderName = crewLeaderName(org, members);
     const CREW_PAGE_SIZE = 8;
     let territoryPage = 1;
     let memberPage = 1;
@@ -7340,6 +7390,7 @@
           <div class="player-profile-hero-copy crew-profile-hero-copy">
             <span>크루</span>
             <strong>${escapeHtml(org.name || "크루")}</strong>
+            ${leaderName ? `<p>개설자 ${escapeHtml(leaderName)}</p>` : ""}
             ${primaryRegion ? `<p>주요 활동 지역 · ${escapeHtml(primaryRegion)}</p>` : ""}
           </div>
         </section>
@@ -7639,7 +7690,7 @@
         </details>
       `;
 
-      renderCrewInviteQr(shareUrl);
+      await renderCrewInviteQr(shareUrl);
 
       $("#crewInviteShareBtn")?.addEventListener("click", () => shareCrewInvite(shareUrl));
       $("#crewInviteNewBtn")?.addEventListener("click", rotateCrewInviteQr);
@@ -7651,16 +7702,17 @@
     }
   }
 
-  function renderCrewInviteQr(value){
+  async function renderCrewInviteQr(value){
     const target = $("#crewInviteQr");
     if(!target) return;
 
     target.innerHTML = "";
 
-    if(!window.QRCode){
+    if(!window.QRCode && !await ensureRuntimeDependency("qrcode")){
       target.innerHTML = `<div class="crew-qr-fallback">QR을 사용할 수 없습니다.</div>`;
       return;
     }
+    if(!document.body.contains(target)) return;
 
     new QRCode(target, {
       text:value,
@@ -8259,41 +8311,6 @@
     }
   }
 
-  function renderNotificationSettingsState(){
-    const row = $("#notificationSettingsState");
-    if(!row) return;
-    if(!playerSession?.authenticated){
-      row.textContent = "";
-      return;
-    }
-    if(!isNativeApp()){
-      row.textContent = pushUnreadCount ? `새 알림 ${pushUnreadCount}` : "앱에서 설정";
-      return;
-    }
-    const enabled = pushPreferences?.push_enabled === true && pushPermissionState === "granted";
-    row.textContent = pushUnreadCount
-      ? `새 알림 ${pushUnreadCount}`
-      : enabled
-        ? "켜짐"
-        : pushPermissionState === "denied"
-          ? "꺼짐"
-          : "설정";
-  }
-
-  async function openNotificationSettings(){
-    if(!playerSession?.authenticated){
-      openMemberLogin();
-      return;
-    }
-    notificationPage = 1;
-    await refreshNotificationState();
-    await loadNotificationInbox();
-    renderNotificationSettingsModal();
-    // Keep the just-opened screen visually faithful to what was unread,
-    // then clear the badge for the next visit.
-    markNotificationsRead();
-  }
-
   async function markNotificationsRead(){
     try{
       const { error } = await sb.rpc("biteboss_mark_notifications_read_v627");
@@ -8709,18 +8726,6 @@
       barEl.style.width = `${safePercent}%`;
       barEl.classList.toggle("muted", muted);
     }
-  }
-
-  function partnershipLabel(status){
-    if(status === "partnered") return "Partner";
-    if(status === "claimed") return "Managed";
-    return "Listed";
-  }
-
-  function partnershipClass(status){
-    if(status === "partnered") return "partnered";
-    if(status === "claimed") return "claimed";
-    return "unclaimed";
   }
 
   function categoryLabel(category){
