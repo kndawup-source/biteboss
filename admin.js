@@ -2096,7 +2096,7 @@
     const {data,error}=await adminSb.rpc("biteboss_admin_ad_analytics_v8179",{p_days:days});
     if(error){
       console.warn("BiteBoss ad analytics:",error);
-      chart.innerHTML='<div class="analytics-empty">광고 성과 데이터를 불러오지 못했습니다. v81.91 SQL 적용 여부를 확인하세요.</div>';
+      chart.innerHTML='<div class="analytics-empty">광고 성과 데이터를 불러오지 못했습니다. v81.92 SQL 적용 여부를 확인하세요.</div>';
       return;
     }
     renderAdAnalytics(data || {});
@@ -2393,58 +2393,48 @@
   }
 
   function splitAdminDateTime(value){
-    const text = String(value || "").trim();
-    if(!text) return { date:"", time:"" };
-    const [date="", rawTime=""] = text.split("T");
-    return { date, time:rawTime.slice(0,5) };
+    const text=String(value || "").trim();
+    if(!text) return {date:"",time:""};
+    const [date="",rawTime=""]=text.split("T");
+    return {date,time:rawTime.slice(0,5)};
   }
 
   function formatAdminDatePart(date){
     if(!date) return "날짜 선택";
-    const [y,m,d] = date.split("-");
+    const [y,m,d]=date.split("-");
     if(!y || !m || !d) return date;
     return `${y}. ${Number(m)}. ${Number(d)}.`;
   }
 
   function formatAdminTimePart(time){
     if(!time) return "시간 선택";
-    const [hh="0", mm="00"] = time.split(":");
-    const hour = Number(hh);
+    const [hh="0",mm="00"]=time.split(":");
+    const hour=Number(hh);
     return `${hour < 12 ? "오전" : "오후"} ${hour % 12 || 12}:${mm}`;
   }
 
-  function renderAdminDateTimeControl(nativeId, dateId, timeId, datePickerId, timePickerId){
-    const native=$(nativeId), date=$(dateId), time=$(timeId);
-    const datePicker=$(datePickerId), timePicker=$(timePickerId);
+  function renderAdminDateTimeControl(nativeId,dateId,timeId,datePickerId,timePickerId){
+    const native=$(nativeId),date=$(dateId),time=$(timeId);
+    const datePicker=$(datePickerId),timePicker=$(timePickerId);
     if(!native || !date || !time || !datePicker || !timePicker) return;
     const parts=splitAdminDateTime(native.value);
+    if(datePicker.value!==parts.date) datePicker.value=parts.date;
+    if(timePicker.value!==parts.time) timePicker.value=parts.time;
     date.textContent=formatAdminDatePart(parts.date);
     time.textContent=formatAdminTimePart(parts.time);
-    date.classList.toggle("is-placeholder", !parts.date);
-    time.classList.toggle("is-placeholder", !parts.time);
-    datePicker.value=parts.date;
-    timePicker.value=parts.time;
+    date.classList.toggle("is-placeholder",!parts.date);
+    time.classList.toggle("is-placeholder",!parts.time);
   }
 
-  function bindAdminDateTimeControl(nativeId, dateId, timeId){
-    const native=$(nativeId), date=$(dateId), time=$(timeId);
-    const datePicker=$(`${dateId}Picker`), timePicker=$(`${timeId}Picker`);
-    if(!native || !date || !time || !datePicker || !timePicker) return;
+  function bindAdminDateTimeControl(nativeId,dateId,timeId){
+    const native=$(nativeId);
+    const datePicker=$(`${dateId}Picker`),timePicker=$(`${timeId}Picker`);
+    if(!native || !datePicker || !timePicker) return;
 
     const commit=()=>{
       native.value=datePicker.value && timePicker.value ? `${datePicker.value}T${timePicker.value}` : "";
       native.dispatchEvent(new Event("change",{bubbles:true}));
-      renderAdminDateTimeControl(nativeId,dateId,timeId,`${dateId}Picker`,`${timeId}Picker`);
     };
-    const open=(picker)=>{
-      try{
-        if(typeof picker.showPicker==="function") picker.showPicker();
-        else picker.click();
-      }catch(_error){ picker.click(); }
-    };
-
-    date.addEventListener("click",()=>open(datePicker));
-    time.addEventListener("click",()=>open(timePicker));
     datePicker.addEventListener("change",commit);
     timePicker.addEventListener("change",commit);
     native.addEventListener("change",()=>renderAdminDateTimeControl(nativeId,dateId,timeId,`${dateId}Picker`,`${timeId}Picker`));
