@@ -9,7 +9,7 @@
   <meta property="og:title" content="BiteBoss" />
   <meta property="og:description" content="주변 매장을 발견하고 도전해 보스를 차지하세요." />
   <meta property="og:type" content="website" />
-  <meta name="biteboss-build" content="81.28" />
+  <meta name="biteboss-build" content="81.49" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -22,7 +22,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet" />
   <link rel="manifest" href="./manifest.webmanifest?v=81.28" />
-  <link rel="stylesheet" href="./styles.css?v=81.28" />
+  <link rel="stylesheet" href="./styles.css?v=81.49" />
 </head>
 <body class="user-app home-active">
 <div id="app" class="app-shell">
@@ -232,6 +232,12 @@
         <span class="takeover-minutes">00</span><span class="takeover-colon" aria-hidden="true">:</span><span class="takeover-seconds">20</span>
       </div>
     </div>
+    <aside id="takeoverAdSlot" class="takeover-ad-slot hidden" aria-label="광고">
+      <div class="takeover-ad-meta"><span>SPONSORED</span><span id="takeoverAdAdvertiser"></span></div>
+      <a id="takeoverAdLink" class="takeover-ad-link" target="_blank" rel="noopener noreferrer">
+        <img id="takeoverAdImage" class="takeover-ad-image" alt="" decoding="async" />
+      </a>
+    </aside>
     <div class="takeover-bottom">
       <div class="takeover-bottom-grid">
         <p id="takeoverStatus" class="takeover-status">매장 안에서 위치를 유지하세요.</p>
@@ -254,6 +260,6 @@
   </div>
 </div>
 
-<script src="./bootstrap.js?v=81.28"></script>
+<script src="./bootstrap.js?v=81.49"></script>
 </body>
 </html>

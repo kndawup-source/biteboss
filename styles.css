@@ -301,7 +301,7 @@ html.modal-open,body.modal-open{overflow:hidden;overscroll-behavior:none}body.mo
 /* takeover */
 .takeover-screen{position:fixed;z-index:1500;inset:0;display:flex;overflow:hidden;background:var(--bg);color:#111}
 .takeover-screen.hidden{display:none}
-.takeover-screen-inner{width:100%;max-width:680px;min-width:0;min-height:100%;margin:0 auto;padding:max(24px,var(--safe-top)) 22px max(24px,var(--safe-bottom));display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;overflow:hidden}
+.takeover-screen-inner{width:100%;max-width:680px;min-width:0;min-height:100%;margin:0 auto;padding:max(24px,var(--safe-top)) 22px max(24px,var(--safe-bottom));display:grid;grid-template-rows:auto auto minmax(0,1fr) auto auto;overflow:hidden}
 .takeover-topline{display:flex;justify-content:space-between;color:#96969c;font-size:8px;font-weight:820;letter-spacing:.14em}
 .takeover-topline span:last-child{color:var(--accent)}
 .takeover-title-block{min-width:0;padding-top:22px}
@@ -317,6 +317,13 @@ html.modal-open,body.modal-open{overflow:hidden;overscroll-behavior:none}body.mo
 .takeover-count.is-word{display:block;width:auto;min-width:4.58ch}
 .takeover-word{display:block;text-align:center}
 .takeover-count.is-final{color:var(--accent)}
+.takeover-ad-slot{width:100%;min-width:0;margin:0 0 16px}
+.takeover-ad-slot.hidden{display:none}
+.takeover-ad-meta{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 2px 7px;color:#a0a0a6;font-size:7px;line-height:1;font-weight:850;letter-spacing:.12em}
+.takeover-ad-meta span:last-child{max-width:62%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right;letter-spacing:0;font-weight:750}
+.takeover-ad-link{display:block;width:100%;aspect-ratio:3/1;border-radius:14px;overflow:hidden;background:#ededf0;text-decoration:none}
+.takeover-ad-image{display:block;width:100%;height:100%;object-fit:cover}
+.takeover-ad-link:active{opacity:.92}
 .takeover-bottom{min-width:0;display:grid;gap:11px}
 .takeover-bottom-grid{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;min-width:0}
 .takeover-status{min-width:0;margin:0;color:#77777d;font-size:11px}

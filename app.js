@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.48";
+  const BITEBOSS_BUILD = "81.49";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -948,6 +948,7 @@
     }
 
     activeBanner = data;
+    if(takeoverUi) renderTakeoverAd(data);
     image.src = data.image_url;
     image.alt = data.advertiser_name ? `${data.advertiser_name} sponsored banner` : "Sponsored banner";
     banner.href = /^https?:\/\//i.test(String(data.click_url || "")) ? data.click_url : "#";
@@ -970,15 +971,50 @@
     banner?.classList.add("hidden");
     if(banner){ banner.removeAttribute("href"); banner.onclick = null; }
     if(image){ image.removeAttribute("src"); image.onerror = null; }
+    hideTakeoverAd();
   }
 
-  async function trackAdEvent(campaignId, eventType){
+  function hideTakeoverAd(){
+    const slot=$("#takeoverAdSlot");
+    const link=$("#takeoverAdLink");
+    const image=$("#takeoverAdImage");
+    if(slot) slot.classList.add("hidden");
+    if(link){ link.removeAttribute("href"); link.onclick=null; }
+    if(image){ image.removeAttribute("src"); image.onerror=null; }
+  }
+
+  function renderTakeoverAd(campaign=activeBanner){
+    const slot=$("#takeoverAdSlot");
+    const link=$("#takeoverAdLink");
+    const image=$("#takeoverAdImage");
+    const advertiser=$("#takeoverAdAdvertiser");
+    if(!slot || !link || !image || !campaign?.id || !campaign?.image_url){
+      hideTakeoverAd();
+      return;
+    }
+
+    const storeId=String(takeoverUi?.storeId || "");
+    image.src=String(campaign.image_url);
+    image.alt=campaign.advertiser_name ? `${campaign.advertiser_name} 광고` : "Sponsored";
+    if(advertiser) advertiser.textContent=String(campaign.advertiser_name || "광고");
+    const clickUrl=/^https?:\/\//i.test(String(campaign.click_url || "")) ? String(campaign.click_url) : "";
+    if(clickUrl) link.href=clickUrl; else link.removeAttribute("href");
+    link.onclick=event=>{
+      if(!clickUrl){ event.preventDefault(); return; }
+      trackAdEvent(campaign.id,"click",`${adSessionKey}:takeover:${storeId}`);
+    };
+    image.onerror=hideTakeoverAd;
+    slot.classList.remove("hidden");
+    trackAdEvent(campaign.id,"impression",`${adSessionKey}:takeover:${storeId}`);
+  }
+
+  async function trackAdEvent(campaignId, eventType, sessionKey=adSessionKey){
     if(!campaignId || !window.sb) return;
     try{
       const { error } = await sb.rpc("biteboss_track_ad_event", {
         p_campaign_id:campaignId,
         p_event_type:eventType,
-        p_session_key:adSessionKey
+        p_session_key:sessionKey
       });
       if(error) console.warn("BiteBoss ad tracking:", error);
     }catch(error){
@@ -3795,6 +3831,7 @@
     updateTakeoverUi(state.status||"tracking",state.reason||"");
     screen.classList.remove("hidden");
     document.body.classList.add("takeover-active");
+    renderTakeoverAd(activeBanner);
     startTakeoverUiTicker();
   }
 
@@ -3908,6 +3945,7 @@
 
     const run=()=>{
       $("#takeoverScreen")?.classList.add("hidden");
+      hideTakeoverAd();
       document.body.classList.remove("takeover-active");
       takeoverUiTimer = clearIntervalRef(takeoverUiTimer);
       takeoverUi=null; takeoverRemaining=0; takeoverRequired=0; takeoverLastServerAt=0;
