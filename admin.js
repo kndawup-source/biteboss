@@ -2096,7 +2096,7 @@
     const {data,error}=await adminSb.rpc("biteboss_admin_ad_analytics_v8179",{p_days:days});
     if(error){
       console.warn("BiteBoss ad analytics:",error);
-      chart.innerHTML='<div class="analytics-empty">광고 성과 데이터를 불러오지 못했습니다. v81.94 SQL 적용 여부를 확인하세요.</div>';
+      chart.innerHTML='<div class="analytics-empty">광고 성과 데이터를 불러오지 못했습니다. v81.95 SQL 적용 여부를 확인하세요.</div>';
       return;
     }
     renderAdAnalytics(data || {});
