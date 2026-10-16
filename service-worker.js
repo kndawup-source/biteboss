@@ -1,4 +1,4 @@
-const BUILD = "81.65";
+const BUILD = "81.67";
 const CACHE_NAME = `biteboss-v${BUILD}`;
 const versioned = path => `${path}?v=${BUILD}`;
 const SHELL = [
@@ -11,13 +11,7 @@ const SHELL = [
   versioned("./supabase.js"),
   versioned("./manifest.webmanifest"),
   versioned("./privacy-policy.html"),
-  versioned("./support.html"),
-  versioned("./admin.html"),
-  versioned("./admin.css"),
-  versioned("./admin.js"),
-  versioned("./store-admin.html"),
-  versioned("./store-admin.css"),
-  versioned("./store-admin.js")
+  versioned("./support.html")
 ];
 
 self.addEventListener("install", event => {
