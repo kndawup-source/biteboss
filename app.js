@@ -2600,16 +2600,18 @@
               (minimumRole === "crew" && (myRole === "crew" || myRole === "boss")) ||
               (minimumRole === "boss" && myRole === "boss")
             );
-            const accessLabel = minimumRole === "boss"
-              ? "보스 전용"
+            const accessLabels = minimumRole === "boss"
+              ? ["보스"]
               : minimumRole === "crew"
-                ? "크루 + 보스"
-                : "모두 사용";
+                ? ["크루","보스"]
+                : ["모두 사용"];
 
             return `
               <article class="partner-benefit ${eligible ? "is-eligible" : "is-locked"}">
                 <div>
-                  <span>${escapeHtml(accessLabel)}</span>
+                  <div class="benefit-role-badges" aria-label="${escapeAttr(accessLabels.join(", "))}">
+                    ${accessLabels.map(label => `<span>${escapeHtml(label)}</span>`).join("")}
+                  </div>
                   <strong>${escapeHtml(item.title)}</strong>
                   ${item.description ? `<p>${escapeHtml(item.description)}</p>` : ""}
                 </div>
