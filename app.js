@@ -365,6 +365,7 @@
 
     // Paint the last successful hero immediately while auth/config load in the background.
     renderHomeSplashImage({ preferCached:true, allowEmpty:false });
+    paintImmediatePartnerBanner();
 
     if(!window.sb){
       throw new Error(window.BITEBOSS_BOOT_ERROR || "BiteBoss could not connect to Supabase.");
@@ -398,14 +399,14 @@
     renderHomeCopy();
     paintImmediatePartnerBanner();
     updateProfileUi();
-    await refreshNotificationState({ registerIfGranted:true });
+    void refreshNotificationState({ registerIfGranted:true });
 
     const initialPositionPromise = getPositionSafe(false, {
       timeout:RUNTIME.initialLocationTimeoutMs,
       maximumAge:RUNTIME.initialLocationMaxAgeMs
     });
 
-    await Promise.all([
+    void Promise.allSettled([
       loadHome(),
       loadAlerts(),
       loadBanner()
@@ -924,7 +925,7 @@
     if(Object.prototype.hasOwnProperty.call(rows, "default_profile_image_url")){
       config.default_profile_image_url = String(rows.default_profile_image_url || "").trim();
       cacheDefaultProfileImage(config.default_profile_image_url);
-      await preloadDefaultProfileImage(config.default_profile_image_url);
+      void preloadDefaultProfileImage(config.default_profile_image_url);
     }
 
     // v81 canonical banner payload. Legacy keys are read only as a temporary
@@ -2142,11 +2143,51 @@
     return null;
   }
 
+  const STORE_DETAIL_CACHE_TTL_MS = 2 * 60 * 1000;
+  const storeDetailMemoryCache = new Map();
+
+  function readCachedStoreDetail(storeId){
+    const key=String(storeId || "").trim();
+    const cached=storeDetailMemoryCache.get(key);
+    if(!cached || Date.now()-cached.savedAt>STORE_DETAIL_CACHE_TTL_MS) return null;
+    return cached.data;
+  }
+
+  function cacheStoreDetail(storeId,data){
+    const key=String(storeId || "").trim();
+    if(!key || !data?.store) return;
+    storeDetailMemoryCache.set(key,{savedAt:Date.now(),data});
+    if(storeDetailMemoryCache.size>12){
+      const oldest=[...storeDetailMemoryCache.entries()].sort((a,b)=>a[1].savedAt-b[1].savedAt)[0];
+      if(oldest) storeDetailMemoryCache.delete(oldest[0]);
+    }
+  }
+
+  function preloadStoreDetailPhotos(data){
+    (Array.isArray(data?.photos) ? data.photos : []).slice(0,2).forEach((photo,index)=>{
+      const src=String(photo?.image_url || "").trim();
+      if(!src) return;
+      const image=new Image();
+      image.decoding=index===0 ? "sync" : "async";
+      image.fetchPriority=index===0 ? "high" : "auto";
+      image.src=src;
+    });
+  }
+
   async function openStoreDetail(storeId, options = {}){
     const cached = stores.find(store => String(store.id) === String(storeId))
       || (options?.storeFallback && String(options.storeFallback.id) === String(storeId)
         ? options.storeFallback
         : null);
+    const cachedDetail=readCachedStoreDetail(storeId);
+    if(cachedDetail){
+      activeStoreDetailId=String(storeId);
+      if(options?.preserveModal !== true) openModal("", "", { type:"store-detail" });
+      renderStoreDetail(cachedDetail,options);
+      preloadStoreDetailPhotos(cachedDetail);
+      return;
+    }
+
     if(options?.preserveModal !== true){
       openModal(
         "",
@@ -2183,6 +2224,7 @@
       }
 
       const data = detailResult.data;
+      preloadStoreDetailPhotos(data);
       data.game = statusResult.error ? null : (statusResult.data || null);
       data.organization = orgResult.error ? null : (orgResult.data || null);
       data.offerAccess = offerResult.error ? null : (offerResult.data || null);
@@ -2204,10 +2246,25 @@
       // Store detail RPCs on older deployments may omit coordinates. This must not make
       // "내 점령지" different from any other store detail: resolve the same canonical
       // store coordinates by id before rendering the shared detail map.
-      await resolveStoreDetailCoordinates(data.store, cached);
+      const directCoords=cacheStoreCoordinates(String(storeId),data.store)
+        || cacheStoreCoordinates(String(storeId),cached)
+        || storeDetailCoordinateCache.get(String(storeId))
+        || null;
+      if(directCoords){
+        data.store.latitude=directCoords.latitude;
+        data.store.longitude=directCoords.longitude;
+      }
 
+      cacheStoreDetail(storeId,data);
       activeStoreDetailId = String(storeId);
       renderStoreDetail(data, options);
+
+      if(!directCoords){
+        void resolveStoreDetailCoordinates(data.store,cached).then(()=>{
+          cacheStoreDetail(storeId,data);
+          if(activeStoreDetailId===String(storeId)) renderStoreDetail(data,options);
+        });
+      }
 
       if(playerSession?.authenticated && String(data.game?.my_role || "visitor") === "boss" && !cachedReclaim?.fresh){
         void refreshOwnStoreReclaimState(storeId);
@@ -4526,10 +4583,15 @@
 
   const partnerBannerPhotoHydration = new Map();
 
-  async function hydratePartnerBannerPhoto(banner){
+  async function hydratePartnerBannerPhoto(banner, { force=false } = {}){
     if(!banner) return;
     const storeId=String(banner.store_id || banner.target_store_id || banner.id || "").trim();
     if(!storeId || partnerBannerPhotoHydration.has(storeId)) return partnerBannerPhotoHydration.get(storeId);
+    const immediatePhoto=String(banner.photo_url || banner.store_photo_url || cachedPartnerBannerPhoto(storeId) || "").trim();
+    if(immediatePhoto && !force){
+      preloadPartnerBannerPhoto(immediatePhoto);
+      return immediatePhoto;
+    }
 
     const request=(async()=>{
       try{
