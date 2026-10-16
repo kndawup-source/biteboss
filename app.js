@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.67";
+  const BITEBOSS_BUILD = "81.68";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -5039,6 +5039,11 @@
     if(!periods) return;
     const supported = currentRank === "players" || currentRank === "organizations";
     periods.classList.toggle("hidden", !supported);
+    const activePeriod = normalizeRankPeriod(currentRankPeriod);
+    $$('[data-rank-period]').forEach(button => {
+      button.classList.toggle("active", button.dataset.rankPeriod === activePeriod);
+      button.setAttribute("aria-pressed", button.dataset.rankPeriod === activePeriod ? "true" : "false");
+    });
   }
 
   async function loadRank(){
