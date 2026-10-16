@@ -450,3 +450,13 @@ body.biteboss-info-page{min-height:100dvh;background:var(--bg);color:#111}.info-
 .store-owner-auth-btn{width:100%;min-height:38px;padding:0 2px;border:0;border-top:1px solid #e2e2e5;background:transparent;color:#111;font:inherit;font-size:11px;font-weight:850;text-align:left;cursor:pointer}
 
 .store-owner-empty-title{font-size:12px;line-height:1.35;font-weight:800}
+
+/* Nearby capture choice: shown only when multiple eligible stores overlap the GPS radius. */
+.takeover-choice-copy{margin:0 0 14px;color:#77777d;font-size:12px;line-height:1.5}
+.takeover-choice-list{display:grid;border-top:1px solid #e2e2e5}
+.takeover-choice-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:stretch;border-bottom:1px solid #e2e2e5}
+.takeover-choice-select{min-width:0;padding:14px 8px 14px 0;border:0;background:transparent;text-align:left;display:grid;gap:4px}
+.takeover-choice-select strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#111;font-size:14px;font-weight:850}
+.takeover-choice-select span{color:#77777d;font-size:11px;font-weight:700}
+.takeover-choice-dismiss{padding:0 2px 0 16px;border:0;background:transparent;color:#8b8b91;font-size:11px;font-weight:800}
+.takeover-choice-more{padding-top:12px;color:#8b8b91;font-size:11px;line-height:1.4}

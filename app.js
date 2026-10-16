@@ -275,6 +275,10 @@
   let takeoverRemaining = 0;
   let takeoverRequired = 0;
   let takeoverCancelledLocally = false;
+  const dismissedTakeoverStores = new Map();
+  let preferredTakeoverStoreId = "";
+  let takeoverChoiceOpen = false;
+  const TAKEOVER_DISMISS_RESET_DISTANCE_M = 180;
   let modalScrollY = 0;
   let modalReturnFocus = null;
   let gamePulseLoadedAt = 0;
@@ -3801,14 +3805,110 @@
     }
   }
 
+  function dismissTakeoverStore(storeId){
+    const id=String(storeId||"").trim();
+    if(!id) return;
+    dismissedTakeoverStores.set(id,Date.now());
+    if(preferredTakeoverStoreId===id) preferredTakeoverStoreId="";
+  }
+
+  function pruneDismissedTakeoverStores(pos){
+    if(!pos?.coords) return;
+    for(const storeId of [...dismissedTakeoverStores.keys()]){
+      const store=stores.find(item=>String(item?.id||"")===storeId);
+      if(!store || !Number.isFinite(Number(store.latitude)) || !Number.isFinite(Number(store.longitude))){
+        dismissedTakeoverStores.delete(storeId);
+        continue;
+      }
+      const distance=haversineMeters(
+        pos.coords.latitude,
+        pos.coords.longitude,
+        Number(store.latitude),
+        Number(store.longitude)
+      );
+      if(distance>=TAKEOVER_DISMISS_RESET_DISTANCE_M) dismissedTakeoverStores.delete(storeId);
+    }
+    if(preferredTakeoverStoreId){
+      const preferred=stores.find(item=>String(item?.id||"")===preferredTakeoverStoreId);
+      if(!preferred || !Number.isFinite(Number(preferred.latitude)) || !Number.isFinite(Number(preferred.longitude))){
+        preferredTakeoverStoreId="";
+      }else{
+        const distance=haversineMeters(
+          pos.coords.latitude,
+          pos.coords.longitude,
+          Number(preferred.latitude),
+          Number(preferred.longitude)
+        );
+        if(distance>=TAKEOVER_DISMISS_RESET_DISTANCE_M) preferredTakeoverStoreId="";
+      }
+    }
+  }
+
+  function closeTakeoverChoice(){
+    takeoverChoiceOpen=false;
+    closeModal();
+  }
+
+  function openTakeoverChoice(rows){
+    if(takeoverChoiceOpen || !Array.isArray(rows) || rows.length<2) return false;
+    const modal=$("#modal");
+    if(modal && !modal.classList.contains("hidden")) return false;
+
+    takeoverChoiceOpen=true;
+    const visibleRows=rows.slice(0,8);
+    openModal("점령할 매장 선택", `
+      <div class="takeover-choice-copy">현재 위치에서 점령 가능한 매장이 여러 곳입니다. 실제 방문 중인 매장을 선택하세요.</div>
+      <div class="takeover-choice-list">
+        ${visibleRows.map(row=>`
+          <div class="takeover-choice-row" data-choice-row="${escapeAttr(row.store.id)}">
+            <button class="takeover-choice-select" type="button" data-takeover-choice="${escapeAttr(row.store.id)}">
+              <strong>${escapeHtml(row.store.name||"매장")}</strong>
+              <span>${escapeHtml(formatDistance(row.distance)||"가까움")}</span>
+            </button>
+            <button class="takeover-choice-dismiss" type="button" data-takeover-dismiss="${escapeAttr(row.store.id)}">제외</button>
+          </div>`).join("")}
+      </div>
+      ${rows.length>visibleRows.length ? `<div class="takeover-choice-more">가까운 매장 ${visibleRows.length}곳을 먼저 표시합니다.</div>` : ""}
+    `, {type:"notice"});
+
+    const body=$("#modalBody");
+    body?.querySelectorAll("[data-takeover-choice]").forEach(button=>{
+      button.addEventListener("click",()=>{
+        preferredTakeoverStoreId=String(button.dataset.takeoverChoice||"").trim();
+        takeoverCancelledLocally=false;
+        takeoverCancelResetTimer = clearTimeoutRef(takeoverCancelResetTimer);
+        closeTakeoverChoice();
+        void tickPresenceTracking();
+      });
+    });
+    body?.querySelectorAll("[data-takeover-dismiss]").forEach(button=>{
+      button.addEventListener("click",()=>{
+        const storeId=String(button.dataset.takeoverDismiss||"").trim();
+        dismissTakeoverStore(storeId);
+        button.closest("[data-choice-row]")?.remove();
+        const remaining=[...body.querySelectorAll("[data-takeover-choice]")].filter(item=>!dismissedTakeoverStores.has(String(item.dataset.takeoverChoice||"")));
+        if(remaining.length===1){
+          preferredTakeoverStoreId=String(remaining[0].dataset.takeoverChoice||"").trim();
+          closeTakeoverChoice();
+          void tickPresenceTracking();
+        }else if(remaining.length===0){
+          closeTakeoverChoice();
+        }
+      });
+    });
+    return true;
+  }
+
   function cancelTakeoverUi(){
+    const cancelledStoreId=String(takeoverUi?.storeId||"").trim();
+    if(cancelledStoreId) dismissTakeoverStore(cancelledStoreId);
     takeoverCancelledLocally=true;
     closeTakeoverUi();
     takeoverCancelResetTimer = clearTimeoutRef(takeoverCancelResetTimer);
     takeoverCancelResetTimer = window.setTimeout(()=>{
       takeoverCancelledLocally=false;
       takeoverCancelResetTimer=null;
-    },Math.max(5000,Number(config.gps_presence_ping_seconds||10)*1000));
+    },Math.max(1200,Number(config.gps_presence_ping_seconds||10)*250));
     showTakeoverCancelledNotice();
   }
 
@@ -4075,6 +4175,7 @@
       const pos = await getPositionSafe(false);
       if(!pos) return;
       lastPosition = pos;
+      pruneDismissedTakeoverStores(pos);
       updateStoreDetailUserLocation(pos);
       void refreshStoresForPosition(pos);
 
@@ -4139,8 +4240,34 @@
       const reclaimTarget = ownedInRadius
         .filter(row => row.reclaim?.is_boss !== false && (row.reclaim?.eligible === true || Number(row.reclaim?.remaining_seconds || 0) <= 0))
         .sort((a,b) => a.distance - b.distance)[0];
-      const normalTarget = distanceRows.find(row => !row.ownedByMe && row.distance <= radius);
-      const nearest = reclaimTarget || normalTarget || distanceRows[0];
+
+      const challengeRowsInRadius = distanceRows.filter(row =>
+        !row.ownedByMe &&
+        row.distance <= radius &&
+        !dismissedTakeoverStores.has(String(row.store.id))
+      );
+
+      let normalTarget = null;
+      if(preferredTakeoverStoreId){
+        normalTarget = distanceRows.find(row =>
+          !row.ownedByMe &&
+          String(row.store.id)===preferredTakeoverStoreId &&
+          !dismissedTakeoverStores.has(String(row.store.id))
+        ) || null;
+      }
+
+      if(!normalTarget && challengeRowsInRadius.length===1){
+        normalTarget=challengeRowsInRadius[0];
+        preferredTakeoverStoreId=String(normalTarget.store.id);
+      }else if(!normalTarget && challengeRowsInRadius.length>1 && !reclaimTarget){
+        if(openTakeoverChoice(challengeRowsInRadius)) return;
+        // Do not silently choose the nearest store while another modal is open.
+        return;
+      }
+
+      const nearest = reclaimTarget || normalTarget || distanceRows.find(row =>
+        row.ownedByMe || !dismissedTakeoverStores.has(String(row.store.id))
+      );
 
       if(!nearest) return;
 
@@ -4271,6 +4398,8 @@
           applyOptimisticReclaimCompletion(nearest.store.id, data?.reclaimed_at);
         }
         presenceState.delete(String(nearest.store.id));
+        dismissedTakeoverStores.delete(String(nearest.store.id));
+        if(preferredTakeoverStoreId===String(nearest.store.id)) preferredTakeoverStoreId="";
         if(presenceBoundaryTargetId === String(nearest.store.id)){
           presenceBoundaryTargetId = "";
           presenceLastInRadiusAt = 0;
@@ -8448,6 +8577,7 @@
     activeStoreDetailId = "";
 
     const modal = $("#modal");
+    takeoverChoiceOpen=false;
     modal?.classList.add("hidden");
     modal?.classList.remove("modal-detail-sheet", "modal-compact", "store-detail-modal", "player-profile-modal", "partner-request-modal", "notice-modal", "victory-modal");
     unlockModalScroll();
