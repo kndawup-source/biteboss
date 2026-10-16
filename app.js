@@ -2335,11 +2335,14 @@
         : `장시간 미방문 · 방어력 -${defenseDecay}`;
 
     const gallery = photos.length ? `
-      <section class="store-detail-section">
-        <h4>사진</h4>
-        <div class="store-detail-gallery">
-          ${photos.map(photo => `<img src="${escapeAttr(photo.image_url)}" alt="${escapeAttr(photo.caption || store.name || "Store photo")}" loading="lazy" decoding="async" />`).join("")}
+      <section class="store-detail-photo-section" aria-label="매장 사진">
+        <div class="store-detail-gallery" data-store-photo-gallery>
+          ${photos.map((photo,index) => `
+            <figure class="store-detail-photo-slide">
+              <img src="${escapeAttr(photo.image_url)}" alt="${escapeAttr(photo.caption || `${store.name || "매장"} 사진 ${index + 1}`)}" loading="${index === 0 ? "eager" : "lazy"}" decoding="async" />
+            </figure>`).join("")}
         </div>
+        ${photos.length > 1 ? `<div class="store-detail-photo-count" aria-hidden="true"><b data-store-photo-current>1</b> / ${photos.length}</div>` : ""}
       </section>` : "";
 
     const managerManagedStore = hasStoreManagerAccount(store, partnerRequest) || isPartner;
@@ -2614,6 +2617,8 @@
             </div>` : ""}
         </header>
 
+        ${gallery}
+
         <section class="store-detail-map-section" aria-label="매장 위치">
           <div id="storeDetailMap" class="store-detail-map" aria-label="${escapeAttr(store.name || "매장")} 지도"></div>
         </section>
@@ -2673,7 +2678,6 @@
                 ${!managerManagedStore && store.notice ? `<div><span>안내</span><strong>${escapeHtml(store.notice)}</strong></div>` : ""}
               </section>` : ""}
 
-            ${gallery}
             ${menuHtml}
           </div>
         </details>
@@ -2709,6 +2713,18 @@
         ${action ? `<div class="store-detail-bottom-action">${action}</div>` : ""}
       </div>
     `;
+
+    const photoGallery = body.querySelector("[data-store-photo-gallery]");
+    const photoCurrent = body.querySelector("[data-store-photo-current]");
+    if(photoGallery && photoCurrent){
+      const updatePhotoIndex = ()=>{
+        const width = photoGallery.clientWidth || 1;
+        const index = Math.max(0, Math.min(photos.length - 1, Math.round(photoGallery.scrollLeft / width)));
+        photoCurrent.textContent = String(index + 1);
+      };
+      photoGallery.addEventListener("scroll", updatePhotoIndex, {passive:true});
+      updatePhotoIndex();
+    }
 
     void renderStoreDetailMap(store);
     bindStoreComments(store.id);
