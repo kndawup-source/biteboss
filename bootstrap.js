@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const ASSET_VERSION = document.querySelector('meta[name="biteboss-build"]')?.content || "81.69";
+  const ASSET_VERSION = document.querySelector('meta[name="biteboss-build"]')?.content || "81.70";
   const localAsset = path => `${path}?v=${encodeURIComponent(ASSET_VERSION)}`;
 
   const isNative = (() => {
