@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.44";
+  const BITEBOSS_BUILD = "81.48";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -6283,7 +6283,7 @@
       const canInvite = isCrewLeader;
       invite.classList.toggle("hidden", !canInvite);
       invite.disabled = !canInvite;
-      invite.textContent = "QR로 초대";
+      invite.textContent = "QR 초대";
     }
 
     const independence = $("#foundIndependentOrganizationBtn");
