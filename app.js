@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.72";
+  const BITEBOSS_BUILD = "81.73";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1696,7 +1696,24 @@
     }
 
     const searchRows = Array.isArray(data) ? data : [];
-    await loadStoreRoles(searchRows);
+    searchRows.sort((a,b) => compareStoreSearchResults(a,b,keyword));
+
+    // The search RPC is the authoritative search result. Paint it immediately;
+    // role hydration is secondary metadata and must never block a registered
+    // store from appearing in search.
+    renderStores(searchRows, { resetPage:true });
+
+    try{
+      await loadStoreRoles(searchRows);
+    }catch(error){
+      console.warn("BiteBoss search store roles:", error);
+      return;
+    }
+
+    // Ignore stale role hydration when the user has already changed the query.
+    if(seq !== storeSearchSeq) return;
+    if(normalizeStoreSearchText($("#storeSearch")?.value) !== normalizeStoreSearchText(keyword)) return;
+
     searchRows.sort((a,b) => compareStoreSearchResults(a,b,keyword));
     renderStores(searchRows, { resetPage:true });
   }
