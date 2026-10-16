@@ -8205,7 +8205,11 @@
     const addStore = $("#addStoreBtn");
     const deleteAccount = $("#deleteAccountBtn");
     const logout = $("#logoutBtn");
-    addStore?.classList.toggle("hidden", !loggedIn);
+    // 매장 등록 요청은 PC/모바일 모두 항상 접근 가능하게 둔다.
+    // 비로그인 사용자가 누르면 openMemberStoreForm()이 로그인 창으로 연결한다.
+    addStore?.classList.remove("hidden");
+    addStore?.removeAttribute("disabled");
+    addStore?.setAttribute("aria-disabled", "false");
     deleteAccount?.classList.toggle("hidden", !loggedIn);
     logout?.classList.toggle("hidden", !loggedIn);
     setText("#memberSessionLabel", "");
