@@ -901,7 +901,7 @@
       return `
         <article class="admin-store-row">
           <div class="admin-store-summary">
-            <div class="admin-store-thumb-wrap">${store.photo_url ? `<img class="admin-store-thumb" src="${escapeAttr(store.photo_url)}" alt="" loading="lazy" decoding="async" />` : `<span class="admin-store-thumb admin-store-thumb-empty" aria-hidden="true"></span>`}</div>
+            <div class="admin-store-thumb-wrap">${store.photo_url ? `<img class="admin-store-thumb" src="${escapeAttr(store.photo_url)}" alt="" loading="lazy" decoding="async" />` : `<span class="admin-store-thumb admin-store-thumb-empty" aria-hidden="true">${escapeHtml(storeInitial(store.name))}</span>`}</div>
             <div class="admin-store-copy">
               <div class="admin-store-title-line"><strong>${escapeHtml(store.name)}</strong><span class="partner-badge ${partnershipClass(store.partnership_status)}">${escapeHtml(partnershipLabel(store.partnership_status))}</span>${(() => { const state = bannerOperationalState(store, bannerEnabled); return `<span class="admin-banner-state ${state.className}">${escapeHtml(state.label)}</span>`; })()}</div>
               <p>${escapeHtml(location)} · ${escapeHtml(categoryLabel(store.category))}</p>
@@ -2094,7 +2094,7 @@
     const {data,error}=await adminSb.rpc("biteboss_admin_ad_analytics_v8179",{p_days:days});
     if(error){
       console.warn("BiteBoss ad analytics:",error);
-      chart.innerHTML='<div class="analytics-empty">광고 성과 데이터를 불러오지 못했습니다. v81.84 SQL 적용 여부를 확인하세요.</div>';
+      chart.innerHTML='<div class="analytics-empty">광고 성과 데이터를 불러오지 못했습니다. v81.85 SQL 적용 여부를 확인하세요.</div>';
       return;
     }
     renderAdAnalytics(data || {});
@@ -2386,6 +2386,12 @@
     const days = Math.floor(hours / 24);
     if(days < 7) return `${days}일 전`;
     return date.toLocaleDateString("ko-KR", { month:"numeric", day:"numeric" });
+  }
+
+  function storeInitial(name){
+    const value = String(name || "").trim();
+    if(!value) return "·";
+    return Array.from(value)[0].toUpperCase();
   }
 
   function categoryLabel(value){
