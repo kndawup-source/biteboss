@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.62";
+  const BITEBOSS_BUILD = "81.63";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -4103,12 +4103,17 @@
       <div class="takeover-choice-copy">현재 위치에서 점령 가능한 매장을 선택하세요.</div>
       <div class="takeover-choice-list">
         ${visibleRows.map(row=>`
-          <div class="takeover-choice-row" data-choice-row="${escapeAttr(row.store.id)}">
+          <div class="takeover-choice-card" data-choice-row="${escapeAttr(row.store.id)}">
             <button class="takeover-choice-select" type="button" data-takeover-choice="${escapeAttr(row.store.id)}">
-              <strong>${escapeHtml(row.store.name||"매장")}</strong>
-              <span>${escapeHtml(formatDistance(row.distance)||"가까움")}</span>
+              <span class="takeover-choice-thumb">
+                ${row.store.photo_url ? `<img src="${escapeAttr(row.store.photo_url)}" alt="" loading="lazy">` : `<span class="takeover-choice-thumb-fallback" aria-hidden="true">${escapeHtml(String(row.store.name||"매장").trim().slice(0,1))}</span>`}
+              </span>
+              <span class="takeover-choice-info">
+                <strong>${escapeHtml(row.store.name||"매장")}</strong>
+                <span>${escapeHtml(formatDistance(row.distance)||"가까움")}</span>
+              </span>
             </button>
-            <button class="takeover-choice-dismiss" type="button" data-takeover-dismiss="${escapeAttr(row.store.id)}">제외</button>
+            <button class="takeover-choice-dismiss" type="button" data-takeover-dismiss="${escapeAttr(row.store.id)}" aria-label="${escapeAttr(row.store.name||"매장")} 제외">×</button>
           </div>`).join("")}
       </div>
       ${rows.length>visibleRows.length ? `<div class="takeover-choice-more">가까운 매장 ${visibleRows.length}곳을 먼저 표시합니다.</div>` : ""}
