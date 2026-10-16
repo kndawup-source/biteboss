@@ -238,6 +238,7 @@
   let nearbyLastRefreshAt = 0;
   let scanner = null;
   let currentRank = "players";
+  let rankLoadSeq = 0;
   let storePage = 1;
   const STORE_PAGE_SIZE = 8;
   let storeViewRows = [];
@@ -4601,36 +4602,42 @@
     if(!box) return;
 
     syncTerritoryMapVisibility();
-    myBox?.classList.add("hidden");
-    rankViewItems = [];
-    rankPage = 1;
-    const rankPagination = $("#rankPagination");
-    rankPagination?.classList.add("hidden");
-    if(rankPagination) rankPagination.innerHTML = "";
+    const requestedRank = currentRank;
+    const requestSeq = ++rankLoadSeq;
+    const isCurrentRequest = () => requestSeq === rankLoadSeq && requestedRank === currentRank;
+    const commitRankView = ({ hideMyRank = true } = {}) => {
+      if(!isCurrentRequest()) return false;
+      if(hideMyRank) myBox?.classList.add("hidden");
+      return true;
+    };
 
     if(config.feature_ranking === false){
-      box.innerHTML = `<div class="app-state">순위 기능이 현재 비활성화되어 있습니다.</div>`;
+      if(commitRankView()) box.innerHTML = `<div class="app-state">순위 기능이 현재 비활성화되어 있습니다.</div>`;
       return;
     }
 
-    box.innerHTML = `<div class="app-state">순위를 불러오는 중…</div>`;
-
-
-    if(currentRank === "season"){
+    // Keep the previous tab visible while the next ranking is fetched.
+    // Replacing it with a temporary loading row caused a visible one-frame flash.
+    if(requestedRank === "season"){
       const {data,error}=await sb.rpc("biteboss_season_region_rank_v71",{p_limit:50});
+      if(!isCurrentRequest()) return;
       if(error){
+        commitRankView();
         console.warn("BiteBoss season ranking:",error);
         box.innerHTML=`<div class="app-state is-error">시즌 순위를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</div>`;
         return;
       }
       const rows=Array.isArray(data)?data:[];
+      if(!commitRankView()) return;
       setRankItems(rows.map((row,index)=>`<article class="rank-card territory-rank-card season-rank-card"><span class="rank-number">${index+1}</span><div><strong>${escapeHtml(compactSeasonRegionName(row.city,row.district))}</strong><div class="meta">${escapeHtml(row.crew_name||"크루")}</div></div><div class="rank-result"><b>${Number(row.store_count||0)}</b><span>점령</span></div></article>`), "이번 시즌 점령 기록이 아직 없습니다.");
       return;
     }
 
-    if(currentRank === "local_crew"){
+    if(requestedRank === "local_crew"){
       const position = lastPosition || await getPositionSafe(false, { timeout:2500, maximumAge:60000 });
+      if(!isCurrentRequest()) return;
       if(!position){
+        commitRankView();
         box.innerHTML = `<div class="app-state"><strong>위치 권한이 필요합니다.</strong><span>현재 위치를 허용하면 주변 크루 순위를 볼 수 있습니다.</span></div>`;
         return;
       }
@@ -4641,14 +4648,17 @@
         p_radius_km:5,
         p_limit:30
       });
+      if(!isCurrentRequest()) return;
 
       if(error){
+        commitRankView();
         console.warn("BiteBoss local crew ranking:", error);
         box.innerHTML = `<div class="app-state is-error">주변 크루 순위를 불러오지 못했습니다.</div>`;
         return;
       }
 
       const rows = Array.isArray(data) ? data : [];
+      if(!commitRankView()) return;
       setRankItems(rows.map((row,index)=>`
           <article class="rank-card local-crew-rank-card">
             <span class="rank-number">${index+1}</span>
@@ -4678,11 +4688,13 @@
     }
 
     const { data, error } = await sb.rpc("biteboss_game_rankings_v656", {
-      p_scope:currentRank,
+      p_scope:requestedRank,
       p_limit:50
     });
+    if(!isCurrentRequest()) return;
 
     if(error){
+      commitRankView();
       console.warn("BiteBoss ranking:", error);
       box.innerHTML = `<div class="app-state is-error">순위를 불러오지 못했습니다.</div>`;
       return;
@@ -4690,7 +4702,8 @@
 
     let rows = Array.isArray(data) ? data : [];
 
-    if(currentRank === "organizations"){
+    if(requestedRank === "organizations"){
+      if(!commitRankView()) return;
       const myOrganizationId = String(organization?.id || "").trim();
       const myOrganizationIndex = myOrganizationId
         ? rows.findIndex(row => String(row.id || "").trim() === myOrganizationId)
@@ -4754,7 +4767,8 @@
       return;
     }
 
-    if(currentRank === "territory"){
+    if(requestedRank === "territory"){
+      if(!commitRankView()) return;
       syncTerritoryMapVisibility();
       loadTerritoryMap();
       setRankItems(rows.map((row,index)=>{
@@ -4779,6 +4793,7 @@
     // A member login can run on top of a different anonymous Supabase auth ID,
     // so authUser.id must not be used as the primary identity here.
     rows = await filterActivePlayerRankRows(rows);
+    if(!commitRankView()) return;
 
     const myId=String(
       playerSession?.player_user_id ||
