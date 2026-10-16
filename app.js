@@ -2149,7 +2149,12 @@
   function readCachedStoreDetail(storeId){
     const key=String(storeId || "").trim();
     const cached=storeDetailMemoryCache.get(key);
-    if(!cached || Date.now()-cached.savedAt>STORE_DETAIL_CACHE_TTL_MS) return null;
+    if(!cached) return null;
+    const age=Date.now()-cached.savedAt;
+    if(!Number.isFinite(age) || age<0 || age>STORE_DETAIL_CACHE_TTL_MS){
+      storeDetailMemoryCache.delete(key);
+      return null;
+    }
     return cached.data;
   }
 
