@@ -235,6 +235,8 @@
     $$('[data-close-store-editor]').forEach(node => node.addEventListener('click', closeStoreEditor));
     $("#adminStoreEditForm")?.addEventListener("submit", saveAdminStoreInfo);
     $("#adminPhotoForm")?.addEventListener("submit", addAdminStorePhoto);
+    bindAdminDateTimeControl("#adStartsAt", "#adStartsDate", "#adStartsTime");
+    bindAdminDateTimeControl("#adEndsAt", "#adEndsDate", "#adEndsTime");
     $("#adminMenuForm")?.addEventListener("submit", saveAdminMenu);
     $("#adminOfferForm")?.addEventListener("submit", saveAdminOffer);
     $("#adminPartnerPromotionForm")?.addEventListener("submit", saveAdminPartnerPromotion);
@@ -2094,7 +2096,7 @@
     const {data,error}=await adminSb.rpc("biteboss_admin_ad_analytics_v8179",{p_days:days});
     if(error){
       console.warn("BiteBoss ad analytics:",error);
-      chart.innerHTML='<div class="analytics-empty">광고 성과 데이터를 불러오지 못했습니다. v81.87 SQL 적용 여부를 확인하세요.</div>';
+      chart.innerHTML='<div class="analytics-empty">광고 성과 데이터를 불러오지 못했습니다. v81.89 SQL 적용 여부를 확인하세요.</div>';
       return;
     }
     renderAdAnalytics(data || {});
@@ -2198,6 +2200,8 @@
     $("#adClickUrl").value = item.click_url || "";
     $("#adStartsAt").value = toDateTimeLocal(item.starts_at);
     $("#adEndsAt").value = toDateTimeLocal(item.ends_at);
+    syncAdminDateTimeParts("#adStartsAt", "#adStartsDate", "#adStartsTime");
+    syncAdminDateTimeParts("#adEndsAt", "#adEndsDate", "#adEndsTime");
     $("#adIsActive").value = String(Boolean(item.is_active));
     $("#adSortOrder").value = Number(item.sort_order || 0);
     const setting=campaignSetting(item.id);
@@ -2386,6 +2390,42 @@
     const days = Math.floor(hours / 24);
     if(days < 7) return `${days}일 전`;
     return date.toLocaleDateString("ko-KR", { month:"numeric", day:"numeric" });
+  }
+
+  function splitAdminDateTime(value){
+    const text = String(value || "").trim();
+    if(!text) return { date:"", time:"" };
+    const [date="", rawTime=""] = text.split("T");
+    return { date, time:rawTime.slice(0,5) };
+  }
+
+  function syncAdminDateTimeParts(nativeId, dateId, timeId){
+    const native = $(nativeId);
+    const date = $(dateId);
+    const time = $(timeId);
+    if(!native || !date || !time) return;
+    const parts = splitAdminDateTime(native.value);
+    date.value = parts.date;
+    time.value = parts.time;
+  }
+
+  function syncAdminDateTimeValue(nativeId, dateId, timeId){
+    const native = $(nativeId);
+    const date = $(dateId);
+    const time = $(timeId);
+    if(!native || !date || !time) return;
+    native.value = date.value && time.value ? `${date.value}T${time.value}` : "";
+    native.dispatchEvent(new Event("change", { bubbles:true }));
+  }
+
+  function bindAdminDateTimeControl(nativeId, dateId, timeId){
+    const date = $(dateId);
+    const time = $(timeId);
+    if(!date || !time) return;
+    const sync = () => syncAdminDateTimeValue(nativeId, dateId, timeId);
+    date.addEventListener("change", sync);
+    time.addEventListener("change", sync);
+    syncAdminDateTimeParts(nativeId, dateId, timeId);
   }
 
   function storeInitial(name){

@@ -1,4 +1,4 @@
-const BUILD = "81.87";
+const BUILD = "81.89";
 const CACHE_NAME = `biteboss-v${BUILD}`;
 const versioned = path => `${path}?v=${BUILD}`;
 const SHELL = [
