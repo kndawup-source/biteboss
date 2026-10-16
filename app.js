@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.50";
+  const BITEBOSS_BUILD = "81.51";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -962,12 +962,19 @@
   function activeCampaignFor(placement){
     const now=Date.now();
     const rows=Array.isArray(config.ad_public_campaigns) ? config.ad_public_campaigns : [];
-    return rows.filter(item => {
+    const eligible=rows.filter(item => {
       if(!item?.id || !item?.image_url || !item.is_active) return false;
       const start=item.starts_at ? new Date(item.starts_at).getTime() : 0;
       const end=item.ends_at ? new Date(item.ends_at).getTime() : Infinity;
       return start <= now && end > now && campaignMatchesPlacement(item,placement) && campaignMatchesRegion(item);
-    }).sort((a,b) => Number(b.sort_order || 0)-Number(a.sort_order || 0))[0] || null;
+    });
+    if(!eligible.length) return null;
+
+    // Priority is authoritative. When several eligible campaigns share the
+    // highest priority, choose one at random so inventory rotates fairly.
+    const highestPriority=eligible.reduce((max,item) => Math.max(max,Number(item.sort_order || 0)), -Infinity);
+    const topTier=eligible.filter(item => Number(item.sort_order || 0) === highestPriority);
+    return topTier[Math.floor(Math.random()*topTier.length)] || null;
   }
 
   async function loadBanner(){

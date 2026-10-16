@@ -340,7 +340,7 @@
         <label>시작일시<input id="adStartsAt" class="input" type="datetime-local" required /></label>
         <label>종료일시<input id="adEndsAt" class="input" type="datetime-local" /></label>
         <label>상태<select id="adIsActive" class="input"><option value="true">활성</option><option value="false">비활성</option></select></label>
-        <label>우선순위<input id="adSortOrder" class="input" type="number" value="0" step="1" /></label>
+        <label>우선순위<input id="adSortOrder" class="input" type="number" value="0" step="1" /><small class="field-help">숫자가 높을수록 우선 노출되며, 같은 우선순위의 캠페인은 랜덤으로 노출됩니다.</small></label>
         <label>노출 위치<select id="adPlacement" class="input"><option value="both">홈 + 점령 대기</option><option value="home">홈만</option><option value="takeover">점령 대기만</option></select></label>
         <label>타게팅<select id="adTargetType" class="input"><option value="all">전체</option><option value="region">지역</option></select></label>
         <label id="adTargetRegionField" class="wide hidden">지역<input id="adTargetRegion" class="input" maxlength="40" placeholder="예: 서울 강남구" /><small class="field-help">시·구 단위로 입력합니다. 점령 대기는 해당 매장 지역, 홈은 현재 위치에서 가장 가까운 매장 지역을 기준으로 노출합니다.</small></label>
