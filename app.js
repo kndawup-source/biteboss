@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.68";
+  const BITEBOSS_BUILD = "81.69";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -5126,7 +5126,7 @@
     }
 
     const period = normalizeRankPeriod(currentRankPeriod);
-    const usePeriodRanking = (requestedRank === "players" || requestedRank === "organizations") && period !== "all";
+    const usePeriodRanking = requestedRank === "players" || requestedRank === "organizations";
     const rankingRequest = usePeriodRanking
       ? sb.rpc("biteboss_period_rank_v8160", { p_scope:requestedRank, p_period:period, p_limit:50 })
       : sb.rpc("biteboss_game_rankings_v656", { p_scope:requestedRank, p_limit:50 });
