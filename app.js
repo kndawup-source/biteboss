@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.58";
+  const BITEBOSS_BUILD = "81.62";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -4100,7 +4100,7 @@
     takeoverChoiceOpen=true;
     const visibleRows=rows.slice(0,8);
     openModal("점령할 매장 선택", `
-      <div class="takeover-choice-copy">현재 위치에서 점령 가능한 매장이 여러 곳입니다. 실제 방문 중인 매장을 선택하세요.</div>
+      <div class="takeover-choice-copy">현재 위치에서 점령 가능한 매장을 선택하세요.</div>
       <div class="takeover-choice-list">
         ${visibleRows.map(row=>`
           <div class="takeover-choice-row" data-choice-row="${escapeAttr(row.store.id)}">
