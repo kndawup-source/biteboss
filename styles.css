@@ -458,3 +458,18 @@ body.biteboss-info-page{min-height:100dvh;background:var(--bg);color:#111}.info-
 .store-owner-auth-btn{width:100%;min-height:38px;padding:0 2px;border:0;border-top:1px solid #e2e2e5;background:transparent;color:#111;font:inherit;font-size:11px;font-weight:850;text-align:left;cursor:pointer}
 
 .store-owner-empty-title{font-size:12px;line-height:1.35;font-weight:800}
+/* Takeover store choice — canonical hierarchy */
+.modal-compact:has(.takeover-choice-list) .modal-card{padding:24px 20px calc(22px + var(--safe-bottom))}
+.modal-compact:has(.takeover-choice-list) .modal-card>h3{margin:0 48px 10px 0;font-size:22px;line-height:1.08;font-weight:860;letter-spacing:-.045em}
+.modal-compact:has(.takeover-choice-list) .x-btn{top:16px;right:16px;width:36px;height:36px}
+.takeover-choice-copy{margin:0 0 18px;color:#77777d;font-size:14px;line-height:1.45;letter-spacing:-.02em}
+.takeover-choice-list{border-top:1px solid #dedee2}
+.takeover-choice-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:14px;min-height:72px;border-bottom:1px solid #dedee2}
+.takeover-choice-select{display:grid;gap:5px;min-width:0;padding:15px 0;text-align:left;background:transparent;color:#111}
+.takeover-choice-select strong{display:block;overflow:hidden;text-overflow:ellipsis;font-size:16px;line-height:1.25;font-weight:820;letter-spacing:-.035em;white-space:nowrap}
+.takeover-choice-select span{display:block;color:#8a8a90;font-size:13px;line-height:1.2;font-weight:650}
+.takeover-choice-dismiss{align-self:center;min-width:44px;min-height:36px;padding:0 2px;background:transparent;color:#8a8a90;font-size:13px;line-height:1;font-weight:720}
+.takeover-choice-dismiss:active{color:#111}
+.takeover-choice-more{padding-top:12px;color:#9a9aa0;font-size:12px;line-height:1.4}
+@media(max-width:480px){.modal-compact:has(.takeover-choice-list) .modal-card{padding-left:20px;padding-right:20px}.takeover-choice-row{min-height:68px}.takeover-choice-select strong{font-size:15px}}
+
