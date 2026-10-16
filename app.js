@@ -592,6 +592,8 @@
 
     $("#rankList")?.addEventListener("click", openCrewProfileFromRank);
     $("#rankList")?.addEventListener("keydown", openCrewProfileFromRank);
+    $("#myRankSummary")?.addEventListener("click", openCrewProfileFromRank);
+    $("#myRankSummary")?.addEventListener("keydown", openCrewProfileFromRank);
 
     $("#organizationPanelOpen")?.addEventListener("click", event => {
       if(event.target.closest("button,a,input,select,textarea,label")) return;
@@ -4682,6 +4684,41 @@
     let rows = Array.isArray(data) ? data : [];
 
     if(currentRank === "organizations"){
+      const myOrganizationId = String(organization?.id || "").trim();
+      const myOrganizationIndex = myOrganizationId
+        ? rows.findIndex(row => String(row.id || "").trim() === myOrganizationId)
+        : -1;
+
+      if(myBox && myOrganizationId){
+        const me = myOrganizationIndex >= 0 ? rows[myOrganizationIndex] : organization;
+        const myCrewName = String(me?.name || organization?.name || "내 크루").trim();
+        const myCrewAvatar = String(me?.avatar_url || organization?.avatar_url || "").trim();
+        const myCrewLeader = String(me?.leader_name || organization?.leader_name || profile?.nickname || "").trim();
+        const myCrewMembers = Number(me?.member_count ?? organization?.member_count ?? 0);
+        const myCrewTerritories = Number(me?.territory_count ?? organization?.territory_count ?? 0);
+
+        myBox.innerHTML=`
+          <strong class="my-rank-position ${myOrganizationIndex < 0 ? "is-out" : ""}">${myOrganizationIndex >= 0 ? myOrganizationIndex + 1 : "–"}</strong>
+          <span
+            class="crew-rank-profile-trigger"
+            data-organization-profile="${escapeAttr(myOrganizationId)}"
+            role="button"
+            tabindex="0"
+            aria-label="${escapeAttr(myCrewName)} 크루 프로필 열기">
+            ${bossAvatarMarkup(myCrewAvatar, myCrewName, "my-rank-avatar")}
+          </span>
+          <div class="my-rank-copy">
+            <b
+              class="crew-rank-profile-trigger"
+              data-organization-profile="${escapeAttr(myOrganizationId)}"
+              role="button"
+              tabindex="0">${escapeHtml(myCrewName)}</b>
+            <small>${escapeHtml([myCrewLeader ? `개설자 ${myCrewLeader}` : "", `멤버 ${myCrewMembers}명`, `점령지 ${myCrewTerritories}`].filter(Boolean).join(" · "))}</small>
+          </div>
+          <span class="my-rank-label">${myOrganizationIndex >= 0 ? "내 크루" : "50위 밖"}</span>`;
+        myBox.classList.remove("hidden");
+      }
+
       setRankItems(rows.map((row,index)=>`
         <article class="rank-card organization-rank-card">
           <span class="rank-number">${index+1}</span>
