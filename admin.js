@@ -217,6 +217,7 @@
       renderStores();
     }));
     $("#adCampaignCancel")?.addEventListener("click", resetAdCampaignForm);
+    $("#adAnalyticsDays")?.addEventListener("change", loadAdAnalytics);
     $("#adTargetType")?.addEventListener("change", syncAdTargetRegionField);
     $("#partnerRequestFilter")?.addEventListener("change", () => { partnerRequestPage = 1; loadPartnerRequests(); });
     $("#refreshPartnerRequests")?.addEventListener("click", loadPartnerRequests);
@@ -2053,7 +2054,8 @@
     settings[id]={
       placement:String($("#adPlacement")?.value || "both"),
       target_type:String($("#adTargetType")?.value || "all"),
-      target_region:String($("#adTargetRegion")?.value || "").trim()
+      target_region:String($("#adTargetRegion")?.value || "").trim(),
+      target_store_id:String($("#adTargetStore")?.value || "").trim()
     };
     const row={ key:"ad_campaign_settings", value:settings, updated_by:session.user.id, updated_at:new Date().toISOString() };
     const { error }=await adminSb.from("biteboss_app_config").upsert(row,{ onConflict:"key" });
@@ -2079,6 +2081,62 @@
     appConfig.ad_public_campaigns=publicRows;
   }
 
+  const adAnalyticsCampaignMap = new Map();
+
+  function populateAdTargetStores(){
+    const select=$("#adTargetStore"); if(!select) return;
+    const selected=select.value;
+    const rows=[...stores].sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"ko"));
+    select.innerHTML='<option value="">브랜드/일반 광고 · 매장 지정 안 함</option>'+rows.map(store=>`<option value="${escapeAttr(store.id)}">${escapeHtml(store.name || "매장")}${store.district ? ` · ${escapeHtml(store.district)}` : ""}</option>`).join("");
+    if(rows.some(row=>String(row.id)===String(selected))) select.value=selected;
+  }
+
+  async function loadAdAnalytics(){
+    const chart=$("#adAnalyticsChart"); if(!chart) return;
+    const days=Math.max(1,Number($("#adAnalyticsDays")?.value || 30));
+    chart.innerHTML='<div class="analytics-loading">불러오는 중…</div>';
+    const {data,error}=await adminSb.rpc("biteboss_admin_ad_analytics_v8179",{p_days:days});
+    if(error){
+      console.warn("BiteBoss ad analytics:",error);
+      chart.innerHTML='<div class="analytics-empty">광고 성과 데이터를 불러오지 못했습니다. v81.79 SQL 적용 여부를 확인하세요.</div>';
+      return;
+    }
+    renderAdAnalytics(data || {});
+  }
+
+  function renderAdAnalytics(data){
+    const total=data.total || {};
+    const impressions=Number(total.impressions||0), clicks=Number(total.clicks||0);
+    setText("#adKpiImpressions",impressions.toLocaleString("ko-KR"));
+    setText("#adKpiClicks",clicks.toLocaleString("ko-KR"));
+    setText("#adKpiCtr",`${impressions ? (clicks/impressions*100).toFixed(1) : "0.0"}%`);
+    setText("#adKpiVisits",Number(total.visits||0).toLocaleString("ko-KR"));
+    setText("#adKpiCaptures",Number(total.captures||0).toLocaleString("ko-KR"));
+
+    adAnalyticsCampaignMap.clear();
+    (Array.isArray(data.campaigns)?data.campaigns:[]).forEach(row=>adAnalyticsCampaignMap.set(String(row.campaign_id),row));
+
+    const rows=Array.isArray(data.trend)?data.trend:[];
+    const chart=$("#adAnalyticsChart");
+    if(chart){
+      if(!rows.length) chart.innerHTML='<div class="analytics-empty">선택한 기간의 광고 데이터가 없습니다.</div>';
+      else{
+        const max=Math.max(1,...rows.flatMap(row=>[Number(row.impressions||0),Number(row.clicks||0),Number(row.visits||0),Number(row.captures||0)]));
+        chart.innerHTML=`<div class="admin-ad-chart-bars">${rows.map(row=>{
+          const h=v=>Math.max(Number(v)>0?3:1,Math.round(Number(v||0)/max*100));
+          return `<div class="admin-ad-chart-item" title="${escapeAttr(row.label||"")} · 노출 ${Number(row.impressions||0)} · 클릭 ${Number(row.clicks||0)} · 방문 ${Number(row.visits||0)} · 점령 ${Number(row.captures||0)}"><div class="admin-ad-chart-columns"><i style="height:${h(row.impressions)}%"></i><i style="height:${h(row.clicks)}%"></i><i style="height:${h(row.visits)}%"></i><i style="height:${h(row.captures)}%"></i></div><span>${escapeHtml(row.label||"")}</span></div>`;
+        }).join("")}</div>`;
+      }
+    }
+    const funnel=$("#adAnalyticsFunnel");
+    if(funnel){
+      const visitRate=clicks?Number(total.visits||0)/clicks*100:0;
+      const captureRate=Number(total.visits||0)?Number(total.captures||0)/Number(total.visits||0)*100:0;
+      funnel.innerHTML=`<div><span>노출</span><strong>${impressions.toLocaleString("ko-KR")}</strong><small>100%</small></div><div><span>클릭</span><strong>${clicks.toLocaleString("ko-KR")}</strong><small>${impressions?(clicks/impressions*100).toFixed(1):"0.0"}%</small></div><div><span>방문</span><strong>${Number(total.visits||0).toLocaleString("ko-KR")}</strong><small>클릭 대비 ${visitRate.toFixed(1)}%</small></div><div><span>점령</span><strong>${Number(total.captures||0).toLocaleString("ko-KR")}</strong><small>방문 대비 ${captureRate.toFixed(1)}%</small></div>`;
+    }
+    renderAds();
+  }
+
   async function loadAds(){
     if(!Object.keys(appConfig).length) await loadConfig();
     const box = $("#adCampaignList");
@@ -2090,8 +2148,10 @@
       return;
     }
     adCampaigns = Array.isArray(data) ? data : [];
+    populateAdTargetStores();
     try{ await syncPublicAdCampaigns(); }catch(error){ console.warn("Ad public config sync:", error); }
     renderAds();
+    await loadAdAnalytics();
     if(!$("#adCampaignId")?.value) ensureAdStartDefault();
   }
 
@@ -2107,6 +2167,9 @@
       const clicks = Number(item.clicks || 0);
       const ctr = impressions > 0 ? (clicks / impressions * 100).toFixed(1) : "0.0";
       const setting = campaignSetting(item.id);
+      const measured = adAnalyticsCampaignMap.get(String(item.id)) || {};
+      const visits = Number(measured.visits || 0);
+      const captures = Number(measured.captures || 0);
       const placementLabel = setting.placement === "home" ? "홈" : (setting.placement === "takeover" ? "점령 대기" : "홈 + 점령 대기");
       const targetLabel = setting.target_type === "region" && setting.target_region ? ` · ${setting.target_region}` : " · 전체";
       return `
@@ -2115,7 +2178,7 @@
           <div class="admin-ad-copy">
             <div class="admin-ad-title"><strong>${escapeHtml(item.campaign_name)}</strong><span>${live ? "LIVE" : (item.is_active ? "SCHEDULED" : "OFF")}</span></div>
             <p>${escapeHtml(item.advertiser_name)} · ${escapeHtml(placementLabel + targetLabel)} · ${escapeHtml(formatAdPeriod(item.starts_at, item.ends_at))}</p>
-            <div class="admin-ad-stats"><span>${impressions.toLocaleString("ko-KR")} 노출</span><span>${clicks.toLocaleString("ko-KR")} 클릭</span><span>CTR ${ctr}%</span></div>
+            <div class="admin-ad-stats"><span>${impressions.toLocaleString("ko-KR")} 노출</span><span>${clicks.toLocaleString("ko-KR")} 클릭</span><span>CTR ${ctr}%</span><span>${visits.toLocaleString("ko-KR")} 방문</span><span>${captures.toLocaleString("ko-KR")} 점령</span></div>
           </div>
           <div class="admin-data-actions">
             <button class="text-btn" data-edit-ad="${escapeAttr(item.id)}" type="button">수정</button>
@@ -2143,6 +2206,7 @@
     $("#adPlacement").value=setting.placement;
     $("#adTargetType").value=setting.target_type;
     $("#adTargetRegion").value=setting.target_region;
+    if($("#adTargetStore")) $("#adTargetStore").value=setting.target_store_id || "";
     syncAdTargetRegionField();
     $("#adCampaignCancel")?.classList.remove("hidden");
     setStatusText($("#adCampaignStatus"), "새 이미지를 선택하지 않으면 기존 배너가 유지됩니다.");
@@ -2158,6 +2222,7 @@
     if($("#adPlacement")) $("#adPlacement").value = "both";
     if($("#adTargetType")) $("#adTargetType").value = "all";
     if($("#adTargetRegion")) $("#adTargetRegion").value = "";
+    if($("#adTargetStore")) $("#adTargetStore").value = "";
     syncAdTargetRegionField();
     $("#adCampaignCancel")?.classList.add("hidden");
     setStatusText($("#adCampaignStatus"), "");

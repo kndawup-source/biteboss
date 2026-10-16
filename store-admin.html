@@ -9,7 +9,7 @@
   <script src="./app-config.js?v=76.3"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./supabase.js?v=76.3"></script>
-  <link rel="stylesheet" href="./store-admin.css?v=76.3" />
+  <link rel="stylesheet" href="./store-admin.css?v=81.79?v=76.3" />
 </head>
 <body class="store-admin-app">
 <div id="storeAuthGate" class="auth-gate">
@@ -82,6 +82,10 @@
         <div class="store-impact-grid"><div><span>방문</span><strong id="impactVisits">0</strong><small id="impactVisitsDelta">-</small></div><div><span>고유 방문자</span><strong id="impactUnique">0</strong><small id="impactUniqueDelta">-</small></div><div><span>신규 방문자</span><strong id="impactNew">0</strong><small id="impactNewDelta">-</small></div><div><span>재방문자</span><strong id="impactRepeat">0</strong><small id="impactRepeatDelta">-</small></div><div><span>혜택 사용</span><strong id="impactBenefits">0</strong><small id="impactBenefitsDelta">-</small></div></div>
       </section>
 
+      <section class="store-impact store-ad-impact">
+        <div class="store-section-head"><div><h3>광고 성과</h3><p>내 매장 광고가 관심과 실제 방문으로 이어진 결과입니다.</p></div><select id="storeAdDays" class="input impact-period"><option value="7">7일</option><option value="30" selected>30일</option><option value="90">90일</option></select></div>
+        <div id="storeAdPerformance" class="store-ad-performance"><div class="store-empty">광고 성과를 불러오는 중…</div></div>
+      </section>
       <section class="today-actions">
         <button class="primary-btn" data-open-store-page="offers" type="button">혜택 코드 확인</button>
         <button class="secondary-btn" data-open-store-page="qr" type="button">QR 열기</button>
@@ -198,6 +202,6 @@
     </section>
   </main>
 </div>
-<script src="./store-admin.js?v=76.3"></script>
+<script src="./store-admin.js?v=81.79?v=76.3"></script>
 </body>
 </html>

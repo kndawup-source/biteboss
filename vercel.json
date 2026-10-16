@@ -32,6 +32,14 @@
   ],
   "rewrites": [
     {
+      "source": "/sitemap.xml",
+      "destination": "/api/sitemap"
+    },
+    {
+      "source": "/store/:id/:slug",
+      "destination": "/api/store-page?id=:id"
+    },
+    {
       "source": "/stores",
       "destination": "/index.html"
     },

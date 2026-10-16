@@ -7,7 +7,7 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <title>BiteBoss Admin</title>
   <link rel="stylesheet" href="./styles.css?v=76.3" />
-  <link rel="stylesheet" href="./admin.css?v=81.54" />
+  <link rel="stylesheet" href="./admin.css?v=81.79" />
   <script src="./app-config.js?v=76.3"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -339,28 +339,55 @@
 
 
     <section class="admin-page" id="admin-ads">
-      <div class="admin-page-head"><div><span class="eyebrow">설정</span><h2>광고</h2><p>홈과 점령 대기 화면에 노출되는 캠페인을 관리합니다.</p></div></div>
-      <form id="adCampaignForm" class="form-grid admin-form admin-ad-form">
-        <input id="adCampaignId" type="hidden" />
-        <label>광고주명<input id="adAdvertiserName" class="input" maxlength="120" required /></label>
-        <label>캠페인명<input id="adCampaignName" class="input" maxlength="160" required /></label>
-        <label class="wide">배너 이미지<input id="adImageFile" class="input" type="file" accept="image/png,image/jpeg,image/webp" /></label>
-        <label class="wide">클릭 URL<input id="adClickUrl" class="input" type="url" placeholder="https://" /></label>
-        <label>시작일시<input id="adStartsAt" class="input" type="datetime-local" required /></label>
-        <label>종료일시<input id="adEndsAt" class="input" type="datetime-local" /></label>
-        <label>상태<select id="adIsActive" class="input"><option value="true">활성</option><option value="false">비활성</option></select></label>
-        <label>우선순위<input id="adSortOrder" class="input" type="number" value="0" step="1" /><small class="field-help">숫자가 높을수록 우선 노출되며, 같은 우선순위의 캠페인은 랜덤으로 노출됩니다.</small></label>
-        <label>노출 위치<select id="adPlacement" class="input"><option value="both">홈 + 점령 대기</option><option value="home">홈만</option><option value="takeover">점령 대기만</option></select></label>
-        <label>타게팅<select id="adTargetType" class="input"><option value="all">전체</option><option value="region">지역</option></select></label>
-        <label id="adTargetRegionField" class="wide hidden">지역<input id="adTargetRegion" class="input" maxlength="40" placeholder="예: 서울 강남구" /><small class="field-help">시·구 단위로 입력합니다. 점령 대기는 해당 매장 지역, 홈은 현재 위치에서 가장 가까운 매장 지역을 기준으로 노출합니다.</small></label>
-        <div class="admin-form-actions wide">
-          <button class="primary-btn" type="submit">캠페인 저장</button>
-          <button id="adCampaignCancel" class="text-btn hidden" type="button">수정 취소</button>
+      <div class="admin-page-head"><div><span class="eyebrow">설정</span><h2>광고</h2><p>광고가 실제 매장 관심과 방문·점령으로 이어지는지 확인하고 캠페인을 관리합니다.</p></div></div>
+
+      <section class="admin-ad-performance">
+        <div class="admin-section-title admin-section-title-row">
+          <div><h3>광고 성과</h3><p>선택한 기간의 전체 캠페인 성과입니다.</p></div>
+          <select id="adAnalyticsDays" class="input admin-ad-period" aria-label="광고 성과 기간">
+            <option value="7">7일</option><option value="30" selected>30일</option><option value="90">90일</option>
+          </select>
         </div>
-        <p id="adCampaignStatus" class="asset-status wide" aria-live="polite"></p>
-      </form>
-      <div class="admin-ad-guide"><span>권장 비율 3:1</span><span>노출 위치·기간·지역·우선순위를 기준으로 화면별 캠페인 1개가 노출됩니다.</span></div>
-      <div id="adCampaignList" class="admin-ad-list"></div>
+        <div class="admin-ad-kpis">
+          <article><span>노출</span><strong id="adKpiImpressions">0</strong><small>광고가 표시된 횟수</small></article>
+          <article><span>클릭</span><strong id="adKpiClicks">0</strong><small>광고 반응</small></article>
+          <article><span>CTR</span><strong id="adKpiCtr">0%</strong><small>노출 대비 클릭</small></article>
+          <article><span>매장 방문</span><strong id="adKpiVisits">0</strong><small>광고 이후 인증 방문</small></article>
+          <article><span>점령 전환</span><strong id="adKpiCaptures">0</strong><small>광고 이후 점령</small></article>
+        </div>
+        <div class="admin-ad-chart-panel">
+          <div class="section-head"><h3>일별 성과</h3><span>노출 · 클릭 · 방문 · 점령</span></div>
+          <div id="adAnalyticsChart" class="admin-ad-chart"><div class="analytics-loading">불러오는 중…</div></div>
+        </div>
+        <div class="admin-ad-funnel" id="adAnalyticsFunnel" aria-label="광고 전환 퍼널"></div>
+      </section>
+
+      <section class="admin-ad-campaigns-section">
+        <div class="admin-section-title"><div><h3>캠페인</h3><p>캠페인별 성과를 비교하고 수정합니다.</p></div></div>
+        <div id="adCampaignList" class="admin-ad-list"></div>
+      </section>
+
+      <section class="admin-ad-editor-section">
+        <div class="admin-section-title"><div><h3>캠페인 등록·수정</h3><p>노출 위치와 대상 매장을 지정합니다. 대상 매장을 지정하면 방문·점령 전환을 측정할 수 있습니다.</p></div></div>
+        <form id="adCampaignForm" class="form-grid admin-form admin-ad-form">
+          <input id="adCampaignId" type="hidden" />
+          <label>광고주명<input id="adAdvertiserName" class="input" maxlength="120" required /></label>
+          <label>캠페인명<input id="adCampaignName" class="input" maxlength="160" required /></label>
+          <label class="wide">대상 매장<select id="adTargetStore" class="input"><option value="">브랜드/일반 광고 · 매장 지정 안 함</option></select><small class="field-help">매장을 지정하면 광고 이후 해당 매장의 방문·점령 전환을 집계합니다.</small></label>
+          <label class="wide">배너 이미지<input id="adImageFile" class="input" type="file" accept="image/png,image/jpeg,image/webp" /></label>
+          <label class="wide">클릭 URL<input id="adClickUrl" class="input" type="url" placeholder="https://" /></label>
+          <label>시작일시<input id="adStartsAt" class="input" type="datetime-local" required /></label>
+          <label>종료일시<input id="adEndsAt" class="input" type="datetime-local" /></label>
+          <label>상태<select id="adIsActive" class="input"><option value="true">활성</option><option value="false">비활성</option></select></label>
+          <label>우선순위<input id="adSortOrder" class="input" type="number" value="0" step="1" /><small class="field-help">숫자가 높을수록 우선 노출됩니다.</small></label>
+          <label>노출 위치<select id="adPlacement" class="input"><option value="both">홈 + 점령 대기</option><option value="home">홈만</option><option value="takeover">점령 대기만</option></select></label>
+          <label>타게팅<select id="adTargetType" class="input"><option value="all">전체</option><option value="region">지역</option></select></label>
+          <label id="adTargetRegionField" class="wide hidden">지역<input id="adTargetRegion" class="input" maxlength="40" placeholder="예: 서울 강남구" /></label>
+          <div class="admin-form-actions wide"><button class="primary-btn" type="submit">캠페인 저장</button><button id="adCampaignCancel" class="text-btn hidden" type="button">수정 취소</button></div>
+          <p id="adCampaignStatus" class="asset-status wide" aria-live="polite"></p>
+        </form>
+        <div class="admin-ad-guide"><span>권장 비율 3:1 · 1200×400</span><span>같은 우선순위는 랜덤 노출됩니다.</span></div>
+      </section>
     </section>
 
     <section class="admin-page" id="admin-maintenance">
@@ -471,6 +498,6 @@
   </section>
 </div>
 
-<script src="./admin.js?v=81.51"></script>
+<script src="./admin.js?v=81.79"></script>
 </body>
 </html>

@@ -23,6 +23,7 @@
   let storeAccount = null;
   let accessibleStores = [];
   let currentStore = null;
+    void loadStoreAdPerformance();
   let currentRole = null;
   let snapshot = {};
   let activeQr = null;
@@ -711,4 +712,15 @@
     showAuthGate();
     setText("#storeLoginStatus", error?.message === "NO_STORE_ACCESS" ? "관리 가능한 BiteBoss 매장이 없습니다." : "초기화에 실패했습니다.");
   }
+  async function loadStoreAdPerformance(){
+    const box=$("#storeAdPerformance"); if(!box || !currentStore?.id) return;
+    const days=Math.max(1,Number($("#storeAdDays")?.value || 30));
+    const {data,error}=await storeSb.rpc("biteboss_store_ad_analytics_v8179",{p_store_id:currentStore.id,p_days:days});
+    if(error){ console.warn("Store ad analytics:",error); box.innerHTML='<div class="store-empty">광고 성과를 불러오지 못했습니다.</div>'; return; }
+    const total=data?.total || {}, trend=Array.isArray(data?.trend)?data.trend:[];
+    const impressions=Number(total.impressions||0), clicks=Number(total.clicks||0);
+    const max=Math.max(1,...trend.map(row=>Number(row.impressions||0)));
+    box.innerHTML=`<article><span>노출</span><strong>${impressions.toLocaleString("ko-KR")}</strong><small>광고 표시</small></article><article><span>클릭</span><strong>${clicks.toLocaleString("ko-KR")}</strong><small>관심 반응</small></article><article><span>CTR</span><strong>${impressions?(clicks/impressions*100).toFixed(1):"0.0"}%</strong><small>노출 대비</small></article><article><span>방문</span><strong>${Number(total.visits||0).toLocaleString("ko-KR")}</strong><small>광고 이후</small></article><article><span>점령</span><strong>${Number(total.captures||0).toLocaleString("ko-KR")}</strong><small>광고 이후</small></article>${trend.length?`<div class="store-ad-mini-bars" aria-label="일별 광고 노출 추이">${trend.map(row=>`<i title="${escapeAttr(row.label||"")} · ${Number(row.impressions||0)}회" style="height:${Math.max(Number(row.impressions||0)?4:1,Math.round(Number(row.impressions||0)/max*100))}%"></i>`).join("")}</div>`:""}`;
+  }
+
 })();

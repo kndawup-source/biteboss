@@ -364,7 +364,7 @@
 
     await ensureUserSession();
     await restorePlayerSession();
-    await ensureProfile();
+    await syncProfileForCurrentPlayer();
 
     // Paint persisted member values before config/organization/network refreshes begin.
     // This makes the next-level number and bar available on the first rank frame.
@@ -796,6 +796,25 @@
     return signed.data.session;
   }
 
+  async function loadCanonicalMemberProfile(){
+    if(!playerSession?.authenticated) return null;
+
+    const { data, error } = await sb.rpc("biteboss_current_profile");
+    if(error) throw error;
+    if(!data?.ok || !data?.profile) throw new Error(data?.error || "PROFILE_LOAD_FAILED");
+
+    profile = data.profile;
+    await syncAuthNickname(profile?.nickname);
+    return profile;
+  }
+
+  async function syncProfileForCurrentPlayer(){
+    if(playerSession?.authenticated){
+      return loadCanonicalMemberProfile();
+    }
+    return ensureProfile();
+  }
+
   async function ensureProfile(){
     const metadataNickname = normalizeNickname(authUser?.user_metadata?.nickname);
     const seed = authUser?.id || `${Date.now()}-${Math.random()}`;
@@ -1064,10 +1083,10 @@
     banner.classList.remove("hidden");
     banner.onclick = event => {
       if(!homeCampaign?.click_url){ event.preventDefault(); return; }
-      trackAdEvent(homeCampaign.id, "click");
+      trackAdEvent(homeCampaign.id, "click", adSessionKey, { store_id:homeCampaign.target_store_id || "", placement:"home" });
     };
     image.onerror = () => { banner.classList.add("hidden"); image.removeAttribute("src"); };
-    trackAdEvent(homeCampaign.id, "impression");
+    trackAdEvent(homeCampaign.id, "impression", adSessionKey, { store_id:homeCampaign.target_store_id || "", placement:"home" });
   }
 
   function hideTakeoverAd(){
@@ -1097,25 +1116,55 @@
     if(clickUrl) link.href=clickUrl; else link.removeAttribute("href");
     link.onclick=event=>{
       if(!clickUrl){ event.preventDefault(); return; }
-      trackAdEvent(campaign.id,"click",`${adSessionKey}:takeover:${storeId}`);
+      trackAdEvent(campaign.id,"click",`${adSessionKey}:takeover:${storeId}`,{ store_id:campaign.target_store_id || storeId, placement:"takeover" });
     };
     image.onerror=hideTakeoverAd;
     slot.classList.remove("hidden");
-    trackAdEvent(campaign.id,"impression",`${adSessionKey}:takeover:${storeId}`);
+    trackAdEvent(campaign.id,"impression",`${adSessionKey}:takeover:${storeId}`,{ store_id:campaign.target_store_id || storeId, placement:"takeover" });
   }
 
-  async function trackAdEvent(campaignId, eventType, sessionKey=adSessionKey){
-    if(!campaignId || !window.sb) return;
+  function rememberAdAttribution(campaign, eventType, storeId=""){
+    if(!campaign?.id) return;
+    const targetStoreId=String(campaign.target_store_id || storeId || "").trim();
+    if(!targetStoreId) return;
     try{
-      const { error } = await sb.rpc("biteboss_track_ad_event", {
+      sessionStorage.setItem("biteboss-ad-attribution",JSON.stringify({
+        campaign_id:String(campaign.id),
+        target_store_id:targetStoreId,
+        event_type:String(eventType||"impression"),
+        at:Date.now()
+      }));
+    }catch{}
+  }
+
+  async function trackAdEvent(campaignId, eventType, sessionKey=adSessionKey, context={}){
+    if(!campaignId || !window.sb) return;
+    const campaign=(Array.isArray(config.ad_public_campaigns)?config.ad_public_campaigns:[]).find(row=>String(row.id)===String(campaignId)) || {id:campaignId};
+    const storeId=String(context.store_id || campaign.target_store_id || "").trim();
+    rememberAdAttribution(campaign,eventType,storeId);
+    try{
+      const { error } = await sb.rpc("biteboss_track_ad_event_v8179", {
         p_campaign_id:campaignId,
         p_event_type:eventType,
-        p_session_key:sessionKey
+        p_session_key:sessionKey,
+        p_store_id:storeId || null,
+        p_placement:String(context.placement || "")
       });
       if(error) console.warn("BiteBoss ad tracking:", error);
     }catch(error){
       console.warn("BiteBoss ad tracking:", error);
     }
+  }
+
+  async function trackAdConversion(storeId, eventType){
+    const id=String(storeId||""); if(!id || !window.sb) return;
+    try{
+      const raw=sessionStorage.getItem("biteboss-ad-attribution");
+      const attribution=raw?JSON.parse(raw):null;
+      if(!attribution?.campaign_id || String(attribution.target_store_id)!==id) return;
+      if(Date.now()-Number(attribution.at||0)>7*86400000) return;
+      await trackAdEvent(attribution.campaign_id,eventType,`${adSessionKey}:conversion:${id}`,{store_id:id,placement:"conversion"});
+    }catch{}
   }
 
   function shouldRefreshNearbyStores(pos){
@@ -4724,6 +4773,8 @@
           store_name:data?.store_name || nearest.store.name || "매장",
           had_organization_before:hadOrganizationBeforeChallenge
         });
+        void trackAdConversion(nearest.store.id, "visit");
+        if(["claimed","boss_reclaim"].includes(outcomeStatus)) void trackAdConversion(nearest.store.id, "capture");
         await Promise.all([
           loadCaptureCooldownStatus(true),
           loadStores(),
@@ -5659,6 +5710,10 @@
       ...data,
       had_organization_before:hadOrganizationBeforeChallenge
     });
+    if(data?.store_id){
+      void trackAdConversion(data.store_id, "visit");
+      if(String(data?.outcome || "") === "boss") void trackAdConversion(data.store_id, "capture");
+    }
     lastPosition = pos;
     await Promise.all([
       loadCaptureCooldownStatus(true),
@@ -5877,7 +5932,7 @@
       }
 
       playerSession = restored;
-      await ensureProfile();
+      await loadCanonicalMemberProfile();
 
       // Login state is authoritative from this point. Clear the guest-only
       // presence block before repainting any store/login UI so the
@@ -5978,7 +6033,7 @@
       if(error) throw error;
       if(!data?.ok) throw new Error(data?.error || "REGISTER_FAILED");
       playerSession = data;
-      await ensureProfile();
+      await loadCanonicalMemberProfile();
       closeModal();
       updateProfileUi();
       const registerPositionPromise = getPositionSafe(false, {
@@ -6017,10 +6072,29 @@
   async function openMemberStoreForm(){
     if(!playerSession?.authenticated) return openMemberLogin();
 
-    const pos = await getPositionSafe(true);
-    const lat = pos?.coords?.latitude;
-    const lng = pos?.coords?.longitude;
-    const hasLocation = Number.isFinite(lat) && Number.isFinite(lng);
+    let requestPosition = lastPosition?.coords ? lastPosition : null;
+    if(!requestPosition){
+      requestPosition = await getPositionSafe(false, {
+        timeout:5000,
+        maximumAge:60000,
+        enableHighAccuracy:false
+      });
+    }
+
+    const renderRequestLocation = position => {
+      const lat = Number(position?.coords?.latitude);
+      const lng = Number(position?.coords?.longitude);
+      const hasLocation = Number.isFinite(lat) && Number.isFinite(lng);
+      const state = $("#memberStoreLocation");
+      const submit = $("#memberStoreSubmit");
+      if(state){
+        state.textContent = hasLocation
+          ? `현재 위치 확인됨 · ${lat.toFixed(5)}, ${lng.toFixed(5)}`
+          : "현재 위치를 확인하지 못했습니다. 위치 권한을 허용한 뒤 다시 확인해 주세요.";
+      }
+      if(submit) submit.disabled = !hasLocation;
+      return hasLocation ? { latitude:lat, longitude:lng } : null;
+    };
 
     openModal("매장 등록 요청", `
       <div class="form-grid member-store-form">
@@ -6030,13 +6104,41 @@
         <label>도시<input id="memberStoreCity" class="input" maxlength="120" placeholder="서울" /></label>
         <label>지역<input id="memberStoreDistrict" class="input" maxlength="120" placeholder="강남구" /></label>
         <label class="wide">주소<input id="memberStoreAddress" class="input" maxlength="300" placeholder="주소 (선택)" /></label>
-        <div class="wide member-location-state" id="memberStoreLocation">${hasLocation ? `현재 위치 확인됨 · ${lat.toFixed(5)}, ${lng.toFixed(5)}` : "현재 위치를 확인하지 못했습니다."}</div>
-        <button id="memberStoreSubmit" class="primary-btn wide" type="button" ${hasLocation ? "" : "disabled"}>등록 요청</button>
+        <div class="wide member-location-state" id="memberStoreLocation"></div>
+        <button id="memberStoreLocationRetry" class="secondary-btn wide" type="button">현재 위치 다시 확인</button>
+        <button id="memberStoreSubmit" class="primary-btn wide" type="button">등록 요청</button>
         <p id="memberStoreStatus" class="inline-status wide" aria-live="polite"></p>
       </div>
     `);
 
-    $("#memberStoreSubmit").onclick = () => submitMemberStoreRequest(lat, lng);
+    let coordinates = renderRequestLocation(requestPosition);
+
+    $("#memberStoreLocationRetry").onclick = async event => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      const state = $("#memberStoreLocation");
+      if(state) state.textContent = "현재 위치 확인 중…";
+      try{
+        const nextPosition = await getPositionSafe(true, {
+          timeout:10000,
+          maximumAge:0,
+          enableHighAccuracy:false
+        });
+        if(nextPosition?.coords){
+          lastPosition = nextPosition;
+          coordinates = renderRequestLocation(nextPosition);
+        }else{
+          coordinates = renderRequestLocation(null);
+        }
+      }finally{
+        button.disabled = false;
+      }
+    };
+
+    $("#memberStoreSubmit").onclick = () => submitMemberStoreRequest(
+      coordinates?.latitude,
+      coordinates?.longitude
+    );
   }
 
   async function submitMemberStoreRequest(latitude, longitude){
@@ -6045,7 +6147,9 @@
     const button = $("#memberStoreSubmit");
 
     if(!name) return setStatus(status, "매장명을 입력하세요.");
-    if(!Number.isFinite(latitude) || !Number.isFinite(longitude)) return setStatus(status, "현재 위치가 필요합니다.");
+    if(!Number.isFinite(latitude) || !Number.isFinite(longitude)){
+      return setStatus(status, "현재 위치를 확인해 주세요. PC에서는 브라우저의 위치 권한 허용이 필요합니다.");
+    }
 
     if(button) button.disabled = true;
     setStatus(status, "요청을 보내는 중…");
