@@ -330,7 +330,10 @@
   }
 
   async function refreshAll(){
-    await Promise.all([loadDashboard(), loadAnalytics(), loadStores(), loadConfig(), loadBosses(), loadUsers(), loadGameOps(), loadAssets(), loadAds(), loadPartnerRequests(), loadAdminComments()]);
+    // Store banner state depends on appConfig.partner_banners. Resolve config first
+    // so the first store render cannot race against configuration loading.
+    await loadConfig();
+    await Promise.all([loadDashboard(), loadAnalytics(), loadStores(), loadBosses(), loadUsers(), loadGameOps(), loadAssets(), loadAds(), loadPartnerRequests(), loadAdminComments()]);
     renderRules();
   }
 
@@ -338,7 +341,10 @@
     if(page === "dashboard"){
       await Promise.all([loadDashboard(), loadAnalytics(), loadBosses()]);
     }
-    if(page === "stores" || page === "qr") await loadStores();
+    if(page === "stores" || page === "qr"){
+      await loadConfig();
+      await loadStores();
+    }
     if(page === "rules") { await loadConfig(); renderRules(); }
     if(page === "bosses") await loadBosses();
     if(page === "users") await loadUsers();
