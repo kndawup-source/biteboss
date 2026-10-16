@@ -2096,7 +2096,7 @@
     const {data,error}=await adminSb.rpc("biteboss_admin_ad_analytics_v8179",{p_days:days});
     if(error){
       console.warn("BiteBoss ad analytics:",error);
-      chart.innerHTML='<div class="analytics-empty">광고 성과 데이터를 불러오지 못했습니다. v81.93 SQL 적용 여부를 확인하세요.</div>';
+      chart.innerHTML='<div class="analytics-empty">광고 성과 데이터를 불러오지 못했습니다. v81.94 SQL 적용 여부를 확인하세요.</div>';
       return;
     }
     renderAdAnalytics(data || {});
@@ -2413,12 +2413,19 @@
     if(!native || !datePicker || !timePicker) return;
 
     const commit=()=>{
-      native.value=datePicker.value && timePicker.value ? `${datePicker.value}T${timePicker.value}` : "";
-      native.dispatchEvent(new Event("change",{bubbles:true}));
+      // 날짜와 시간은 각각 독립적으로 먼저 선택할 수 있어야 한다.
+      // 한쪽이 비어 있을 때 hidden datetime 값을 비우고 다시 렌더하면
+      // 방금 선택한 값까지 초기화되므로, 둘 다 선택된 시점에만 결합한다.
+      if(datePicker.value && timePicker.value){
+        native.value=`${datePicker.value}T${timePicker.value}`;
+        native.dispatchEvent(new Event("change",{bubbles:true}));
+      }
     };
     datePicker.addEventListener("change",commit);
     timePicker.addEventListener("change",commit);
-    native.addEventListener("change",()=>renderAdminDateTimeControl(nativeId,`${dateId}Picker`,`${timeId}Picker`));
+    native.addEventListener("change",()=>{
+      if(native.value) renderAdminDateTimeControl(nativeId,`${dateId}Picker`,`${timeId}Picker`);
+    });
     renderAdminDateTimeControl(nativeId,`${dateId}Picker`,`${timeId}Picker`);
   }
 
