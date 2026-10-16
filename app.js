@@ -239,6 +239,7 @@
   let nearbyLastRefreshAt = 0;
   let scanner = null;
   let currentRank = "players";
+  let currentRankPeriod = "month";
   let rankLoadSeq = 0;
   let storePage = 1;
   const STORE_PAGE_SIZE = 8;
@@ -633,8 +634,16 @@
         currentRank = btn.dataset.rank || "players";
         $$("[data-rank]").forEach(item => item.classList.toggle("active", item === btn));
         syncTerritoryMapVisibility();
+        syncRankPeriodVisibility();
         await loadRank();
         if(currentRank === "territory") await loadTerritoryMap();
+      });
+    });
+    $$("[data-rank-period]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        currentRankPeriod = String(btn.dataset.rankPeriod || "month");
+        $$("[data-rank-period]").forEach(item => item.classList.toggle("active", item === btn));
+        await loadRank();
       });
     });
   }
@@ -4968,6 +4977,13 @@
     return [shortCity, String(district || "").trim()].filter(Boolean).join(" ") || "지역";
   }
 
+  function syncRankPeriodVisibility(){
+    const periods = $("#rankPeriodTabs");
+    if(!periods) return;
+    const supported = currentRank === "players" || currentRank === "organizations";
+    periods.classList.toggle("hidden", !supported);
+  }
+
   async function loadRank(){
     const box = $("#rankList");
     const myBox = $("#myRankSummary");
@@ -4990,20 +5006,6 @@
 
     // Keep the previous tab visible while the next ranking is fetched.
     // Replacing it with a temporary loading row caused a visible one-frame flash.
-    if(requestedRank === "season"){
-      const {data,error}=await sb.rpc("biteboss_season_region_rank_v71",{p_limit:50});
-      if(!isCurrentRequest()) return;
-      if(error){
-        commitRankView();
-        console.warn("BiteBoss season ranking:",error);
-        box.innerHTML=`<div class="app-state is-error">시즌 순위를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.</div>`;
-        return;
-      }
-      const rows=Array.isArray(data)?data:[];
-      if(!commitRankView()) return;
-      setRankItems(rows.map((row,index)=>`<article class="rank-card territory-rank-card season-rank-card"><span class="rank-number">${index+1}</span><div><strong>${escapeHtml(compactSeasonRegionName(row.city,row.district))}</strong><div class="meta">${escapeHtml(row.crew_name||"크루")}</div></div><div class="rank-result"><b>${Number(row.store_count||0)}</b><span>점령</span></div></article>`), "이번 시즌 점령 기록이 아직 없습니다.");
-      return;
-    }
 
     if(requestedRank === "local_crew"){
       const position = lastPosition || await getPositionSafe(false, { timeout:2500, maximumAge:60000 });
@@ -5059,10 +5061,12 @@
       return;
     }
 
-    const { data, error } = await sb.rpc("biteboss_game_rankings_v656", {
-      p_scope:requestedRank,
-      p_limit:50
-    });
+    const period = ["week","month","all"].includes(currentRankPeriod) ? currentRankPeriod : "month";
+    const usePeriodRanking = (requestedRank === "players" || requestedRank === "organizations") && period !== "all";
+    const rankingRequest = usePeriodRanking
+      ? sb.rpc("biteboss_period_rank_v8160", { p_scope:requestedRank, p_period:period, p_limit:50 })
+      : sb.rpc("biteboss_game_rankings_v656", { p_scope:requestedRank, p_limit:50 });
+    const { data, error } = await rankingRequest;
     if(!isCurrentRequest()) return;
 
     if(error){
@@ -5105,7 +5109,7 @@
               data-organization-profile="${escapeAttr(myOrganizationId)}"
               role="button"
               tabindex="0">${escapeHtml(myCrewName)}</b>
-            <small>${escapeHtml([myCrewLeader ? `개설자 ${myCrewLeader}` : "", `멤버 ${myCrewMembers}명`, `점령지 ${myCrewTerritories}`].filter(Boolean).join(" · "))}</small>
+            <small>${escapeHtml([myCrewLeader ? `개설자 ${myCrewLeader}` : "", `멤버 ${myCrewMembers}명`, usePeriodRanking ? `활동 ${Number(me?.score || 0)}` : `점령지 ${myCrewTerritories}`].filter(Boolean).join(" · "))}</small>
           </div>
           <span class="my-rank-label">${myOrganizationIndex >= 0 ? "내 크루" : "50위 밖"}</span>`;
         myBox.classList.remove("hidden");
@@ -5131,8 +5135,8 @@
             <div class="rank-meta meta">개설자 ${escapeHtml(row.leader_name || "—")} · 멤버 ${Number(row.member_count || 0)}명</div>
           </div>
           <div class="rank-result">
-            <b>${Number(row.territory_count || 0)}</b>
-            <span>점령지</span>
+            <b>${Number(usePeriodRanking ? row.score : (row.territory_count || 0)).toLocaleString("ko-KR")}</b>
+            <span>${usePeriodRanking ? "활동" : "점령지"}</span>
           </div>
         </article>
       `), "아직 크루 순위가 없습니다.");
@@ -5221,8 +5225,8 @@
             <div class="rank-meta meta">${escapeHtml(rankMeta)}</div>
           </div>
           <div class="rank-result">
-            <b>${Number(row.xp || 0).toLocaleString("ko-KR")}</b>
-            <span>XP</span>
+            <b>${Number(usePeriodRanking ? row.score : (row.xp || 0)).toLocaleString("ko-KR")}</b>
+            <span>${usePeriodRanking ? "활동" : "XP"}</span>
           </div>
         </article>`;
     }), "아직 사용자 순위가 없습니다.");
