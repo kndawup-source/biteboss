@@ -6786,34 +6786,81 @@
       `;
     };
 
-    const territoryRowMarkup = row => {
+    const territoryRegionKey = row => {
+      const city = String(row.city || "").trim();
+      const district = String(row.district || "").trim();
+      return [city, district].filter(Boolean).join(" ") || "기타 지역";
+    };
+
+    const territoryRegionGroups = rows => {
+      const groups = new Map();
+      rows.forEach(row => {
+        const key = territoryRegionKey(row);
+        if(!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(row);
+      });
+      return [...groups.entries()]
+        .map(([region, items]) => ({ region, items }))
+        .sort((a,b) => b.items.length - a.items.length || a.region.localeCompare(b.region, "ko"));
+    };
+
+    const territoryStoreMarkup = row => {
       const protectedNow = Boolean(
         row.protected_until &&
         new Date(row.protected_until).getTime() > Date.now()
       );
-      const place = [row.city,row.district].filter(Boolean).join(" ");
       const privateStatus = protectedNow
         ? `보호 ${formatRemaining(row.protected_until)} 남음`
         : `방어력 ${Number(row.boss_defense || 0)}`;
 
       return `
         <button
-          class="organization-territory-row"
+          class="crew-territory-store"
           type="button"
           data-org-territory-store="${escapeAttr(row.store_id)}">
-          <div>
+          <span class="crew-territory-store-copy">
             <strong>${escapeHtml(row.store_name || "매장")}</strong>
-            <span>${escapeHtml([place,row.category].filter(Boolean).join(" · "))}</span>
-          </div>
-          ${isOwnOrganization ? `
-            <div>
-              <b>${escapeHtml(row.boss_nickname || "보스")}</b>
-              <span>${escapeHtml(privateStatus)}</span>
-            </div>
-          ` : `<span class="organization-territory-public-meta">최근 점령</span>`}
+            ${row.category ? `<small>${escapeHtml(row.category)}</small>` : ""}
+          </span>
+          ${isOwnOrganization
+            ? `<span class="crew-territory-store-meta"><b>${escapeHtml(row.boss_nickname || "보스")}</b><small>${escapeHtml(privateStatus)}</small></span>`
+            : `<span class="crew-territory-store-arrow" aria-hidden="true">→</span>`}
         </button>
       `;
     };
+
+    const territoryRegionCardMarkup = (group, index) => {
+      const leadStore = group.items[0]?.store_name || "점령 매장";
+      const extraCount = Math.max(0, group.items.length - 1);
+      const summary = extraCount ? `${leadStore} 외 ${extraCount}곳` : leadStore;
+      return `
+        <article class="crew-territory-card" data-crew-region-card>
+          <button
+            class="crew-territory-card-toggle"
+            type="button"
+            aria-expanded="false"
+            aria-controls="crewRegionStores${index}"
+            data-crew-region-toggle>
+            <span class="crew-territory-card-title">
+              <strong>${escapeHtml(group.region)}</strong>
+              <small>${group.items.length}곳 점령</small>
+            </span>
+            <span class="crew-territory-card-summary">
+              <span>${escapeHtml(summary)}</span>
+              <b aria-hidden="true">+</b>
+            </span>
+          </button>
+          <div
+            id="crewRegionStores${index}"
+            class="crew-territory-card-stores hidden"
+            data-crew-region-stores>
+            ${group.items.map(territoryStoreMarkup).join("")}
+          </div>
+        </article>
+      `;
+    };
+
+    const primaryRegion = territoryRegionGroups(sortedTerritories)[0]?.region || "";
 
     body.innerHTML = `
       <div class="organization-detail crew-profile-detail">
@@ -6826,6 +6873,7 @@
           <div class="player-profile-hero-copy crew-profile-hero-copy">
             <span>크루</span>
             <strong>${escapeHtml(org.name || "크루")}</strong>
+            ${primaryRegion ? `<p>주요 활동 지역 · ${escapeHtml(primaryRegion)}</p>` : ""}
           </div>
         </section>
 
@@ -6873,21 +6921,41 @@
       const list = $('[data-crew-territory-list]', body);
       const nav = $('[data-crew-territory-pagination]', body);
       if(!list || !nav) return;
+
       const source = isOwnOrganization ? sortedTerritories : publicTerritories;
-      const slice = isOwnOrganization ? pageSlice(source, territoryPage, CREW_PAGE_SIZE) : {page:1,pages:1,rows:source};
+      const groups = territoryRegionGroups(source);
+      const REGION_PAGE_SIZE = 4;
+      const slice = pageSlice(groups, territoryPage, REGION_PAGE_SIZE);
       territoryPage = slice.page;
-      list.innerHTML = slice.rows.map(territoryRowMarkup).join("") || `<div class="store-detail-empty">아직 점령지가 없습니다.</div>`;
+
+      list.innerHTML = slice.rows.map((group,index) => territoryRegionCardMarkup(group, index)).join("") ||
+        `<div class="store-detail-empty">아직 점령지가 없습니다.</div>`;
       bindTerritoryRows();
-      if(isOwnOrganization){
-        renderPagination(nav, territoryPage, source.length, CREW_PAGE_SIZE, nextPage => {
-          territoryPage = nextPage;
-          renderTerritoryPage();
-          $('[data-crew-detail-panel="territory"]', body)?.scrollIntoView({block:"nearest"});
+
+      $$('[data-crew-region-toggle]', list).forEach(toggle => {
+        toggle.addEventListener("click", () => {
+          const card = toggle.closest("[data-crew-region-card]");
+          const stores = card?.querySelector("[data-crew-region-stores]");
+          if(!card || !stores) return;
+          const opening = toggle.getAttribute("aria-expanded") !== "true";
+
+          $$('[data-crew-region-card]', list).forEach(otherCard => {
+            const otherToggle = otherCard.querySelector("[data-crew-region-toggle]");
+            const otherStores = otherCard.querySelector("[data-crew-region-stores]");
+            otherToggle?.setAttribute("aria-expanded", "false");
+            otherStores?.classList.add("hidden");
+          });
+
+          toggle.setAttribute("aria-expanded", opening ? "true" : "false");
+          stores.classList.toggle("hidden", !opening);
         });
-      }else{
-        nav.classList.add("hidden");
-        nav.innerHTML = "";
-      }
+      });
+
+      renderPagination(nav, territoryPage, groups.length, REGION_PAGE_SIZE, nextPage => {
+        territoryPage = nextPage;
+        renderTerritoryPage();
+        $('[data-crew-detail-panel="territory"]', body)?.scrollIntoView({block:"nearest"});
+      });
     };
 
     const renderMemberPage = () => {
