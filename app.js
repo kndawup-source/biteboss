@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.56";
+  const BITEBOSS_BUILD = "81.57";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -2310,7 +2310,7 @@
       : [];
     const wasPastBoss = !isBoss && myPastReigns.some(row => Boolean(row?.ended_at));
     const hasVisitHistory = validVisits > 0;
-    const storeCreatedAt = new Date(store.created_at || cached?.created_at || "").getTime();
+    const storeCreatedAt = new Date(store.created_at || "").getTime();
     const NEW_STORE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
     const isNewStore = Number.isFinite(storeCreatedAt)
       && storeCreatedAt <= Date.now()
