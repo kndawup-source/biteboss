@@ -2610,7 +2610,7 @@
               <article class="partner-benefit ${eligible ? "is-eligible" : "is-locked"}">
                 <div>
                   <div class="benefit-role-badges" aria-label="${escapeAttr(accessLabels.join(", "))}">
-                    ${accessLabels.map(label => `<span>${escapeHtml(label)}</span>`).join("")}
+                    ${accessLabels.map(label => `<span class="store-status-tag">${escapeHtml(label)}</span>`).join("")}
                   </div>
                   <strong>${escapeHtml(item.title)}</strong>
                   ${item.description ? `<p>${escapeHtml(item.description)}</p>` : ""}
