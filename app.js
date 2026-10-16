@@ -671,6 +671,8 @@
       void loadGamePulse();
     }
     if(tab === "rank"){
+      // Reuse the last confirmed XP immediately instead of waiting for the home summary RPC.
+      restoreRankMeter();
       syncTerritoryMapVisibility();
       loadRank();
       if(currentRank === "territory") loadTerritoryMap();
@@ -3443,6 +3445,44 @@
   }
 
 
+  function rankMeterCacheKey(){
+    const playerId = String(
+      playerSession?.player_user_id ||
+      profile?.user_id ||
+      authUser?.id ||
+      ""
+    ).trim();
+    return playerId ? `biteboss-rank-meter:${playerId}` : "";
+  }
+
+  function cacheRankMeterXp(xp){
+    const key = rankMeterCacheKey();
+    if(!key) return;
+    try{
+      sessionStorage.setItem(key, String(Math.max(0, Number(xp) || 0)));
+    }catch{}
+  }
+
+  function restoreRankMeter(){
+    const liveXp = Number(summary?.xp);
+    if(Number.isFinite(liveXp)){
+      updateRankMeter(liveXp);
+      return true;
+    }
+    const key = rankMeterCacheKey();
+    if(!key) return false;
+    try{
+      const raw = sessionStorage.getItem(key);
+      if(raw === null) return false;
+      const cached = Number(raw);
+      if(Number.isFinite(cached) && cached >= 0){
+        updateRankMeter(cached);
+        return true;
+      }
+    }catch{}
+    return false;
+  }
+
   async function loadHome(){
     if(!playerSession?.authenticated){
       resetMemberSummaryUi();
@@ -3476,6 +3516,7 @@
     updateHomeProtectionMeter(summary);
     updateProfileMeter(bossCount);
     updateRankMeter(xp);
+    cacheRankMeterXp(xp);
     await loadHistory();
   }
 
@@ -8565,9 +8606,8 @@
     modal.classList.remove("hidden");
     const modalCard = modal.querySelector(".modal-card");
     if(modalCard) modalCard.scrollTop = 0;
-    window.requestAnimationFrame(() => {
-      $("#modalClose")?.focus({preventScroll:true});
-    });
+    // Do not force focus onto the close button. Touch browsers can retain a
+    // focused/active visual state on the top-right X after the modal transition.
   }
 
   function closeModal(){
