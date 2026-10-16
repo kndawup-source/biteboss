@@ -377,9 +377,9 @@ body.biteboss-info-page{min-height:100dvh;background:var(--bg);color:#111}.info-
 /* legal + support */
 .legal-page-shell{width:min(100%,680px);margin:0 auto;padding:calc(30px + var(--safe-top)) 20px calc(44px + var(--safe-bottom))}
 .legal-page-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:start;margin-bottom:24px}
-.legal-kicker{display:block;color:#aaaab0;font-size:7px;font-weight:850;letter-spacing:.12em}
-.legal-page-head h1{margin:6px 0 0;color:#111;font-size:22px;line-height:1.08;font-weight:850;letter-spacing:-.04em}
-.legal-page-head p{max-width:500px;margin:7px 0 0;color:#94949a;font-size:10.5px;line-height:1.45;letter-spacing:-.01em}
+.legal-kicker{display:block;color:#a5a5ab;font-size:7px;font-weight:800;letter-spacing:.15em;text-transform:uppercase}
+.legal-page-head h1{margin:6px 0 0;color:var(--ink);font-size:28px;line-height:1;font-weight:850;letter-spacing:-.045em;word-break:keep-all}
+.legal-page-head p{max-width:500px;margin:7px 0 0;color:#94949a;font-size:10.5px;line-height:1.45;letter-spacing:-.01em;word-break:keep-all}
 .legal-home-button{min-width:54px;height:34px;padding:0 12px;border-radius:11px;display:inline-flex;align-items:center;justify-content:center;background:#fff;color:#111;font-size:10px;font-weight:820;text-decoration:none}
 .legal-updated{margin:-8px 0 18px;color:#aaaab0;font-size:8px;font-weight:700}
 .legal-section-list{display:grid;gap:8px}
@@ -401,7 +401,7 @@ body.biteboss-info-page{min-height:100dvh;background:var(--bg);color:#111}.info-
 .support-faq-item[open] summary i{transform:rotate(45deg)}
 .support-faq-item p{margin:0;padding:0 15px 15px 51px;color:#77777d;font-size:10px;line-height:1.6;word-break:keep-all}
 @media(max-width:520px){
-  .legal-page-shell{padding-left:18px;padding-right:18px}.legal-page-head p{font-size:10px}.legal-section{padding:14px}.legal-section h2{font-size:12px}.support-faq-item summary strong{font-size:11px}
+  .legal-page-shell{padding-left:18px;padding-right:18px}.legal-page-head h1{font-size:26px}.legal-page-head p{font-size:10px}.legal-section{padding:14px}.legal-section h2{font-size:12px}.support-faq-item summary strong{font-size:11px}
 }
 
 .app-state-retry{display:grid;justify-items:start;gap:9px}.app-state-retry>span{display:block}.app-state-retry-btn{min-height:40px;padding:0 13px;border:0;border-radius:12px;background:#111;color:#fff;font-size:10px;font-weight:820;cursor:pointer}.app-state-retry-btn:disabled{opacity:.45;cursor:default}
