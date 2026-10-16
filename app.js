@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.63";
+  const BITEBOSS_BUILD = "81.64";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -4092,39 +4092,59 @@
     closeModal();
   }
 
-  function openTakeoverChoice(rows){
-    if(takeoverChoiceOpen || !Array.isArray(rows) || rows.length<2) return false;
-    const modal=$("#modal");
-    if(modal && !modal.classList.contains("hidden")) return false;
+  function takeoverChoiceCard(row){
+    const store=row?.store||{};
+    const roleState=storeRoleMap.get(String(store.id))||{};
+    const protectionUntil=roleState.protected_until||store.protected_until||null;
+    const protectedNow=Boolean(protectionUntil&&new Date(protectionUntil).getTime()>Date.now());
+    const isPartner=String(store.partnership_status||"unclaimed")==="partnered";
+    const hasBenefit=Boolean(store.has_benefit||Number(store.active_offer_count||0)>0);
+    const boss=String(store.current_boss_nickname||"").trim();
+    const bossExists=Boolean(boss&&boss!=="No Boss"&&boss!=="미점령");
+    const place=[store.city,store.district].filter(Boolean).join(" ");
+    const distance=Number.isFinite(Number(row?.distance))?formatDistance(row.distance):(Number.isFinite(Number(store.distance_m))?formatDistance(store.distance_m):"");
+    const protectionSummary=protectedNow?`보호 ${formatRemaining(protectionUntil)} 남음`:"";
+    const details=[categoryLabel(store.category),place,distance,protectionSummary].filter(Boolean).join(" · ");
+    const status=bossExists?`현재 BOSS · ${boss}`:"미점령";
+    const badges=[isPartner?{label:"제휴",cls:"partner"}:null,hasBenefit?{label:"혜택",cls:"benefit"}:null].filter(Boolean);
+    const cardMode=takeoverModeFromStore(store);
+    return `<div class="takeover-choice-row" data-choice-row="${escapeAttr(store.id)}">
+      <button class="takeover-choice-store" type="button" data-takeover-choice="${escapeAttr(store.id)}" aria-label="${escapeAttr(store.name||"매장")} 점령 선택">
+        <article class="store-card challenge-card mode-${escapeAttr(cardMode)} ${isPartner?"is-partner-store":""}">
+          <div class="store-card-main">
+            ${occupiedStoreAvatarMarkup(store,"store-card-photo")}
+            <div class="store-card-copy">
+              <div class="store-card-title-row">
+                <strong class="store-card-name">${escapeHtml(store.name||"매장")}</strong>
+                ${badges.length?`<div class="store-status-tags">${badges.map(tag=>`<span class="store-status-tag ${tag.cls}">${tag.label}</span>`).join("")}</div>`:""}
+              </div>
+              ${details?`<div class="store-card-meta">${escapeHtml(details)}</div>`:""}
+              <div class="store-card-status ${protectedNow?"is-protected":""}">${escapeHtml(status)}</div>
+            </div>
+          </div>
+        </article>
+      </button>
+      <button class="takeover-choice-dismiss" type="button" data-takeover-dismiss="${escapeAttr(store.id)}">제외</button>
+    </div>`;
+  }
 
+  function openTakeoverChoice(rows){
+    if(takeoverChoiceOpen||!Array.isArray(rows)||rows.length<2) return false;
+    const modal=$("#modal");
+    if(modal&&!modal.classList.contains("hidden")) return false;
     takeoverChoiceOpen=true;
     const visibleRows=rows.slice(0,8);
-    openModal("점령할 매장 선택", `
-      <div class="takeover-choice-copy">현재 위치에서 점령 가능한 매장을 선택하세요.</div>
-      <div class="takeover-choice-list">
-        ${visibleRows.map(row=>`
-          <div class="takeover-choice-card" data-choice-row="${escapeAttr(row.store.id)}">
-            <button class="takeover-choice-select" type="button" data-takeover-choice="${escapeAttr(row.store.id)}">
-              <span class="takeover-choice-thumb">
-                ${row.store.photo_url ? `<img src="${escapeAttr(row.store.photo_url)}" alt="" loading="lazy">` : `<span class="takeover-choice-thumb-fallback" aria-hidden="true">${escapeHtml(String(row.store.name||"매장").trim().slice(0,1))}</span>`}
-              </span>
-              <span class="takeover-choice-info">
-                <strong>${escapeHtml(row.store.name||"매장")}</strong>
-                <span>${escapeHtml(formatDistance(row.distance)||"가까움")}</span>
-              </span>
-            </button>
-            <button class="takeover-choice-dismiss" type="button" data-takeover-dismiss="${escapeAttr(row.store.id)}" aria-label="${escapeAttr(row.store.name||"매장")} 제외">×</button>
-          </div>`).join("")}
-      </div>
-      ${rows.length>visibleRows.length ? `<div class="takeover-choice-more">가까운 매장 ${visibleRows.length}곳을 먼저 표시합니다.</div>` : ""}
-    `, {type:"notice"});
-
+    openModal("점령할 매장 선택",`
+      <div class="takeover-choice-copy">현재 위치에서 매장을 선택하세요.</div>
+      <div class="takeover-choice-list">${visibleRows.map(takeoverChoiceCard).join("")}</div>
+      ${rows.length>visibleRows.length?`<div class="takeover-choice-more">가까운 매장 ${visibleRows.length}곳을 먼저 표시합니다.</div>`:""}
+    `,{type:"notice"});
     const body=$("#modalBody");
     body?.querySelectorAll("[data-takeover-choice]").forEach(button=>{
       button.addEventListener("click",()=>{
         preferredTakeoverStoreId=String(button.dataset.takeoverChoice||"").trim();
         takeoverCancelledLocally=false;
-        takeoverCancelResetTimer = clearTimeoutRef(takeoverCancelResetTimer);
+        takeoverCancelResetTimer=clearTimeoutRef(takeoverCancelResetTimer);
         closeTakeoverChoice();
         void tickPresenceTracking();
       });
@@ -4135,13 +4155,8 @@
         dismissTakeoverStore(storeId);
         button.closest("[data-choice-row]")?.remove();
         const remaining=[...body.querySelectorAll("[data-takeover-choice]")].filter(item=>!dismissedTakeoverStores.has(String(item.dataset.takeoverChoice||"")));
-        if(remaining.length===1){
-          preferredTakeoverStoreId=String(remaining[0].dataset.takeoverChoice||"").trim();
-          closeTakeoverChoice();
-          void tickPresenceTracking();
-        }else if(remaining.length===0){
-          closeTakeoverChoice();
-        }
+        if(remaining.length===1){preferredTakeoverStoreId=String(remaining[0].dataset.takeoverChoice||"").trim();closeTakeoverChoice();void tickPresenceTracking();}
+        else if(remaining.length===0) closeTakeoverChoice();
       });
     });
     return true;
