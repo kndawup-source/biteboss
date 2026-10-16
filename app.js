@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.57";
+  const BITEBOSS_BUILD = "81.58";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -3866,7 +3866,7 @@
   }
 
   function takeoverModeLabel(mode){
-    return ({takeover:"TAKING OVER",challenge:"CHALLENGING",retake:"RETAKING",hot:"HOT TAKEOVER"})[String(mode||"")] || "TAKING OVER";
+    return ({takeover:"TAKING OVER",challenge:"CHALLENGING",retake:"RETAKING",hot:"HOT TAKEOVER",reclaim:"RECLAIMING"})[String(mode||"")] || "TAKING OVER";
   }
 
   function takeoverModeFromStore(store){
@@ -3885,7 +3885,8 @@
 
   function showTakeoverUi(store,state={}){
     if(!store?.id || takeoverCancelledLocally) return;
-    if(isMyBossStore(store)){
+    const requestedMode=String(state.mode||"");
+    if(isMyBossStore(store) && requestedMode!=="reclaim"){
       if(takeoverUi?.storeId===String(store.id)) closeTakeoverUi();
       return;
     }
@@ -3902,6 +3903,8 @@
     takeoverLastServerAt=Date.now();
     $("#takeoverEyebrow").textContent=takeoverModeLabel(mode);
     $("#takeoverStoreName").textContent=takeoverUi.storeName;
+    const cancelButton=$("#takeoverCancelBtn");
+    if(cancelButton) cancelButton.textContent=mode==="reclaim" ? "재점령 취소" : "점령 취소";
     updateTakeoverUi(state.status||"tracking",state.reason||"");
     screen.classList.remove("hidden");
     document.body.classList.add("takeover-active");
@@ -3979,7 +3982,8 @@
 
   function syncTakeoverUi(store,state={}){
     if(!store?.id) return;
-    if(isMyBossStore(store)){
+    const requestedMode=String(state.mode||"");
+    if(isMyBossStore(store) && requestedMode!=="reclaim"){
       if(takeoverUi?.storeId===String(store.id)) closeTakeoverUi();
       return;
     }
@@ -4011,6 +4015,8 @@
     }
     if(state.mode) takeoverUi.mode=String(state.mode);
     $("#takeoverEyebrow").textContent=takeoverModeLabel(takeoverUi.mode);
+    const cancelButton=$("#takeoverCancelBtn");
+    if(cancelButton) cancelButton.textContent=takeoverUi.mode==="reclaim" ? "재점령 취소" : "점령 취소";
     updateTakeoverUi(status,state.reason||"");
   }
 
@@ -4466,7 +4472,7 @@
       }
 
       const reclaimTarget = ownedInRadius
-        .filter(row => row.reclaim?.is_boss !== false && (row.reclaim?.eligible === true || Number(row.reclaim?.remaining_seconds || 0) <= 0))
+        .filter(row => !dismissedTakeoverStores.has(String(row.store.id)) && row.reclaim?.is_boss !== false && (row.reclaim?.eligible === true || Number(row.reclaim?.remaining_seconds || 0) <= 0))
         .sort((a,b) => a.distance - b.distance)[0];
 
       const challengeRowsInRadius = distanceRows.filter(row =>
@@ -4500,7 +4506,7 @@
       if(!nearest) return;
 
       const ownedByMe=nearest.ownedByMe;
-      if(ownedByMe && takeoverUi?.storeId===String(nearest.store.id)) closeTakeoverUi();
+      if(ownedByMe && takeoverUi?.storeId===String(nearest.store.id) && takeoverUi?.mode!=="reclaim") closeTakeoverUi();
 
       const nearestId = String(nearest.store.id);
       const withinRadius = nearest.distance <= radius;
@@ -4521,12 +4527,17 @@
           remaining_seconds:Number(config.gps_dwell_seconds || 120)
         });
         if(ownedByMe){
-          syncOwnerReclaimPresence(nearest.store.id, {
+          const outsideState={
             status:"outside",
+            mode:"reclaim",
             distance_m:nearest.distance,
             required_seconds:Number(config.gps_dwell_seconds || 120),
             remaining_seconds:Number(config.gps_dwell_seconds || 120)
-          });
+          };
+          syncOwnerReclaimPresence(nearest.store.id, outsideState);
+          if(nearest.reclaim?.eligible === true || Number(nearest.reclaim?.remaining_seconds || 0) <= 0){
+            syncTakeoverUi(nearest.store,outsideState);
+          }
         }else if(takeoverUi?.storeId===nearestId){
           syncTakeoverUi(nearest.store,{status:"hold",reason:"OUTSIDE",remaining_seconds:currentTakeoverVisualRemaining(),required_seconds:takeoverRequired});
         }
@@ -4592,6 +4603,7 @@
           };
           storeReclaimCache.set(String(nearest.store.id), { data:reclaimData, fetchedAt:Date.now() });
           if(String(activeStoreDetailId || "") === String(nearest.store.id)) applyOwnerReclaimState(reclaimData);
+          if(takeoverUi?.storeId===String(nearest.store.id) && takeoverUi?.mode==="reclaim") closeTakeoverUi();
         }else if(ownedByMe){
           syncOwnerReclaimPresence(nearest.store.id, blockedPresence);
         }
@@ -4613,6 +4625,9 @@
       // server presence/dwell clock that can actually complete the capture.
       if(ownedByMe){
         syncOwnerReclaimPresence(nearest.store.id, presenceClock);
+        if(!takeoverCancelledLocally && !["boss_visit","boss_reclaim"].includes(presenceClock.status)){
+          syncTakeoverUi(nearest.store,{...presenceClock,mode:"reclaim"});
+        }
       }else if(!takeoverCancelledLocally && !["claimed","crew","boss_visit","boss_reclaim"].includes(presenceClock.status)){
         syncTakeoverUi(nearest.store,presenceClock);
       }
@@ -4635,7 +4650,7 @@
         if(takeoverUi?.storeId===String(nearest.store.id)){
           setTakeoverCountDisplay(String(data?.status||"")==="crew" ? "HOLD" : "BOSS");
           const status=$("#takeoverStatus");
-          if(status) status.textContent=String(data?.status||"")==="crew" ? "도전 결과를 확인하세요." : `${nearest.store.name||"매장"} 점령 완료`;
+          if(status) status.textContent=String(data?.status||"")==="crew" ? "도전 결과를 확인하세요." : (String(data?.status||"")==="boss_reclaim" ? `${nearest.store.name||"매장"} 재점령 완료` : `${nearest.store.name||"매장"} 점령 완료`);
           closeTakeoverUi(900);
         }
         showChallengeOutcome({
@@ -5563,8 +5578,20 @@
     }
 
     if(outcome === "boss_reclaim"){
-      invalidateStoreReclaimState(data?.store_id || takeoverUi?.storeId || "");
-      return toast(`${storeName} 재점령 완료 · 24시간 재방문이 확인되어 점령 기록과 보호시간이 갱신되었습니다.`);
+      openModal("재점령 완료", `
+        <div class="boss-victory">
+          <div class="boss-victory-copy">
+            <span>BOSS 유지</span>
+            <strong>${escapeHtml(storeName)}</strong>
+            <p>재방문이 확인되어 점령 기록과 보호시간이 갱신되었습니다.</p>
+          </div>
+          <div class="boss-victory-actions">
+            <button id="reclaimOkBtn" class="primary-btn" type="button">확인</button>
+          </div>
+        </div>
+      `, { type:"victory" });
+      $("#reclaimOkBtn")?.addEventListener("click", closeModal);
+      return;
     }
 
     const myPower = Number(data?.challenger_power || 0);
