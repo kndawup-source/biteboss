@@ -4464,7 +4464,7 @@
     const image = String(banner.photo_url || banner.store_photo_url || registeredStore?.photo_url || "").trim();
     const visual = image
       ? `<span class="partner-banner-thumb" aria-hidden="true"><img src="${escapeAttr(image)}" alt="" loading="eager" decoding="async" fetchpriority="high" /></span>`
-      : `<span class="partner-banner-thumb partner-banner-fallback" aria-hidden="true">${escapeHtml(Array.from(storeName)[0] || "P")}</span>`;
+      : `<span class="partner-banner-thumb partner-banner-fallback" aria-hidden="true"></span>`;
     return `<button class="game-pulse-item is-partner-banner" type="button" data-pulse-store="${escapeAttr(storeId)}" data-pulse-name="${escapeAttr(storeName)}">${visual}<strong>${escapeHtml(storeName)}</strong><small>${escapeHtml(copy)}</small></button>`;
   }
 
