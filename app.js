@@ -2007,13 +2007,12 @@
 
     let action = "";
     if(!ownedByMe && isPartner){
-      action = `<button class="store-list-action is-primary" data-scan-store="${escapeAttr(store.id)}" type="button">QR 도전</button>`;
+      action = `<button class="store-list-action is-primary is-live" data-scan-store="${escapeAttr(store.id)}" type="button">QR 도전</button>`;
     }else if(!ownedByMe && presence?.status === "tracking"){
       action = `<span class="store-list-action is-live" aria-live="polite">${formatPresenceSeconds(remainingSeconds)} 남음</span>`;
     }
 
     const badges = [
-      isPartner ? {label:"제휴", cls:"partner"} : null,
       Boolean(store.has_benefit || Number(store.active_offer_count || 0) > 0) ? {label:"혜택", cls:"benefit"} : null
     ].filter(Boolean);
 
@@ -2027,12 +2026,12 @@
             <div class="store-card-title-row">
               <strong class="store-card-name">${escapeHtml(store.name)}</strong>
               ${badges.length ? `<div class="store-status-tags">${badges.map(tag => `<span class="store-status-tag ${tag.cls}">${tag.label}</span>`).join("")}</div>` : ""}
-              ${action ? `<div class="store-card-title-action">${action}</div>` : ""}
             </div>
             ${details ? `<div class="store-card-meta">${escapeHtml(details)}</div>` : ""}
             ${status ? `<div class="store-card-status ${protectedNow ? "is-protected" : ""}" ${ownedByMe && reclaimAt && !presence?.status ? `data-store-reclaim-at="${escapeAttr(reclaimAt)}"` : ""}>${escapeHtml(status)}</div>` : ""}
           </div>
         </div>
+        ${action}
       </article>
     `;
   }
