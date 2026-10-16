@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.49";
+  const BITEBOSS_BUILD = "81.50";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -145,6 +145,7 @@
     home_primary_cta:"QR 스캔하기",
     home_secondary_cta:"내 주변 보스 찾기",
     partner_banners:[],
+    ad_public_campaigns:[],
     crew_qr_invite_hours:72,
     crew_qr_max_uses:30,
     crew_max_members:30,
@@ -931,37 +932,84 @@
     }
   }
 
+  function adRegionKeyForStore(store){
+    return [String(store?.city || "").trim(), String(store?.district || "").trim()].filter(Boolean).join(" ").trim();
+  }
+
+  function currentAdRegion(){
+    const takeoverStore=takeoverUi?.storeId ? stores.find(store => String(store.id) === String(takeoverUi.storeId)) : null;
+    if(takeoverStore) return adRegionKeyForStore(takeoverStore);
+    if(!lastPosition?.coords) return "";
+    const nearby=stores.filter(store => Number.isFinite(Number(store.latitude)) && Number.isFinite(Number(store.longitude)))
+      .map(store => ({ store, distance:localStoreDistance(store) }))
+      .filter(item => Number.isFinite(item.distance))
+      .sort((a,b) => a.distance-b.distance)[0]?.store;
+    return adRegionKeyForStore(nearby);
+  }
+
+  function campaignMatchesPlacement(campaign, placement){
+    const value=String(campaign?.placement || "both");
+    return value === "both" || value === placement;
+  }
+
+  function campaignMatchesRegion(campaign){
+    if(String(campaign?.target_type || "all") !== "region") return true;
+    const target=String(campaign?.target_region || "").replace(/\s+/g," ").trim();
+    const current=currentAdRegion().replace(/\s+/g," ").trim();
+    return Boolean(target && current && (current === target || current.includes(target) || target.includes(current)));
+  }
+
+  function activeCampaignFor(placement){
+    const now=Date.now();
+    const rows=Array.isArray(config.ad_public_campaigns) ? config.ad_public_campaigns : [];
+    return rows.filter(item => {
+      if(!item?.id || !item?.image_url || !item.is_active) return false;
+      const start=item.starts_at ? new Date(item.starts_at).getTime() : 0;
+      const end=item.ends_at ? new Date(item.ends_at).getTime() : Infinity;
+      return start <= now && end > now && campaignMatchesPlacement(item,placement) && campaignMatchesRegion(item);
+    }).sort((a,b) => Number(b.sort_order || 0)-Number(a.sort_order || 0))[0] || null;
+  }
+
   async function loadBanner(){
     const banner = $("#homeAdBanner");
     const image = $("#homeAdImage");
     if(!banner || !image || !window.sb) return;
 
-    const { data, error } = await sb.rpc("biteboss_active_banner");
-    if(error){
-      console.warn("BiteBoss banner:", error);
-      hideBanner();
-      return;
+    let homeCampaign=activeCampaignFor("home");
+    let takeoverCampaign=activeCampaignFor("takeover");
+
+    // Legacy fallback until an administrator opens the Ads page once and the
+    // public campaign config is synchronized.
+    if(!Array.isArray(config.ad_public_campaigns) || !config.ad_public_campaigns.length){
+      const { data, error } = await sb.rpc("biteboss_active_banner");
+      if(error) console.warn("BiteBoss banner:", error);
+      else if(data?.id && data?.image_url){ homeCampaign=data; takeoverCampaign=data; }
     }
-    if(!data?.id || !data?.image_url){
-      hideBanner();
+
+    activeBanner = homeCampaign;
+    if(takeoverUi){
+      if(takeoverCampaign) renderTakeoverAd(takeoverCampaign);
+      else hideTakeoverAd();
+    }
+    if(!homeCampaign){
+      banner.classList.add("hidden");
+      banner.removeAttribute("href");
+      banner.onclick=null;
+      image.removeAttribute("src");
+      image.onerror=null;
       return;
     }
 
-    activeBanner = data;
-    if(takeoverUi) renderTakeoverAd(data);
-    image.src = data.image_url;
-    image.alt = data.advertiser_name ? `${data.advertiser_name} sponsored banner` : "Sponsored banner";
-    banner.href = /^https?:\/\//i.test(String(data.click_url || "")) ? data.click_url : "#";
+    image.src = homeCampaign.image_url;
+    image.alt = homeCampaign.advertiser_name ? `${homeCampaign.advertiser_name} sponsored banner` : "Sponsored banner";
+    banner.href = /^https?:\/\//i.test(String(homeCampaign.click_url || "")) ? homeCampaign.click_url : "#";
     banner.classList.remove("hidden");
-    banner.onclick = async event => {
-      if(!activeBanner?.click_url){
-        event.preventDefault();
-        return;
-      }
-      trackAdEvent(activeBanner.id, "click");
+    banner.onclick = event => {
+      if(!homeCampaign?.click_url){ event.preventDefault(); return; }
+      trackAdEvent(homeCampaign.id, "click");
     };
-    image.onerror = hideBanner;
-    trackAdEvent(data.id, "impression");
+    image.onerror = () => { banner.classList.add("hidden"); image.removeAttribute("src"); };
+    trackAdEvent(homeCampaign.id, "impression");
   }
 
   function hideBanner(){
@@ -983,7 +1031,7 @@
     if(image){ image.removeAttribute("src"); image.onerror=null; }
   }
 
-  function renderTakeoverAd(campaign=activeBanner){
+  function renderTakeoverAd(campaign=activeCampaignFor("takeover")){
     const slot=$("#takeoverAdSlot");
     const link=$("#takeoverAdLink");
     const image=$("#takeoverAdImage");
@@ -3831,7 +3879,7 @@
     updateTakeoverUi(state.status||"tracking",state.reason||"");
     screen.classList.remove("hidden");
     document.body.classList.add("takeover-active");
-    renderTakeoverAd(activeBanner);
+    renderTakeoverAd(activeCampaignFor("takeover"));
     startTakeoverUiTicker();
   }
 

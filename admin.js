@@ -215,6 +215,7 @@
       renderStores();
     }));
     $("#adCampaignCancel")?.addEventListener("click", resetAdCampaignForm);
+    $("#adTargetType")?.addEventListener("change", syncAdTargetRegionField);
     $("#partnerRequestFilter")?.addEventListener("change", () => { partnerRequestPage = 1; loadPartnerRequests(); });
     $("#refreshPartnerRequests")?.addEventListener("click", loadPartnerRequests);
     $("#refreshAdminComments")?.addEventListener("click", () => loadAdminComments(adminCommentPage));
@@ -689,27 +690,16 @@
   }
 
   async function loadStores(){
-    const pageSize = 1000;
-    const allStores = [];
+    const { data, error } = await adminSb
+      .from("biteboss_stores")
+      .select("*")
+      .order("created_at", { ascending:false });
 
-    for(let from = 0; ; from += pageSize){
-      const { data, error } = await adminSb
-        .from("biteboss_stores")
-        .select("*")
-        .order("created_at", { ascending:false })
-        .range(from, from + pageSize - 1);
-
-      if(error){
-        console.warn(error);
-        return;
-      }
-
-      const rows = Array.isArray(data) ? data : [];
-      allStores.push(...rows);
-      if(rows.length < pageSize) break;
+    if(error){
+      console.warn(error);
+      return;
     }
-
-    stores = allStores;
+    stores = data || [];
     renderStores();
     await renderQr();
   }
@@ -1923,7 +1913,61 @@
   function setStatusText(node, text){ if(node) node.textContent = String(text || ""); }
 
 
+  function adPlacementConfig(){
+    const raw = appConfig.ad_campaign_settings;
+    return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+  }
+
+  function campaignSetting(id){
+    const value = adPlacementConfig()[String(id)] || {};
+    return {
+      placement:["home","takeover","both"].includes(String(value.placement)) ? String(value.placement) : "both",
+      target_type:String(value.target_type) === "region" ? "region" : "all",
+      target_region:String(value.target_region || "").trim()
+    };
+  }
+
+  function syncAdTargetRegionField(){
+    const isRegion = String($("#adTargetType")?.value || "all") === "region";
+    $("#adTargetRegionField")?.classList.toggle("hidden", !isRegion);
+    if($("#adTargetRegion")) $("#adTargetRegion").required = isRegion;
+  }
+
+  async function saveAdCampaignSetting(campaignId){
+    const id=String(campaignId || "");
+    if(!id) return;
+    const settings={ ...adPlacementConfig() };
+    settings[id]={
+      placement:String($("#adPlacement")?.value || "both"),
+      target_type:String($("#adTargetType")?.value || "all"),
+      target_region:String($("#adTargetRegion")?.value || "").trim()
+    };
+    const row={ key:"ad_campaign_settings", value:settings, updated_by:session.user.id, updated_at:new Date().toISOString() };
+    const { error }=await adminSb.from("biteboss_app_config").upsert(row,{ onConflict:"key" });
+    if(error) throw error;
+    appConfig.ad_campaign_settings=settings;
+  }
+
+  async function syncPublicAdCampaigns(){
+    const settings=adPlacementConfig();
+    const publicRows=adCampaigns.map(item=>{
+      const setting=campaignSetting(item.id);
+      return {
+        id:item.id, advertiser_name:item.advertiser_name || "", campaign_name:item.campaign_name || "",
+        image_url:item.image_url || "", click_url:item.click_url || "", starts_at:item.starts_at || null,
+        ends_at:item.ends_at || null, is_active:Boolean(item.is_active), sort_order:Number(item.sort_order || 0),
+        placement:setting.placement, target_type:setting.target_type, target_region:setting.target_region
+      };
+    });
+    const { error }=await adminSb.from("biteboss_app_config").upsert({
+      key:"ad_public_campaigns", value:publicRows, updated_by:session.user.id, updated_at:new Date().toISOString()
+    },{ onConflict:"key" });
+    if(error) throw error;
+    appConfig.ad_public_campaigns=publicRows;
+  }
+
   async function loadAds(){
+    if(!Object.keys(appConfig).length) await loadConfig();
     const box = $("#adCampaignList");
     if(!box) return;
     const { data, error } = await adminSb.rpc("biteboss_admin_list_campaigns");
@@ -1933,6 +1977,7 @@
       return;
     }
     adCampaigns = Array.isArray(data) ? data : [];
+    try{ await syncPublicAdCampaigns(); }catch(error){ console.warn("Ad public config sync:", error); }
     renderAds();
     if(!$("#adCampaignId")?.value) ensureAdStartDefault();
   }
@@ -1948,12 +1993,15 @@
       const impressions = Number(item.impressions || 0);
       const clicks = Number(item.clicks || 0);
       const ctr = impressions > 0 ? (clicks / impressions * 100).toFixed(1) : "0.0";
+      const setting = campaignSetting(item.id);
+      const placementLabel = setting.placement === "home" ? "홈" : (setting.placement === "takeover" ? "점령 대기" : "홈 + 점령 대기");
+      const targetLabel = setting.target_type === "region" && setting.target_region ? ` · ${setting.target_region}` : " · 전체";
       return `
         <article class="admin-ad-row">
           <img class="admin-ad-thumb" src="${escapeAttr(item.image_url)}" alt="" />
           <div class="admin-ad-copy">
             <div class="admin-ad-title"><strong>${escapeHtml(item.campaign_name)}</strong><span>${live ? "LIVE" : (item.is_active ? "SCHEDULED" : "OFF")}</span></div>
-            <p>${escapeHtml(item.advertiser_name)} · ${escapeHtml(formatAdPeriod(item.starts_at, item.ends_at))}</p>
+            <p>${escapeHtml(item.advertiser_name)} · ${escapeHtml(placementLabel + targetLabel)} · ${escapeHtml(formatAdPeriod(item.starts_at, item.ends_at))}</p>
             <div class="admin-ad-stats"><span>${impressions.toLocaleString("ko-KR")} 노출</span><span>${clicks.toLocaleString("ko-KR")} 클릭</span><span>CTR ${ctr}%</span></div>
           </div>
           <div class="admin-data-actions">
@@ -1978,6 +2026,11 @@
     $("#adEndsAt").value = toDateTimeLocal(item.ends_at);
     $("#adIsActive").value = String(Boolean(item.is_active));
     $("#adSortOrder").value = Number(item.sort_order || 0);
+    const setting=campaignSetting(item.id);
+    $("#adPlacement").value=setting.placement;
+    $("#adTargetType").value=setting.target_type;
+    $("#adTargetRegion").value=setting.target_region;
+    syncAdTargetRegionField();
     $("#adCampaignCancel")?.classList.remove("hidden");
     setStatusText($("#adCampaignStatus"), "새 이미지를 선택하지 않으면 기존 배너가 유지됩니다.");
     $("#adCampaignForm")?.scrollIntoView({ behavior:"smooth", block:"start" });
@@ -1989,6 +2042,10 @@
     if($("#adCampaignId")) $("#adCampaignId").value = "";
     if($("#adIsActive")) $("#adIsActive").value = "true";
     if($("#adSortOrder")) $("#adSortOrder").value = "0";
+    if($("#adPlacement")) $("#adPlacement").value = "both";
+    if($("#adTargetType")) $("#adTargetType").value = "all";
+    if($("#adTargetRegion")) $("#adTargetRegion").value = "";
+    syncAdTargetRegionField();
     $("#adCampaignCancel")?.classList.add("hidden");
     setStatusText($("#adCampaignStatus"), "");
     ensureAdStartDefault();
@@ -2053,6 +2110,15 @@
       });
       if(error) throw error;
       if(!data?.ok) throw new Error(data?.error || "CAMPAIGN_SAVE_FAILED");
+      let savedCampaignId=String(data?.id || data?.campaign_id || id || "");
+      if(!savedCampaignId){
+        const listed=await adminSb.rpc("biteboss_admin_list_campaigns");
+        if(listed.error) throw listed.error;
+        const saved=(Array.isArray(listed.data) ? listed.data : []).find(item => String(item.image_url || "") === String(imageUrl));
+        savedCampaignId=String(saved?.id || "");
+      }
+      if(!savedCampaignId) throw new Error("CAMPAIGN_ID_NOT_RETURNED");
+      await saveAdCampaignSetting(savedCampaignId);
 
       if(newStoragePath && previous?.storage_path && previous.storage_path !== newStoragePath){
         const removed = await adminSb.storage.from("biteboss-assets").remove([previous.storage_path]);
@@ -2085,6 +2151,9 @@
         if(removed.error) console.warn("Ad asset cleanup:", removed.error);
       }
       if(String($("#adCampaignId")?.value || "") === String(id)) resetAdCampaignForm();
+      const settings={ ...adPlacementConfig() }; delete settings[String(id)];
+      await adminSb.from("biteboss_app_config").upsert({ key:"ad_campaign_settings", value:settings, updated_by:session.user.id, updated_at:new Date().toISOString() },{ onConflict:"key" });
+      appConfig.ad_campaign_settings=settings;
       await loadAds();
     }catch(error){
       alert(error?.message || "캠페인 삭제에 실패했습니다.");
