@@ -1029,6 +1029,29 @@
     return Boolean(target && current && (current === target || current.includes(target) || target.includes(current)));
   }
 
+  function campaignStoreProfile(campaign){
+    if(!campaign) return { photoUrl:"", storeName:"" };
+    const targetStoreId=String(campaign.target_store_id || "").trim();
+    const targetStore=targetStoreId
+      ? stores.find(store=>String(store.id)===targetStoreId) || null
+      : null;
+    return {
+      photoUrl:String(
+        targetStore?.photo_url
+        || campaign.store_photo_url
+        || campaign.profile_image_url
+        || campaign.photo_url
+        || ""
+      ).trim(),
+      storeName:String(
+        targetStore?.name
+        || campaign.store_name
+        || campaign.advertiser_name
+        || "광고"
+      ).trim()
+    };
+  }
+
   function activeCampaignFor(placement){
     const now=Date.now();
     const rows=Array.isArray(config.ad_public_campaigns) ? config.ad_public_campaigns : [];
@@ -1077,6 +1100,24 @@
       return;
     }
 
+    const homeProfile=campaignStoreProfile(homeCampaign);
+    const homeProfileImage=$("#homeAdProfileImage");
+    const homeProfileFallback=$("#homeAdProfileFallback");
+    if(homeProfileImage){
+      if(homeProfile.photoUrl){
+        homeProfileImage.src=homeProfile.photoUrl;
+        homeProfileImage.alt=`${homeProfile.storeName} 매장 사진`;
+        homeProfileImage.classList.remove("hidden");
+        if(homeProfileFallback) homeProfileFallback.classList.add("hidden");
+      }else{
+        homeProfileImage.removeAttribute("src");
+        homeProfileImage.classList.add("hidden");
+        if(homeProfileFallback){
+          homeProfileFallback.textContent=Array.from(homeProfile.storeName)[0] || "B";
+          homeProfileFallback.classList.remove("hidden");
+        }
+      }
+    }
     image.src = homeCampaign.image_url;
     image.alt = homeCampaign.advertiser_name ? `${homeCampaign.advertiser_name} sponsored banner` : "Sponsored banner";
     banner.href = /^https?:\/\//i.test(String(homeCampaign.click_url || "")) ? homeCampaign.click_url : "#";
@@ -1103,12 +1144,30 @@
     const link=$("#takeoverAdLink");
     const image=$("#takeoverAdImage");
     const advertiser=$("#takeoverAdAdvertiser");
+    const profileImage=$("#takeoverAdProfileImage");
+    const profileFallback=$("#takeoverAdProfileFallback");
     if(!slot || !link || !image || !campaign?.id || !campaign?.image_url){
       hideTakeoverAd();
       return;
     }
 
     const storeId=String(takeoverUi?.storeId || "");
+    const profile=campaignStoreProfile(campaign);
+    if(profileImage){
+      if(profile.photoUrl){
+        profileImage.src=profile.photoUrl;
+        profileImage.alt=`${profile.storeName} 매장 사진`;
+        profileImage.classList.remove("hidden");
+        if(profileFallback) profileFallback.classList.add("hidden");
+      }else{
+        profileImage.removeAttribute("src");
+        profileImage.classList.add("hidden");
+        if(profileFallback){
+          profileFallback.textContent=Array.from(profile.storeName)[0] || "B";
+          profileFallback.classList.remove("hidden");
+        }
+      }
+    }
     image.src=String(campaign.image_url);
     image.alt=campaign.advertiser_name ? `${campaign.advertiser_name} 광고` : "Sponsored";
     if(advertiser) advertiser.textContent=String(campaign.advertiser_name || "광고");
@@ -1944,8 +2003,6 @@
       status = `${Math.round(Number(presence.distance_m || 0))}m 더 가까이 가면 자동 시작`;
     }else if(presence?.status === "low_accuracy"){
       status = "GPS 정확도 확인 중";
-    }else if(isPartner){
-      status = "QR로 바로 도전";
     }
 
     let action = "";
@@ -2342,7 +2399,6 @@
               <img src="${escapeAttr(photo.image_url)}" alt="${escapeAttr(photo.caption || `${store.name || "매장"} 사진 ${index + 1}`)}" loading="${index === 0 ? "eager" : "lazy"}" decoding="async" />
             </figure>`).join("")}
         </div>
-        ${photos.length > 1 ? `<div class="store-detail-photo-count" aria-hidden="true"><b data-store-photo-current>1</b> / ${photos.length}</div>` : ""}
       </section>` : "";
 
     const managerManagedStore = hasStoreManagerAccount(store, partnerRequest) || isPartner;
@@ -2617,11 +2673,11 @@
             </div>` : ""}
         </header>
 
-        ${gallery}
-
         <section class="store-detail-map-section" aria-label="매장 위치">
           <div id="storeDetailMap" class="store-detail-map" aria-label="${escapeAttr(store.name || "매장")} 지도"></div>
         </section>
+
+        ${gallery}
 
         ${ownerStatusHtml}
 
@@ -2713,18 +2769,6 @@
         ${action ? `<div class="store-detail-bottom-action">${action}</div>` : ""}
       </div>
     `;
-
-    const photoGallery = body.querySelector("[data-store-photo-gallery]");
-    const photoCurrent = body.querySelector("[data-store-photo-current]");
-    if(photoGallery && photoCurrent){
-      const updatePhotoIndex = ()=>{
-        const width = photoGallery.clientWidth || 1;
-        const index = Math.max(0, Math.min(photos.length - 1, Math.round(photoGallery.scrollLeft / width)));
-        photoCurrent.textContent = String(index + 1);
-      };
-      photoGallery.addEventListener("scroll", updatePhotoIndex, {passive:true});
-      updatePhotoIndex();
-    }
 
     void renderStoreDetailMap(store);
     bindStoreComments(store.id);
