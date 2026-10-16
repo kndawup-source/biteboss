@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.54";
+  const BITEBOSS_BUILD = "81.55";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -3214,7 +3214,6 @@
     const storeName=String(store?.name||"STORE").trim();
     const place=[store?.city,store?.district].filter(Boolean).join(" ");
     const statusLine=isBoss ? "내가 현재 보스" : (bossName ? `현재 보스 ${bossName}` : "아직 보스 없음");
-    const challengeLine=isBoss ? "나한테서 뺏어봐." : "이 매장을 점령해봐." ;
     const timeText=new Intl.DateTimeFormat("en",{month:"short",day:"2-digit",hour:"2-digit",minute:"2-digit"}).format(new Date()).toUpperCase();
 
     ctx.fillStyle="#000";
@@ -3236,53 +3235,42 @@
     ctx.font="900 92px system-ui";
     const name=storeName.toUpperCase();
     ctx.fillText(name.slice(0,18),72,410);
-    if(name.length>18){
-      ctx.fillText(name.slice(18,34),72,510);
-    }
+    if(name.length>18) ctx.fillText(name.slice(18,34),72,510);
 
+    // Keep the card factual: ownership state only. No challenge/slogan copy.
     ctx.fillStyle="#d5232f";
-    ctx.font="900 82px system-ui";
+    ctx.font="900 72px system-ui";
     ctx.fillText(statusLine.slice(0,24).toUpperCase(),72,690);
-
-    ctx.fillStyle="#fff";
-    ctx.font="900 116px system-ui";
-    ctx.fillText(challengeLine,72,845);
 
     ctx.strokeStyle="#242424";
     ctx.lineWidth=2;
     ctx.beginPath();
-    ctx.moveTo(72,930);
-    ctx.lineTo(1008,930);
+    ctx.moveTo(72,790);
+    ctx.lineTo(1008,790);
     ctx.stroke();
 
     ctx.fillStyle="#777";
     ctx.font="800 25px system-ui";
-    ctx.fillText("보스 방어력",72,1005);
-    ctx.fillText("내 파워",400,1005);
-    ctx.fillText("상태",730,1005);
+    ctx.fillText("보스 방어력",72,870);
+    ctx.fillText("내 파워",400,870);
+    ctx.fillText("상태",730,870);
 
     ctx.fillStyle="#fff";
     ctx.font="900 56px system-ui";
-    ctx.fillText(String(Math.max(0,Number(bossDefense||0))),72,1070);
-    ctx.fillText(String(Math.max(0,Number(myPower||0))),400,1070);
+    ctx.fillText(String(Math.max(0,Number(bossDefense||0))),72,935);
+    ctx.fillText(String(Math.max(0,Number(myPower||0))),400,935);
 
     ctx.fillStyle=protectedNow ? "#fff" : "#d5232f";
     ctx.font="900 34px system-ui";
-    ctx.fillText(protectedNow ? "보호 중" : "도전 가능",730,1066);
+    ctx.fillText(protectedNow ? "보호 중" : "도전 가능",730,931);
 
     ctx.fillStyle="#777";
     ctx.font="700 24px system-ui";
-    if(place) ctx.fillText(place.toUpperCase().slice(0,36),72,1175);
-    ctx.fillText(timeText,72,1222);
+    if(place) ctx.fillText(place.toUpperCase().slice(0,36),72,1110);
+    ctx.fillText(timeText,72,1157);
     if(protectedNow&&protectionUntil){
-      ctx.fillText(`보호 ${formatRemaining(protectionUntil)} 남음`,72,1269);
+      ctx.fillText(`보호 ${formatRemaining(protectionUntil)} 남음`,72,1204);
     }
-
-    ctx.textAlign="right";
-    ctx.fillStyle="#fff";
-    ctx.font="900 26px system-ui";
-    ctx.fillText("찾고, 점령하고, 보스가 돼.",1008,1269);
-    ctx.textAlign="left";
 
     const blob=await new Promise((resolve,reject)=>
       canvas.toBlob(b=>b?resolve(b):reject(new Error("CARD_EXPORT_FAILED")),"image/png")
@@ -3299,7 +3287,7 @@
         await navigator.share({
           files:[file],
           title:`${storeName} · BiteBoss`,
-          text:isBoss ? "나한테서 뺏어봐. #BiteBoss" : "이 매장을 점령해봐. #BiteBoss"
+          text:`${storeName} · BiteBoss`
         });
         shared=true;
       }
@@ -3321,7 +3309,6 @@
       is_boss:Boolean(isBoss)
     });
   }
-
 
   async function createBenefitPass(offerId){
     if(!offerId) return;
