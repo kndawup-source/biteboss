@@ -210,8 +210,16 @@
     return request;
   }
 
-  // Warm-start campaign/profile assets so first paint never waits for a second avatar request.
+  // Warm-start campaign/profile assets before async boot.
   config.partner_banners = readCachedPartnerBanners();
+  config.partner_banners.forEach(banner=>{
+    const storeId=String(banner?.store_id || banner?.target_store_id || banner?.id || "").trim();
+    const photoUrl=String(banner?.photo_url || banner?.store_photo_url || cachedPartnerBannerPhoto(storeId) || "").trim();
+    if(photoUrl){
+      banner.photo_url=photoUrl;
+      preloadPartnerBannerPhoto(photoUrl);
+    }
+  });
   config.default_profile_image_url = readCachedDefaultProfileImage();
   void preloadDefaultProfileImage(config.default_profile_image_url);
 
@@ -852,6 +860,43 @@
     }catch{}
   }
 
+  const PARTNER_BANNER_PHOTO_CACHE_KEY = "biteboss-partner-banner-photos-v1";
+
+  function readPartnerBannerPhotoCache(){
+    try{
+      const parsed=JSON.parse(localStorage.getItem(PARTNER_BANNER_PHOTO_CACHE_KEY) || "{}");
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+    }catch{
+      return {};
+    }
+  }
+
+  function cachePartnerBannerPhoto(storeId,url){
+    const id=String(storeId || "").trim();
+    const src=String(url || "").trim();
+    if(!id || !src) return;
+    try{
+      const cached=readPartnerBannerPhotoCache();
+      cached[id]=src;
+      localStorage.setItem(PARTNER_BANNER_PHOTO_CACHE_KEY,JSON.stringify(cached));
+    }catch{}
+  }
+
+  function cachedPartnerBannerPhoto(storeId){
+    const id=String(storeId || "").trim();
+    if(!id) return "";
+    return String(readPartnerBannerPhotoCache()[id] || "").trim();
+  }
+
+  function preloadPartnerBannerPhoto(url){
+    const src=String(url || "").trim();
+    if(!src) return;
+    const image=new Image();
+    image.decoding="sync";
+    image.fetchPriority="high";
+    image.src=src;
+  }
+
   async function loadConfig(){
     const { data, error } = await sb
       .from("biteboss_app_config")
@@ -869,6 +914,11 @@
     if(Array.isArray(rows.partner_banners)){
       config.partner_banners = rows.partner_banners;
       cachePartnerBanners(config.partner_banners);
+      config.partner_banners.forEach(banner=>{
+        const storeId=String(banner?.store_id || banner?.target_store_id || banner?.id || "").trim();
+        const photoUrl=String(banner?.photo_url || banner?.store_photo_url || "").trim();
+        if(storeId && photoUrl) cachePartnerBannerPhoto(storeId,photoUrl);
+      });
     }
 
     if(Object.prototype.hasOwnProperty.call(rows, "default_profile_image_url")){
@@ -4461,7 +4511,13 @@
       ? "이 매장에서 BiteBoss 혜택을 확인해 보세요."
       : "지금 이 매장을 확인해 보세요.";
     const copy = String(banner.copy || defaultCopy).trim();
-    const image = String(banner.photo_url || banner.store_photo_url || registeredStore?.photo_url || "").trim();
+    const image = String(
+      banner.photo_url
+      || banner.store_photo_url
+      || cachedPartnerBannerPhoto(storeId)
+      || registeredStore?.photo_url
+      || ""
+    ).trim();
     const visual = image
       ? `<span class="partner-banner-thumb" aria-hidden="true"><img src="${escapeAttr(image)}" alt="" loading="eager" decoding="async" fetchpriority="high" /></span>`
       : `<span class="partner-banner-thumb partner-banner-fallback" aria-hidden="true"></span>`;
@@ -4487,7 +4543,9 @@
         const current=(Array.isArray(config.partner_banners) ? config.partner_banners : [])
           .find(item=>String(item?.id || item?.store_id || item?.target_store_id || "").trim()===storeId);
         if(current) current.photo_url=imageUrl;
+        cachePartnerBannerPhoto(storeId,imageUrl);
         cachePartnerBanners(config.partner_banners);
+        preloadPartnerBannerPhoto(imageUrl);
         paintImmediatePartnerBanner();
       }catch(error){
         console.warn("BiteBoss partner banner photo:", error);
