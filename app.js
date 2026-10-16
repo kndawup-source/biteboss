@@ -1639,7 +1639,7 @@
       || store?.boss_organization_id
       || store?.current_boss_organization_id
     );
-    const occupierUrl = occupierCustomUrl || (occupied ? defaultProfileImageUrl() : "");
+    const occupierUrl = occupierCustomUrl;
 
     if(!occupied || !occupierUrl){
       return storeAvatarMarkup(photoUrl, storeName, className);
@@ -2709,7 +2709,8 @@
 
   function formatCommentTime(value){
     if(!value) return "";
-    const time = new Date(value).getTime();
+    const date = new Date(value);
+    const time = date.getTime();
     if(!Number.isFinite(time)) return "";
     const seconds = Math.max(0, Math.floor((Date.now() - time) / 1000));
     if(seconds < 60) return "방금 전";
@@ -2719,7 +2720,12 @@
     if(hours < 24) return `${hours}시간 전`;
     const days = Math.floor(hours / 24);
     if(days < 7) return `${days}일 전`;
-    return new Date(value).toLocaleDateString("ko-KR", { month:"numeric", day:"numeric" });
+
+    const now = new Date();
+    const options = date.getFullYear() === now.getFullYear()
+      ? { month:"numeric", day:"numeric" }
+      : { year:"numeric", month:"numeric", day:"numeric" };
+    return date.toLocaleDateString("ko-KR", options);
   }
 
   function destroyStoreDetailMap(){
