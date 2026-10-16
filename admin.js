@@ -1834,6 +1834,21 @@
       });
       if(error) throw error;
       if(!data?.ok) throw new Error(data?.error || "PHOTO_ADD_FAILED");
+
+      if(isCover){
+        const existingBanner=bannerConfigForStore({ id:editingStoreId });
+        if(existingBanner){
+          const banners=normalizedPartnerBanners().filter(item=>item.id!==String(editingStoreId));
+          banners.push({ ...existingBanner, photo_url:imageUrl });
+          const syncResult=await adminSb.from("biteboss_app_config").upsert([{
+            key:"partner_banners", value:banners,
+            updated_by:session.user.id, updated_at:new Date().toISOString()
+          }], { onConflict:"key" });
+          if(syncResult.error) throw syncResult.error;
+          appConfig.partner_banners=banners;
+        }
+      }
+
       form?.reset();
       setStatusText(status, "사진이 등록되었습니다.");
       await Promise.all([reloadStoreEditor(), loadStores()]);

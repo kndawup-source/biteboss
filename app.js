@@ -4461,11 +4461,40 @@
       ? "이 매장에서 BiteBoss 혜택을 확인해 보세요."
       : "지금 이 매장을 확인해 보세요.";
     const copy = String(banner.copy || defaultCopy).trim();
-    const image = String(registeredStore?.photo_url || banner.store_photo_url || banner.photo_url || "").trim();
+    const image = String(banner.photo_url || banner.store_photo_url || registeredStore?.photo_url || "").trim();
     const visual = image
       ? `<span class="partner-banner-thumb" aria-hidden="true"><img src="${escapeAttr(image)}" alt="" loading="eager" decoding="async" fetchpriority="high" /></span>`
       : `<span class="partner-banner-thumb partner-banner-fallback" aria-hidden="true">${escapeHtml(Array.from(storeName)[0] || "P")}</span>`;
     return `<button class="game-pulse-item is-partner-banner" type="button" data-pulse-store="${escapeAttr(storeId)}" data-pulse-name="${escapeAttr(storeName)}">${visual}<strong>${escapeHtml(storeName)}</strong><small>${escapeHtml(copy)}</small></button>`;
+  }
+
+  const partnerBannerPhotoHydration = new Map();
+
+  async function hydratePartnerBannerPhoto(banner){
+    if(!banner) return;
+    const storeId=String(banner.store_id || banner.target_store_id || banner.id || "").trim();
+    if(!storeId || partnerBannerPhotoHydration.has(storeId)) return partnerBannerPhotoHydration.get(storeId);
+
+    const request=(async()=>{
+      try{
+        const { data, error }=await sb.rpc("biteboss_store_detail", { p_store_id:storeId });
+        if(error) throw error;
+        const photos=Array.isArray(data?.photos) ? data.photos : [];
+        const cover=photos.find(photo=>Boolean(photo?.is_cover)) || photos[0] || null;
+        const imageUrl=String(cover?.image_url || data?.store?.photo_url || "").trim();
+        if(!imageUrl) return;
+
+        const current=(Array.isArray(config.partner_banners) ? config.partner_banners : [])
+          .find(item=>String(item?.id || item?.store_id || item?.target_store_id || "").trim()===storeId);
+        if(current) current.photo_url=imageUrl;
+        cachePartnerBanners(config.partner_banners);
+        paintImmediatePartnerBanner();
+      }catch(error){
+        console.warn("BiteBoss partner banner photo:", error);
+      }
+    })();
+    partnerBannerPhotoHydration.set(storeId,request);
+    return request;
   }
 
   function bindGamePulseStoreLinks(box){
@@ -4484,11 +4513,13 @@
   function paintImmediatePartnerBanner(){
     const box=$("#gamePulse");
     if(!box) return;
-    const markup=partnerBannerMarkup(currentPartnerBanner());
+    const banner=currentPartnerBanner();
+    const markup=partnerBannerMarkup(banner);
     if(!markup) return;
     box.innerHTML=markup;
     box.classList.remove("hidden");
     bindGamePulseStoreLinks(box);
+    void hydratePartnerBannerPhoto(banner);
   }
 
   async function loadGamePulse(force=false){
