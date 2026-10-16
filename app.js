@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.71";
+  const BITEBOSS_BUILD = "81.72";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -5843,8 +5843,18 @@
 
       playerSession = restored;
       await ensureProfile();
+
+      // Login state is authoritative from this point. Clear the guest-only
+      // presence block before repainting any store/login UI so the
+      // "로그인이 필요합니다" notice disappears in the same frame as login.
+      if(presenceBlockedReason === "MEMBER_LOGIN_REQUIRED"){
+        presenceBlockedReason = "";
+      }
+      presenceState.clear();
+
       closeModal();
       updateProfileUi();
+      renderStores(storeViewRows.length ? storeViewRows : stores);
 
       const loginPositionPromise = getPositionSafe(false, {
         timeout:3000,
