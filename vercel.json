@@ -29,5 +29,19 @@
         }
       ]
     }
+  ],
+  "rewrites": [
+    {
+      "source": "/stores",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/rank",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/profile",
+      "destination": "/index.html"
+    }
   ]
 }

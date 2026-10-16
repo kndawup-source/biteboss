@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.55";
+  const BITEBOSS_BUILD = "81.56";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -335,7 +335,7 @@
     syncViewportMetrics();
     bindUi();
     bindStaticUi();
-    const initialTab = "";
+    const initialTab = primaryTabFromPath(location.pathname);
     setupNativeUrlListener();
     setupPushListeners();
     updateNetworkState();
@@ -361,7 +361,7 @@
 
     // Do not activate a deep-linked primary tab before auth/profile cache restoration.
     // In particular, #rank used to render the HTML 0 / 500 XP placeholder for one frame.
-    if(["stores","rank","profile"].includes(initialTab)) openTab(initialTab);
+    if(["stores","rank","profile"].includes(initialTab)) openTab(initialTab, { historyMode:"replace" });
 
     // Load server state in parallel. Location must not block first paint.
     await Promise.all([
@@ -543,6 +543,9 @@
   function bindUi(){
     document.addEventListener("touchmove", blockHomeViewportScroll, { passive:false });
     document.addEventListener("wheel", blockHomeViewportScroll, { passive:false });
+    window.addEventListener("popstate", () => {
+      openTab(primaryTabFromPath(location.pathname), { historyMode:"replace" });
+    });
 
     $$(".nav-btn,[data-tab]").forEach(btn => {
       btn.addEventListener("click", () => openTab(btn.dataset.tab));
@@ -654,7 +657,32 @@
     event.preventDefault();
   }
 
-  function openTab(tab){
+  const PRIMARY_TAB_PATHS = Object.freeze({
+    home:"/",
+    stores:"/stores",
+    rank:"/rank",
+    profile:"/profile"
+  });
+
+  function primaryTabFromPath(pathname = location.pathname){
+    const path = String(pathname || "/").replace(/\/+$/, "") || "/";
+    if(path === "/stores") return "stores";
+    if(path === "/rank") return "rank";
+    if(path === "/profile") return "profile";
+    return "home";
+  }
+
+  function syncPrimaryTabUrl(tab, historyMode = "push"){
+    const path = PRIMARY_TAB_PATHS[tab];
+    if(!path) return;
+    const next = `${path}${location.search || ""}`;
+    const current = `${location.pathname}${location.search || ""}`;
+    if(current === next && !location.hash) return;
+    const method = historyMode === "replace" ? "replaceState" : "pushState";
+    history[method]({ ...(history.state || {}), bitebossTab:tab }, "", next);
+  }
+
+  function openTab(tab, options = {}){
     if(!tab) return;
     const isHome = tab === "home";
     setHomeViewportLocked(isHome);
@@ -666,9 +694,8 @@
     $(`#page-${tab}`)?.classList.add("active");
     $$(".nav-btn").forEach(btn => btn.classList.toggle("active", btn.dataset.tab === tab));
     if(["home","stores","rank","profile"].includes(tab)){
-      // Primary navigation is app state, not a URL fragment. Keep the public address clean.
-      const cleanRoute = `${location.pathname}${location.search}`;
-      if(location.hash) history.replaceState(history.state, "", cleanRoute);
+      // Public primary screens use clean paths instead of URL fragments.
+      syncPrimaryTabUrl(tab, options.historyMode || "push");
     }
 
     if(isHome){
@@ -2283,7 +2310,11 @@
       : [];
     const wasPastBoss = !isBoss && myPastReigns.some(row => Boolean(row?.ended_at));
     const hasVisitHistory = validVisits > 0;
-    const isNewStore = !bossExists && history.length === 0;
+    const storeCreatedAt = new Date(store.created_at || cached?.created_at || "").getTime();
+    const NEW_STORE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+    const isNewStore = Number.isFinite(storeCreatedAt)
+      && storeCreatedAt <= Date.now()
+      && (Date.now() - storeCreatedAt) < NEW_STORE_WINDOW_MS;
     const reclaimAvailable = isBoss && reclaim?.eligible !== false && Number(reclaim?.remaining_seconds || 0) <= 0;
 
     const occupancyBadge = isBoss
