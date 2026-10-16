@@ -1102,6 +1102,13 @@
   }
 
 
+  function renderBaseStoreList(options = {}){
+    const keyword = String($("#storeSearch")?.value || "").trim();
+    if(keyword) return false;
+    renderStores(stores, options);
+    return true;
+  }
+
   async function loadStores(){
     let result;
 
@@ -1129,7 +1136,7 @@
     stores.sort(compareNearbyStores);
 
     // Fast first paint: show the nearby RPC result immediately.
-    renderStores(stores, { resetPage:true });
+    renderBaseStoreList({ resetPage:true });
     renderHomeNearbyBosses();
 
     const autoImportEnabled = config.auto_store_import_enabled !== false &&
@@ -1138,7 +1145,7 @@
     const roleTask = loadStoreRoles(stores)
       .then(() => {
         stores.sort(compareNearbyStores);
-        renderStores(stores, { patch:true });
+        renderBaseStoreList({ patch:true });
         void loadGamePulse(false);
       })
       .catch(error => console.warn("BiteBoss store roles:", error));
@@ -1168,9 +1175,9 @@
         stores.sort(compareNearbyStores);
 
         if(beforeIds === afterIds){
-          renderStores(stores, { patch:true });
+          renderBaseStoreList({ patch:true });
         }else{
-          renderStores(stores, { resetPage:true });
+          renderBaseStoreList({ resetPage:true });
         }
         renderHomeNearbyBosses();
       }else{

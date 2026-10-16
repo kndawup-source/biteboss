@@ -84,7 +84,19 @@ module.exports = async function handler(req, res){
     const rows = normalizePlaces(places);
 
     if(rows.length){
-      await upsertStores(env, rows);
+      const existingIdentities = await getStoreIdentityRows(
+        env,
+        existingNearby.map(store => store?.id).filter(Boolean)
+      );
+      const { linked, remaining } = planStoreReconciliation(rows, existingIdentities);
+
+      const linkFallbackRows = linked.length
+        ? await linkManualStores(env, linked)
+        : [];
+      const rowsToUpsert = [...remaining, ...linkFallbackRows];
+      if(rowsToUpsert.length){
+        await upsertStores(env, rowsToUpsert);
+      }
     }
 
     // Read again after the upsert so the response reflects the DB
@@ -363,6 +375,171 @@ function normalizePlaces(places){
   return [...deduped.values()];
 }
 
+function normalizeMatchText(value){
+  return String(value || "")
+    .normalize("NFKC")
+    .toLocaleLowerCase("ko-KR")
+    .replace(/[^0-9a-z가-힣]/g, "");
+}
+
+function distanceMeters(a, b){
+  const lat1 = Number(a?.latitude);
+  const lng1 = Number(a?.longitude);
+  const lat2 = Number(b?.latitude);
+  const lng2 = Number(b?.longitude);
+  if(![lat1,lng1,lat2,lng2].every(Number.isFinite)) return Number.POSITIVE_INFINITY;
+
+  const rad = value => value * Math.PI / 180;
+  const earth = 6371000;
+  const dLat = rad(lat2 - lat1);
+  const dLng = rad(lng2 - lng1);
+  const x = Math.sin(dLat / 2) ** 2 +
+    Math.cos(rad(lat1)) * Math.cos(rad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return earth * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+}
+
+function commonPrefixLength(a, b){
+  const limit = Math.min(a.length, b.length);
+  let index = 0;
+  while(index < limit && a[index] === b[index]) index += 1;
+  return index;
+}
+
+function manualMatchScore(incoming, existing){
+  if(String(existing?.provider_place_id || "").trim()) return null;
+  if(String(existing?.status || "active") !== "active") return null;
+  if(existing?.category && incoming?.category && String(existing.category) !== String(incoming.category)) return null;
+
+  const meters = distanceMeters(incoming, existing);
+  if(!Number.isFinite(meters) || meters > 80) return null;
+
+  const incomingName = normalizeMatchText(incoming?.name);
+  const existingName = normalizeMatchText(existing?.name);
+  const incomingAddress = normalizeMatchText(incoming?.address);
+  const existingAddress = normalizeMatchText(existing?.address);
+  if(!incomingName || !existingName) return null;
+
+  if(incomingAddress && existingAddress && incomingAddress === existingAddress){
+    return meters;
+  }
+  if(incomingName === existingName && meters <= 60){
+    return 100 + meters;
+  }
+
+  const shorter = incomingName.length <= existingName.length ? incomingName : existingName;
+  const longer = shorter === incomingName ? existingName : incomingName;
+  if(shorter.length >= 3 && longer.includes(shorter) && meters <= 35){
+    return 200 + meters;
+  }
+  if(commonPrefixLength(incomingName, existingName) >= 3 && meters <= 25){
+    return 300 + meters;
+  }
+  return null;
+}
+
+function planStoreReconciliation(rows, existingStores){
+  const incomingRows = Array.isArray(rows) ? rows : [];
+  const existing = Array.isArray(existingStores) ? existingStores : [];
+  const exactProviderIds = new Set(
+    existing
+      .filter(store => String(store?.provider || "") === "kakao" && String(store?.provider_place_id || "").trim())
+      .map(store => String(store.provider_place_id))
+  );
+  const manualStores = existing.filter(store => !String(store?.provider_place_id || "").trim());
+  const proposals = [];
+
+  incomingRows.forEach((row, rowIndex) => {
+    if(exactProviderIds.has(String(row?.provider_place_id || ""))) return;
+    manualStores.forEach(store => {
+      const score = manualMatchScore(row, store);
+      if(score !== null){
+        proposals.push({ rowIndex, storeId:String(store.id), score, row, store });
+      }
+    });
+  });
+
+  proposals.sort((a,b) => a.score - b.score);
+  const usedRows = new Set();
+  const usedStores = new Set();
+  const linked = [];
+
+  proposals.forEach(match => {
+    if(usedRows.has(match.rowIndex) || usedStores.has(match.storeId)) return;
+    usedRows.add(match.rowIndex);
+    usedStores.add(match.storeId);
+    linked.push(match);
+  });
+
+  return {
+    linked,
+    remaining:incomingRows.filter((_, index) => !usedRows.has(index))
+  };
+}
+
+async function getStoreIdentityRows(env, ids){
+  const uniqueIds = [...new Set((Array.isArray(ids) ? ids : []).map(String).filter(Boolean))];
+  if(!uniqueIds.length) return [];
+
+  const rows = [];
+  for(let offset = 0; offset < uniqueIds.length; offset += 100){
+    const chunk = uniqueIds.slice(offset, offset + 100);
+    const query = new URLSearchParams({
+      select:"id,name,category,city,district,address,latitude,longitude,status,provider,provider_place_id,auto_imported",
+      id:`in.(${chunk.join(",")})`
+    });
+    const response = await supabaseFetch(env, `/rest/v1/biteboss_stores?${query.toString()}`, { method:"GET" });
+    if(!response.ok){
+      throw new Error(`SUPABASE_STORE_IDENTITY_${response.status}:${await response.text()}`);
+    }
+    const page = await response.json();
+    if(Array.isArray(page)) rows.push(...page);
+  }
+  return rows;
+}
+
+async function linkManualStores(env, matches){
+  const fallbackRows = [];
+
+  for(const match of matches){
+    const row = match.row;
+    const query = new URLSearchParams({
+      id:`eq.${match.storeId}`,
+      provider_place_id:"is.null"
+    });
+    const response = await supabaseFetch(env, `/rest/v1/biteboss_stores?${query.toString()}`, {
+      method:"PATCH",
+      headers:{
+        "Prefer":"return=representation",
+        "Content-Type":"application/json"
+      },
+      body:JSON.stringify({
+        name:row.name,
+        category:row.category,
+        city:row.city,
+        district:row.district,
+        address:row.address,
+        latitude:row.latitude,
+        longitude:row.longitude,
+        phone:row.phone,
+        provider:row.provider,
+        provider_place_id:row.provider_place_id,
+        source_url:row.source_url,
+        updated_at:new Date().toISOString()
+      })
+    });
+    if(!response.ok){
+      throw new Error(`SUPABASE_STORE_LINK_${response.status}:${await response.text()}`);
+    }
+
+    const updated = await response.json();
+    if(!Array.isArray(updated) || updated.length === 0){
+      fallbackRows.push(row);
+    }
+  }
+
+  return fallbackRows;
+}
+
 async function upsertStores(env, rows){
   const response = await supabaseFetch(
     env,
@@ -422,4 +599,13 @@ async function supabaseFetch(env, path, options = {}){
 }
 
 // Pure helpers exposed only for local regression tests.
-module.exports.__test = { numberInRange, integerInRange, makeCellKey, normalizePlaces };
+module.exports.__test = {
+  numberInRange,
+  integerInRange,
+  makeCellKey,
+  normalizePlaces,
+  normalizeMatchText,
+  distanceMeters,
+  manualMatchScore,
+  planStoreReconciliation
+};
