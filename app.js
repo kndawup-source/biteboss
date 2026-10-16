@@ -1397,6 +1397,10 @@
     renderBaseStoreList({ resetPage:true });
     renderHomeNearbyBosses();
 
+    // The partner banner may have painted before stores were available.
+    // Repaint now that the canonical store rows (including photo_url) are loaded.
+    paintImmediatePartnerBanner();
+
     const autoImportEnabled = config.auto_store_import_enabled !== false &&
       String(config.auto_store_import_enabled).toLowerCase() !== "false";
 
@@ -1438,6 +1442,7 @@
           renderBaseStoreList({ resetPage:true });
         }
         renderHomeNearbyBosses();
+        paintImmediatePartnerBanner();
       }else{
         console.warn("BiteBoss nearby refresh:", refreshed.error);
       }
