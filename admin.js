@@ -908,17 +908,16 @@
             <div class="admin-store-copy">
               <div class="admin-store-title-line"><strong>${escapeHtml(store.name)}</strong><span class="partner-badge ${partnershipClass(store.partnership_status)}">${escapeHtml(partnershipLabel(store.partnership_status))}</span>${(() => { const state = bannerOperationalState(store, bannerEnabled); return `<span class="admin-banner-state ${state.className}">${escapeHtml(state.label)}</span>`; })()}</div>
               <p>${escapeHtml(location)} · ${escapeHtml(categoryLabel(store.category))}</p>
-              <p class="admin-store-coords">${store.latitude ?? "-"}, ${store.longitude ?? "-"}</p>
             </div>
           </div>
           <div class="admin-store-actions">
-            <button class="secondary-btn admin-store-edit-btn" data-edit-store="${escapeAttr(store.id)}" type="button">매장 수정</button>
-            <button class="text-btn admin-banner-toggle ${bannerEnabled ? "is-on" : ""}" data-banner-store="${escapeAttr(store.id)}" data-banner-enabled="${bannerEnabled ? "true" : "false"}" type="button">${bannerEnabled ? "배너 끄기" : "배너 켜기"}</button>
+            <button class="secondary-btn admin-store-edit-btn admin-action-btn" data-edit-store="${escapeAttr(store.id)}" type="button">매장 수정</button>
+            <button class="secondary-btn admin-banner-toggle admin-action-btn ${bannerEnabled ? "is-on" : ""}" data-banner-store="${escapeAttr(store.id)}" data-banner-enabled="${bannerEnabled ? "true" : "false"}" type="button">${bannerEnabled ? "배너 끄기" : "배너 켜기"}</button>
             ${isPartner
-              ? `<a class="text-link" href="./store-admin.html">매장 어드민</a><span class="admin-action-note">관리자 계정에서 메뉴·공지·QR을 운영할 수 있습니다.</span>`
-              : `<button class="text-btn" data-partner-store="${escapeAttr(store.id)}" type="button">제휴 전환</button><span class="admin-action-note">GPS 체류 자동점령</span>`}
-            <button class="text-btn ${store.status === "active" ? "danger-text" : ""}" data-toggle-store="${escapeAttr(store.id)}" type="button">${store.status === "active" ? "비활성화" : "활성화"}</button>
-            <button class="text-btn danger-text" data-delete-store="${escapeAttr(store.id)}" type="button">삭제</button>
+              ? `<a class="secondary-btn admin-action-btn" href="./store-admin.html">매장 어드민</a>`
+              : `<button class="secondary-btn admin-action-btn" data-partner-store="${escapeAttr(store.id)}" type="button">제휴 전환</button>`}
+            <button class="secondary-btn admin-action-btn ${store.status === "active" ? "danger-text" : ""}" data-toggle-store="${escapeAttr(store.id)}" type="button">${store.status === "active" ? "비활성화" : "활성화"}</button>
+            <button class="secondary-btn admin-action-btn danger-text" data-delete-store="${escapeAttr(store.id)}" type="button">삭제</button>
           </div>
           ${activationCodes.has(String(store.id)) ? (() => { const item = activationCodes.get(String(store.id)); return `<div class="activation-result" data-activation-result="${escapeAttr(store.id)}"><strong>직원 활성화 코드</strong><code>${escapeHtml(item.code)}</code><button class="secondary-btn" data-copy-code="${escapeAttr(item.code)}" type="button">코드 복사</button><p>${escapeHtml(item.expires || "7일 안에 매장 어드민에서 ID/PIN을 등록합니다.")}</p></div>`; })() : `<div class="activation-result hidden" data-activation-result="${escapeAttr(store.id)}"></div>`}
         </article>`;
@@ -2098,7 +2097,7 @@
     const {data,error}=await adminSb.rpc("biteboss_admin_ad_analytics_v8179",{p_days:days});
     if(error){
       console.warn("BiteBoss ad analytics:",error);
-      chart.innerHTML='<div class="analytics-empty">광고 성과 데이터를 불러오지 못했습니다. v81.79 SQL 적용 여부를 확인하세요.</div>';
+      chart.innerHTML='<div class="analytics-empty">광고 성과 데이터를 불러오지 못했습니다. v81.81 SQL 적용 여부를 확인하세요.</div>';
       return;
     }
     renderAdAnalytics(data || {});
@@ -2194,6 +2193,8 @@
   function editAdCampaign(id){
     const item = adCampaigns.find(row => String(row.id) === String(id));
     if(!item) return;
+    const editor = $("#adCampaignEditor");
+    if(editor) editor.open = true;
     $("#adCampaignId").value = item.id;
     $("#adAdvertiserName").value = item.advertiser_name || "";
     $("#adCampaignName").value = item.campaign_name || "";

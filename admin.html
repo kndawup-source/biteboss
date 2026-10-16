@@ -7,7 +7,7 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <title>BiteBoss Admin</title>
   <link rel="stylesheet" href="./styles.css?v=76.3" />
-  <link rel="stylesheet" href="./admin.css?v=81.79" />
+  <link rel="stylesheet" href="./admin.css?v=81.81" />
   <script src="./app-config.js?v=76.3"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -133,13 +133,7 @@
         </section>
       </section>
 
-      <section class="admin-dashboard-section admin-current-bosses">
-        <div class="section-head"><h3>현재 보스</h3><span>실시간 점령 상태</span></div>
-        <div id="bossList" class="store-list"></div>
-        <nav id="bossPagination" class="list-pagination hidden" aria-label="현재 보스 매장 페이지"></nav>
-      </section>
-
-      <section class="ops-recent admin-dashboard-section">
+      <section class="ops-recent admin-dashboard-section admin-section-card">
         <div class="section-head"><h3>최근 활동</h3><span>서비스 이벤트</span></div>
         <div id="adminLogs" class="admin-activity-list"></div>
       </section>
@@ -149,8 +143,8 @@
     <section class="admin-page" id="admin-stores">
       <div class="admin-page-head"><div><span class="eyebrow">매장</span><h2>매장 관리</h2><p>새 매장을 등록하고, 등록된 매장의 정보·사진·메뉴·혜택을 수정합니다.</p></div></div>
 
-      <section class="admin-section-card admin-create-store">
-        <div class="admin-section-title"><div><h3>새 매장 등록</h3><p>기본 등록은 비제휴 GPS 자동점령 매장으로 생성됩니다.</p></div></div>
+      <details class="admin-section-card admin-create-store admin-collapsible">
+        <summary class="admin-collapse-summary"><div><h3>새 매장 등록</h3><p>필요할 때만 열어 직접 등록합니다.</p></div><span>열기</span></summary>
         <form id="storeForm" class="form-grid admin-form admin-form-embedded">
           <label>매장명<input name="name" class="input" required /></label>
           <label>브랜드명<input name="brand_name" class="input" /></label>
@@ -169,7 +163,7 @@
           <div class="admin-form-actions wide"><button class="primary-btn" type="submit">매장 등록</button></div>
           <p id="storeCreateStatus" class="asset-status wide" aria-live="polite"></p>
         </form>
-      </section>
+      </details>
 
       <section class="admin-section-card admin-store-requests">
         <div class="admin-section-title admin-section-title-row">
@@ -211,8 +205,8 @@
 
     <section class="admin-page" id="admin-comments">
       <div class="admin-page-head"><div><span class="eyebrow">매장</span><h2>한마디 관리</h2><p>전체 매장의 신고·고정·숨김 상태를 관리합니다.</p></div></div>
-      <section class="admin-section-card">
-        <div class="section-head"><div><h3>한마디</h3><span id="adminCommentCount">0개</span></div><button id="refreshAdminComments" class="text-btn" type="button">새로고침</button></div>
+      <section class="admin-section-card admin-comments-card">
+        <div class="admin-compact-toolbar"><span id="adminCommentCount" class="admin-count-chip">0개</span><button id="refreshAdminComments" class="secondary-btn admin-small-btn" type="button">새로고침</button></div>
         <div class="admin-comment-filters" id="adminCommentFilters" aria-label="한마디 상태 필터">
           <button type="button" class="active" data-comment-filter="all">전체</button>
           <button type="button" data-comment-filter="reported">신고 있음</button>
@@ -230,7 +224,9 @@
     </section>
 
     <section class="admin-page" id="admin-rules">
-      <div class="admin-page-head"><div><span class="eyebrow">게임</span><h2>게임 규칙</h2><p>점령, GPS, 파워와 크루 규칙을 설정합니다.</p></div></div>
+      <div class="admin-page-head"><div><span class="eyebrow">게임</span><h2>게임 규칙</h2><p>현재 규칙은 유지하고, 변경이 필요할 때만 편집합니다.</p></div></div>
+      <details class="admin-section-card admin-collapsible admin-rules-editor">
+        <summary class="admin-collapse-summary"><div><h3>규칙 편집</h3><p>점령 · GPS · 파워 · 크루 설정</p></div><span>열기</span></summary>
       <form id="rulesForm" class="form-grid admin-form">
         <label>보호시간(분)<input name="protect_minutes" class="input" type="number" min="1" required /></label>
         <label>점령 간격(분)<input name="capture_cooldown_minutes" class="input" type="number" min="0" required /></label>
@@ -274,6 +270,7 @@
 
         <button class="primary-btn wide" type="submit">규칙 저장</button>
       </form>
+      </details>
     </section>
 
     
@@ -367,8 +364,8 @@
         <div id="adCampaignList" class="admin-ad-list"></div>
       </section>
 
-      <section class="admin-ad-editor-section">
-        <div class="admin-section-title"><div><h3>캠페인 등록·수정</h3><p>노출 위치와 대상 매장을 지정합니다. 대상 매장을 지정하면 방문·점령 전환을 측정할 수 있습니다.</p></div></div>
+      <details id="adCampaignEditor" class="admin-ad-editor-section admin-collapsible">
+        <summary class="admin-collapse-summary"><div><h3>캠페인 등록·수정</h3><p>새 캠페인을 만들거나 기존 캠페인을 수정합니다.</p></div><span>열기</span></summary>
         <form id="adCampaignForm" class="form-grid admin-form admin-ad-form">
           <input id="adCampaignId" type="hidden" />
           <label>광고주명<input id="adAdvertiserName" class="input" maxlength="120" required /></label>
@@ -387,7 +384,7 @@
           <p id="adCampaignStatus" class="asset-status wide" aria-live="polite"></p>
         </form>
         <div class="admin-ad-guide"><span>권장 비율 3:1 · 1200×400</span><span>같은 우선순위는 랜덤 노출됩니다.</span></div>
-      </section>
+      </details>
     </section>
 
     <section class="admin-page" id="admin-maintenance">
@@ -498,6 +495,6 @@
   </section>
 </div>
 
-<script src="./admin.js?v=81.79"></script>
+<script src="./admin.js?v=81.81"></script>
 </body>
 </html>
