@@ -7,7 +7,7 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <title>BiteBoss Admin</title>
   <link rel="stylesheet" href="./styles.css?v=76.3" />
-  <link rel="stylesheet" href="./admin.css?v=81.50" />
+  <link rel="stylesheet" href="./admin.css?v=81.54" />
   <script src="./app-config.js?v=76.3"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -237,7 +237,7 @@
         <label>매장 혜택<select name="feature_offers" class="input"><option value="true">ON</option><option value="false">OFF</option></select></label>
 
         <div class="admin-rule-divider wide">플레이어 · 매장 파워</div>
-        <label>레벨 XP<input class="input" type="text" value="성장 곡선 · 레벨별 증가" disabled /></label>
+        <label>레벨당 XP<input name="xp_per_level" class="input" type="number" min="1" required /></label>
         <label>방문 XP<input name="xp_visit" class="input" type="number" min="0" required /></label>
         <label>보스 승리 XP<input name="xp_boss_win" class="input" type="number" min="0" required /></label>
         <label>크루 XP<input name="xp_crew" class="input" type="number" min="0" required /></label>
@@ -462,6 +462,6 @@
   </section>
 </div>
 
-<script src="./admin.js?v=81.50"></script>
+<script src="./admin.js?v=81.51"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.53";
+  const BITEBOSS_BUILD = "81.54";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -335,7 +335,7 @@
     syncViewportMetrics();
     bindUi();
     bindStaticUi();
-    const initialTab = String(location.hash || "").replace(/^#/, "");
+    const initialTab = "";
     setupNativeUrlListener();
     setupPushListeners();
     updateNetworkState();
@@ -666,8 +666,9 @@
     $(`#page-${tab}`)?.classList.add("active");
     $$(".nav-btn").forEach(btn => btn.classList.toggle("active", btn.dataset.tab === tab));
     if(["home","stores","rank","profile"].includes(tab)){
-      const route = tab === "home" ? `${location.pathname}${location.search}` : `#${tab}`;
-      history.replaceState(history.state, "", route);
+      // Primary navigation is app state, not a URL fragment. Keep the public address clean.
+      const cleanRoute = `${location.pathname}${location.search}`;
+      if(location.hash) history.replaceState(history.state, "", cleanRoute);
     }
 
     if(isHome){
