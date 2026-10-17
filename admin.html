@@ -8,7 +8,7 @@
 <meta content="yes" name="mobile-web-app-capable"/>
 <title>BiteBoss Admin</title>
 <link href="./styles.css?v=82.20" rel="stylesheet"/>
-<link href="./admin.css?v=82.20" rel="stylesheet"/>
+<link href="./admin.css?v=82.33" rel="stylesheet"/>
 <script src="./app-config.js?v=82.20"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -419,8 +419,8 @@
 <form class="form-grid admin-form admin-ad-form" id="adCreativeForm">
 <input id="adCreativeId" type="hidden"/>
 <label class="wide">소재명<input class="input" id="adCreativeName" maxlength="120" placeholder="예: 메인 비주얼 A" required=""/></label>
-<label class="wide">홈 · 점령 대기 이미지<input accept="image/png,image/jpeg,image/webp" class="input" id="adCreativeImageFile" type="file"/><small class="field-help">권장 1200×400 (3:1). 수정 시 새 이미지를 선택하지 않으면 기존 이미지를 유지합니다.</small></label>
-<label class="wide">매장 목록 이미지<input accept="image/png,image/jpeg,image/webp" class="input" id="adCreativeStoreListImageFile" type="file"/><small class="field-help">매장 목록 전용 이미지입니다. 비워두면 매장 목록에는 이 소재가 노출되지 않습니다.</small></label>
+<label class="wide">홈 · 점령 대기 이미지<input accept="image/png,image/jpeg,image/webp" class="input" id="adCreativeImageFile" type="file"/><small class="field-help">권장 1200×400 (3:1). 홈/점령 대기 노출용이며 매장 목록 전용 캠페인에서는 비워둘 수 있습니다.</small></label>
+<label class="wide">매장 목록 이미지<input accept="image/png,image/jpeg,image/webp" class="input" id="adCreativeStoreListImageFile" type="file"/><small class="field-help">권장 1200×240 (5:1). 매장 목록 사이에만 노출되는 전용 이미지입니다.</small></label>
 <label class="wide">클릭 URL<input class="input" id="adCreativeClickUrl" placeholder="https://" type="url"/></label>
 <label>상태<select class="input" id="adCreativeIsActive"><option value="true">활성</option><option value="false">비활성</option></select></label>
 <label>소재 순서<input class="input" id="adCreativeSortOrder" step="1" type="number" value="0"/><small class="field-help">캠페인 우선순위가 같을 때 소재 선택에만 사용합니다.</small></label>
@@ -438,7 +438,7 @@
 <div class="wide admin-store-picker" id="adTargetStorePicker"><label for="adTargetStoreSearch">대상 매장</label><input id="adTargetStore" type="hidden" value=""/><div class="admin-store-picker-selected hidden" id="adTargetStoreSelected"><div><strong id="adTargetStoreSelectedName"></strong><span id="adTargetStoreSelectedMeta"></span></div><button class="text-btn" id="adTargetStoreClear" type="button">변경</button></div><div class="admin-store-picker-search" id="adTargetStoreSearchWrap"><input autocomplete="off" class="input" id="adTargetStoreSearch" placeholder="매장명 · 브랜드 · 지역 검색" type="search"/><div class="admin-store-picker-results hidden" id="adTargetStoreResults"></div></div><small class="field-help">선택하지 않으면 브랜드/일반 광고입니다. 매장을 지정하면 광고 이후 방문·점령 전환을 집계합니다.</small></div>
 <div class="wide admin-ad-first-creative-label"><strong>첫 광고 소재</strong><span>캠페인을 만들 때 기본 소재 1개를 함께 등록합니다. 이후 광고 소재 영역에서 추가 소재를 관리합니다.</span></div>
 <label class="wide">홈 · 점령 대기 이미지<input accept="image/png,image/jpeg,image/webp" class="input" id="adImageFile" type="file"/><small class="field-help">첫 광고 소재 · 권장 1200×400 (3:1)</small></label>
-<label class="wide">매장 목록 이미지<input accept="image/png,image/jpeg,image/webp" class="input" id="adStoreListImageFile" type="file"/><small class="field-help">첫 광고 소재의 매장 목록 전용 이미지입니다. 등록하지 않으면 매장 목록에는 노출되지 않습니다.</small></label>
+<label class="wide">매장 목록 이미지<input accept="image/png,image/jpeg,image/webp" class="input" id="adStoreListImageFile" type="file"/><small class="field-help">권장 1200×240 (5:1). 매장 목록 전용 캠페인에서는 이 이미지만 등록하면 됩니다.</small></label>
 <label class="wide">첫 소재 클릭 URL<input class="input" id="adClickUrl" placeholder="https://" type="url"/></label>
 <label>시작일시<div class="admin-datetime-control"><input id="adStartsDatePicker" class="input admin-picker-input admin-date-part" type="date" aria-label="날짜 선택"><input id="adStartsTimePicker" class="input admin-picker-input admin-time-part" type="time" step="60" aria-label="시간 선택"></div><input aria-hidden="true" class="admin-native-datetime-value" id="adStartsAt" required="" tabindex="-1" type="datetime-local"/></label>
 <label>종료일시<div class="admin-datetime-control"><input id="adEndsDatePicker" class="input admin-picker-input admin-date-part" type="date" aria-label="날짜 선택"><input id="adEndsTimePicker" class="input admin-picker-input admin-time-part" type="time" step="60" aria-label="시간 선택"></div><input aria-hidden="true" class="admin-native-datetime-value" id="adEndsAt" tabindex="-1" type="datetime-local"/></label>
@@ -684,6 +684,6 @@
 </div>
 </section>
 </div>
-<script src="./admin.js?v=82.20"></script>
+<script src="./admin.js?v=82.33"></script>
 </body>
 </html>
