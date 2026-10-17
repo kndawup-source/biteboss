@@ -8,7 +8,7 @@
 <meta content="yes" name="mobile-web-app-capable"/>
 <title>BiteBoss Admin</title>
 <link href="./styles.css?v=82.20" rel="stylesheet"/>
-<link href="./admin.css?v=82.43" rel="stylesheet"/>
+<link href="./admin.css?v=82.44" rel="stylesheet"/>
 <script src="./app-config.js?v=82.20"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -369,6 +369,7 @@
 <label>아이콘<input class="input" id="firstCaptureGuideIcon" maxlength="8" placeholder="💡"/></label>
 <label class="wide">제목<input class="input" id="firstCaptureGuideTitle" maxlength="40" placeholder="첫 점령 가이드" required=""/></label>
 <label class="wide">설명<input class="input" id="firstCaptureGuideBody" maxlength="100" placeholder="가까운 미점령 매장부터 시작해 보세요."/></label>
+<label class="wide">링크 URL<input class="input" id="firstCaptureGuideLinkUrl" inputmode="url" maxlength="500" placeholder="https://example.com"/><small class="field-help">선택 사항 · 입력하면 공지 전체를 눌러 링크를 엽니다.</small></label>
 <button class="primary-btn wide" type="submit">앱 공지 저장</button>
 </form>
 <p class="asset-status" id="firstCaptureGuideStatus"></p></div>
@@ -684,6 +685,6 @@
 </div>
 </section>
 </div>
-<script src="./admin.js?v=82.43"></script>
+<script src="./admin.js?v=82.44"></script>
 </body>
 </html>

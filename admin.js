@@ -1740,6 +1740,7 @@
     if($("#firstCaptureGuideIcon")) $("#firstCaptureGuideIcon").value = String(appConfig.first_capture_guide_icon ?? "💡");
     if($("#firstCaptureGuideTitle")) $("#firstCaptureGuideTitle").value = String(appConfig.first_capture_guide_title ?? "첫 점령 가이드");
     if($("#firstCaptureGuideBody")) $("#firstCaptureGuideBody").value = String(appConfig.first_capture_guide_body ?? "가까운 미점령 매장부터 시작해 보세요.");
+    if($("#firstCaptureGuideLinkUrl")) $("#firstCaptureGuideLinkUrl").value = String(appConfig.first_capture_guide_link_url ?? "");
 
     const copyPreview = $("#homeCopyPreview");
     if(copyPreview){
@@ -1879,10 +1880,21 @@
     const icon=String($("#firstCaptureGuideIcon")?.value ?? "").trim().slice(0,8);
     const title=String($("#firstCaptureGuideTitle")?.value ?? "").trim().slice(0,40);
     const body=String($("#firstCaptureGuideBody")?.value ?? "").trim().slice(0,100);
+    const linkUrl=String($("#firstCaptureGuideLinkUrl")?.value ?? "").trim().slice(0,500);
 
     if(!title){
       if(status) status.textContent="제목은 비워둘 수 없습니다.";
       return;
+    }
+
+    if(linkUrl){
+      try{
+        const parsed=new URL(linkUrl);
+        if(!["http:","https:"].includes(parsed.protocol)) throw new Error("INVALID_NOTICE_URL");
+      }catch{
+        if(status) status.textContent="링크는 http:// 또는 https:// 주소로 입력해 주세요.";
+        return;
+      }
     }
 
     if(button) button.disabled=true;
@@ -1893,7 +1905,8 @@
       { key:"first_capture_guide_enabled", value:enabled, updated_by:session.user.id, updated_at:now },
       { key:"first_capture_guide_icon", value:icon, updated_by:session.user.id, updated_at:now },
       { key:"first_capture_guide_title", value:title, updated_by:session.user.id, updated_at:now },
-      { key:"first_capture_guide_body", value:body, updated_by:session.user.id, updated_at:now }
+      { key:"first_capture_guide_body", value:body, updated_by:session.user.id, updated_at:now },
+      { key:"first_capture_guide_link_url", value:linkUrl, updated_by:session.user.id, updated_at:now }
     ];
 
     try{

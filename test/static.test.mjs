@@ -528,3 +528,18 @@ test('82.43 ad performance drills down from overall to campaign to creative', ()
   assert.match(sql, /and \(v_creative_id is null or e\.creative_id = v_creative_id\)/);
   assert.match(sql, /generate_series/);
 });
+
+
+test('82.44 app notice supports an optional safe external link', () => {
+  const adminHtml = read('admin.html');
+  const adminJs = read('admin.js');
+  const appJs = read('app.js');
+  const styles = read('styles.css');
+  assert.match(adminHtml, /id="firstCaptureGuideLinkUrl"/);
+  assert.match(adminJs, /first_capture_guide_link_url/);
+  assert.match(adminJs, /http:\"?,\"https:/);
+  assert.match(appJs, /first_capture_guide_link_url/);
+  assert.match(appJs, /is-guide is-linked/);
+  assert.match(appJs, /noopener noreferrer/);
+  assert.match(styles, /is-guide\.is-linked/);
+});

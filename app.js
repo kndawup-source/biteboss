@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.43";
+  const BITEBOSS_BUILD = "82.44";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -5403,7 +5403,18 @@ await handleClaimParam();
     const icon=String(config.first_capture_guide_icon ?? "💡").trim().slice(0,8);
     const title=String(config.first_capture_guide_title ?? "첫 점령 가이드").trim();
     const body=String(config.first_capture_guide_body ?? "가까운 미점령 매장부터 시작해 보세요.").trim();
-    return `<div class="game-pulse-item is-guide" role="note">${icon ? `<span class="guide-bulb" aria-hidden="true">${escapeHtml(icon)}</span>` : ""}<strong>${escapeHtml(title)}</strong>${body ? `<small>${escapeHtml(body)}</small>` : ""}</div>`;
+    const rawLink=String(config.first_capture_guide_link_url ?? "").trim();
+    let linkUrl="";
+    if(rawLink){
+      try{
+        const parsed=new URL(rawLink);
+        if(["http:","https:"].includes(parsed.protocol)) linkUrl=parsed.href;
+      }catch{}
+    }
+    const content=`${icon ? `<span class="guide-bulb" aria-hidden="true">${escapeHtml(icon)}</span>` : ""}<strong>${escapeHtml(title)}</strong>${body ? `<small>${escapeHtml(body)}</small>` : ""}`;
+    return linkUrl
+      ? `<a class="game-pulse-item is-guide is-linked" href="${escapeAttr(linkUrl)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeAttr(`${title} 링크 열기`)}">${content}</a>`
+      : `<div class="game-pulse-item is-guide" role="note">${content}</div>`;
   }
 
   function shouldShowFirstCaptureGuide(){
