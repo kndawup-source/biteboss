@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.46";
+  const BITEBOSS_BUILD = "82.47";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -3037,6 +3037,9 @@ await handleClaimParam();
               <img src="${escapeAttr(photo.image_url)}" alt="${escapeAttr(photo.caption || `${store.name || "매장"} 사진 ${index + 1}`)}" loading="${index === 0 ? "eager" : "lazy"}" decoding="async" />
             </figure>`).join("")}
         </div>
+        ${photos.length > 1 ? `<div class="store-detail-photo-dots" data-store-photo-dots aria-label="사진 ${photos.length}장">
+          ${photos.map((_,index)=>`<button class="store-detail-photo-dot${index === 0 ? " active" : ""}" type="button" data-store-photo-dot="${index}" aria-label="${index + 1}번째 사진" aria-current="${index === 0 ? "true" : "false"}"></button>`).join("")}
+        </div>` : ""}
       </section>` : "";
     const videoHtml = isPartner ? storeVideoMarkup(videos, store.name) : "";
 
@@ -3474,6 +3477,7 @@ await handleClaimParam();
     `;
 
     void renderStoreDetailMap(store);
+    bindStoreDetailPhotoGallery(body);
     bindStoreComments(store.id);
 
     if(ownerClaimHtml){
@@ -3502,6 +3506,38 @@ await handleClaimParam();
         button.dataset.defaultBenefitStore,
         button.dataset.defaultBenefitName
       ));
+    });
+  }
+
+
+  function bindStoreDetailPhotoGallery(root){
+    const gallery=root?.querySelector?.("[data-store-photo-gallery]");
+    const dots=[...(root?.querySelectorAll?.("[data-store-photo-dot]") || [])];
+    if(!gallery || dots.length < 2) return;
+
+    const setActive = (index) => {
+      const safeIndex=Math.max(0,Math.min(dots.length-1,Number(index) || 0));
+      dots.forEach((dot,dotIndex)=>{
+        const active=dotIndex===safeIndex;
+        dot.classList.toggle("active",active);
+        dot.setAttribute("aria-current",active ? "true" : "false");
+      });
+    };
+
+    let frame=0;
+    gallery.addEventListener("scroll",()=>{
+      if(frame) cancelAnimationFrame(frame);
+      frame=requestAnimationFrame(()=>{
+        const width=gallery.clientWidth || 1;
+        setActive(Math.round(gallery.scrollLeft / width));
+      });
+    },{passive:true});
+
+    dots.forEach((dot,index)=>{
+      dot.addEventListener("click",()=>{
+        gallery.scrollTo({left:gallery.clientWidth*index,behavior:"smooth"});
+        setActive(index);
+      });
     });
   }
 

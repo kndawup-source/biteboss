@@ -530,7 +530,7 @@ test('82.43 ad performance drills down from overall to campaign to creative', ()
 });
 
 
-test('82.46 app notice supports an optional tappable external link', () => {
+test('82.47 app notice supports an optional tappable external link', () => {
   const adminHtml = read('admin.html');
   const adminJs = read('admin.js');
   const appJs = read('app.js');
@@ -551,4 +551,13 @@ test('public app config schema includes app notice link so saved URL is hydrated
   assert.match(app, /first_capture_guide_link_url:\s*""/);
   assert.match(app, /Object\.keys\(config\)\.forEach\(key\s*=>\s*\{/);
   assert.match(app, /config\.first_capture_guide_link_url/);
+});
+
+
+test('store detail photo gallery shows centered dots only for multiple photos', () => {
+  assert.match(app, /store-detail-photo-dots/);
+  assert.match(app, /photos\.length > 1/);
+  assert.match(app, /bindStoreDetailPhotoGallery\(body\)/);
+  assert.match(app, /aria-current/);
+  assert.match(css, /\.store-detail-photo-dots\{[^}]*left:50%[^}]*bottom:10px/);
 });
