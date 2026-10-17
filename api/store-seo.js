@@ -43,13 +43,6 @@ export default async function handler(req,res){
   try{
     const id=String(req.query?.id || "").trim();
     const requestedSlug=String(req.query?.slug || "").trim().toLowerCase();
-    if(String(req.query?.app || "")==="1"){
-      const origin=`${req.headers["x-forwarded-proto"] || "https"}://${req.headers.host}`;
-      const shell=await fetch(`${origin}/index.html`,{headers:{"user-agent":"BiteBoss-Store-Shell/1.0"}});
-      if(!shell.ok) return res.status(500).send("App unavailable");
-      res.setHeader("Cache-Control","no-cache");
-      return res.status(200).send(await shell.text());
-    }
 
     let storeId=id;
     let seo=null;
@@ -61,19 +54,50 @@ export default async function handler(req,res){
     }
     if(!/^[0-9a-f-]{36}$/i.test(storeId)) return res.status(404).send("Not found");
 
-    const detail=await rpc("biteboss_store_detail",{p_store_id:storeId});
-    const store=detail?.store;
-    if(!store) return res.status(404).send("Not found");
     seo=seo || await rpc("biteboss_store_seo_settings",{p_store_id:storeId});
     const canonicalSlug=String(seo?.slug || autoSlug(storeId));
 
+    // Legacy UUID URLs permanently converge on the clean public URL.
     if(id) return res.redirect(308,`/store/${encodeURIComponent(canonicalSlug)}`);
     if(requestedSlug!==canonicalSlug) return res.redirect(308,`/store/${encodeURIComponent(canonicalSlug)}`);
 
-    res.setHeader("Cache-Control","public, s-maxage=300, stale-while-revalidate=86400");
-    res.status(200).send(page({store,photos:Array.isArray(detail.photos)?detail.photos:[],seo}));
+    // Serve the real BiteBoss app shell. The client reads /store/:slug,
+    // resolves it to the store UUID, then calls the same openStoreDetail()
+    // used when a store is opened from the store list.
+    const origin=`${req.headers["x-forwarded-proto"] || "https"}://${req.headers.host}`;
+    const shellResponse=await fetch(`${origin}/index.html`,{headers:{"user-agent":"BiteBoss-Store-Shell/1.0"}});
+    if(!shellResponse.ok) return res.status(500).send("App unavailable");
+    let shell=await shellResponse.text();
+
+    // Keep direct store URLs indexable without creating a second visual page.
+    // Metadata is injected into the same app shell only.
+    try{
+      const detail=await rpc("biteboss_store_detail",{p_store_id:storeId});
+      const store=detail?.store || null;
+      if(store){
+        const name=String(store.name || "매장");
+        const place=[store.city,store.district].filter(Boolean).join(" ");
+        const description=([place,store.category,store.notice].filter(Boolean).join(" · ").slice(0,155) || `${name}의 BiteBoss 매장 정보입니다.`);
+        const canonical=`https://biteboss.dasaft.com/store/${encodeURIComponent(canonicalSlug)}`;
+        const cover=((Array.isArray(detail.photos)?detail.photos:[]).find(x=>x?.is_cover) || (Array.isArray(detail.photos)?detail.photos:[])[0] || {}).image_url || "";
+        shell=shell
+          .replace(/<title>[^<]*<\/title>/i,`<title>${esc(name)} | BiteBoss</title>`)
+          .replace(/<meta name="description" content="[^"]*"\s*\/?>/i,`<meta name="description" content="${esc(description)}" />`)
+          .replace(/<link rel="canonical" href="[^"]*"\s*\/?>/i,`<link rel="canonical" href="${esc(canonical)}" />`)
+          .replace(/<meta property="og:title" content="[^"]*"\s*\/?>/i,`<meta property="og:title" content="${esc(name)} | BiteBoss" />`)
+          .replace(/<meta property="og:description" content="[^"]*"\s*\/?>/i,`<meta property="og:description" content="${esc(description)}" />`);
+        if(cover && !/property="og:image"/i.test(shell)){
+          shell=shell.replace('</head>',`  <meta property="og:image" content="${esc(cover)}" />\n</head>`);
+        }
+      }
+    }catch(metaError){
+      console.warn("BiteBoss store metadata:",metaError);
+    }
+
+    res.setHeader("Cache-Control","public, s-maxage=60, stale-while-revalidate=300");
+    return res.status(200).send(shell);
   }catch(error){
     console.error(error);
-    res.status(500).send("Store page unavailable");
+    return res.status(500).send("Store page unavailable");
   }
 }

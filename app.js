@@ -353,6 +353,8 @@
     return native || standalone;
   }
 
+  const partnerBannerPhotoHydration = new Map();
+
   async function init(){
     syncRuntimeShell();
     syncViewportMetrics();
@@ -4739,8 +4741,6 @@
       : `<span class="partner-banner-thumb partner-banner-fallback" aria-hidden="true"></span>`;
     return `<button class="game-pulse-item is-partner-banner" type="button" data-pulse-store="${escapeAttr(storeId)}" data-pulse-name="${escapeAttr(storeName)}">${visual}<strong>${escapeHtml(storeName)}</strong><small>${escapeHtml(copy)}</small></button>`;
   }
-
-  const partnerBannerPhotoHydration = new Map();
 
   async function hydratePartnerBannerPhoto(banner, { force=false } = {}){
     if(!banner) return;
