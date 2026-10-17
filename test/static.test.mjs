@@ -430,7 +430,7 @@ test('82.26 keeps PRO store-manager features visible but disabled for PARTNER st
 });
 
 
-test('82.27 benefit redemption uses a live full-screen pass while keeping server role validation', () => {
+test('82.28 benefit passes support partner offers and non-partner boss verification without promising discounts', () => {
   const storeAdminHtml = read('store-admin.html');
   assert.match(html, /id="benefitPassScreen" class="benefit-pass-screen hidden"/);
   assert.match(html, /id="benefitPassClock"/);
@@ -440,4 +440,9 @@ test('82.27 benefit redemption uses a live full-screen pass while keeping server
   assert.match(app, /ROLE_REQUIRED/);
   assert.match(css, /\.benefit-pass-screen\{position:fixed;z-index:1800;inset:0/);
   assert.match(storeAdminHtml, /<option value="crew" selected>크루 \+ 보스<\/option>/);
+  assert.match(app, /async function createDefaultBossPass\(storeId, storeName\)/);
+  assert.match(app, /sb\.rpc\("biteboss_my_store_status",\{p_store_id:id\}\)/);
+  assert.match(app, /data-default-benefit-store/);
+  assert.match(app, /할인·서비스 제공 여부는 매장 정책에 따릅니다/);
+  assert.match(app, /defaultBossPassEligible = !isPartner && \(isBoss \|\| isCrew\)/);
 });
