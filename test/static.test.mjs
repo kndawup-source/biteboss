@@ -400,7 +400,7 @@ test('release source contains no stale historical version-tag comments', () => {
 });
 
 
-test('82.25 current territory ranking opens the occupied store list and avoids duplicate map loads', () => {
+test('82.26 current territory ranking opens the occupied store list and avoids duplicate map loads', () => {
   assert.match(app, /data-territory-rank/);
   assert.match(app, /function openTerritoryRankStores\(trigger\)/);
   assert.match(app, /fetchTerritoryRows\(\)/);
@@ -410,4 +410,21 @@ test('82.25 current territory ranking opens the occupied store list and avoids d
   const rankTabBlock = blockBetween(app, 'const openTerritoryStoresFromRank', '$$("[data-rank-period]")');
   assert.match(rankTabBlock, /openTerritoryRankStores\(trigger\)/);
   assert.doesNotMatch(rankTabBlock, /if\(currentRank === "territory"\) await loadTerritoryMap\(\)/);
+});
+
+
+test('82.26 keeps PRO store-manager features visible but disabled for PARTNER stores', () => {
+  const storeAdminHtml = read('store-admin.html');
+  const storeAdminJs = read('store-admin.js');
+  const storeAdminCss = read('store-admin.css');
+  assert.match(storeAdminHtml, /data-pro-feature="unique"/);
+  assert.match(storeAdminHtml, /data-pro-feature="new"/);
+  assert.match(storeAdminHtml, /data-pro-feature="repeat"/);
+  assert.match(storeAdminHtml, /data-pro-feature="benefits"/);
+  assert.match(storeAdminHtml, /PRO에서 사용/);
+  assert.match(storeAdminJs, /classList\.toggle\("is-locked",!isPro\)/);
+  assert.match(storeAdminJs, /setAttribute\("aria-disabled",isPro \? "false" : "true"\)/);
+  assert.match(storeAdminCss, /\.pro-feature\.is-locked/);
+  assert.match(storeAdminCss, /cursor:not-allowed/);
+  assert.match(storeAdminCss, /store-plan-pro \.pro-feature-head>b\{display:none\}/);
 });

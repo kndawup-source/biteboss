@@ -83,7 +83,13 @@
 </section>
 <section class="store-impact">
         <div class="store-section-head"><div><h3>방문 성과</h3><p>BiteBoss를 통해 실제로 얼마나 방문했는지 보여줍니다.</p></div><select id="storeImpactDays" class="input impact-period" aria-label="통계 기간"><option value="7">7일</option><option value="30" selected>30일</option><option value="90">90일</option></select></div>
-        <div class="store-impact-grid"><div><span>방문</span><strong id="impactVisits">0</strong><small id="impactVisitsDelta">-</small></div><div><span>고유 방문자</span><strong id="impactUnique">0</strong><small id="impactUniqueDelta">-</small></div><div><span>신규 방문자</span><strong id="impactNew">0</strong><small id="impactNewDelta">-</small></div><div><span>재방문자</span><strong id="impactRepeat">0</strong><small id="impactRepeatDelta">-</small></div><div><span>혜택 사용</span><strong id="impactBenefits">0</strong><small id="impactBenefitsDelta">-</small></div></div>
+        <div class="store-impact-grid">
+          <div class="store-impact-metric"><span>방문</span><strong id="impactVisits">0</strong><small id="impactVisitsDelta">-</small></div>
+          <div class="store-impact-metric pro-feature" data-pro-feature="unique"><div class="pro-feature-head"><span>고유 방문자</span><b>PRO</b></div><strong id="impactUnique">—</strong><small id="impactUniqueDelta">PRO에서 사용</small></div>
+          <div class="store-impact-metric pro-feature" data-pro-feature="new"><div class="pro-feature-head"><span>신규 방문자</span><b>PRO</b></div><strong id="impactNew">—</strong><small id="impactNewDelta">PRO에서 사용</small></div>
+          <div class="store-impact-metric pro-feature" data-pro-feature="repeat"><div class="pro-feature-head"><span>재방문자</span><b>PRO</b></div><strong id="impactRepeat">—</strong><small id="impactRepeatDelta">PRO에서 사용</small></div>
+          <div class="store-impact-metric pro-feature" data-pro-feature="benefits"><div class="pro-feature-head"><span>혜택 사용</span><b>PRO</b></div><strong id="impactBenefits">—</strong><small id="impactBenefitsDelta">PRO에서 사용</small></div>
+        </div>
       </section>
 
       <section class="today-actions">

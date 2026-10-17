@@ -327,10 +327,22 @@
     $("#storePlanCard")?.classList.toggle("is-pro",isPro);
     $("#storeAdminApp")?.classList.toggle("store-plan-pro",isPro);
     $("#storeAdminApp")?.classList.toggle("store-plan-partner",!isPro);
-    ["#impactUnique","#impactNew","#impactRepeat","#impactBenefits"].forEach(selector=>{
-      const el=$(selector);
-      if(el && !isPro) el.textContent="—";
+    $$("[data-pro-feature]").forEach(card=>{
+      card.classList.toggle("is-locked",!isPro);
+      card.setAttribute("aria-disabled",isPro ? "false" : "true");
     });
+    const proMetricState = [
+      ["#impactUnique","#impactUniqueDelta"],
+      ["#impactNew","#impactNewDelta"],
+      ["#impactRepeat","#impactRepeatDelta"],
+      ["#impactBenefits","#impactBenefitsDelta"]
+    ];
+    if(!isPro){
+      proMetricState.forEach(([valueSelector,deltaSelector])=>{
+        setText(valueSelector,"—");
+        setText(deltaSelector,"PRO에서 사용");
+      });
+    }
 
     const card = $("#storeBossCard");
     if(card){
