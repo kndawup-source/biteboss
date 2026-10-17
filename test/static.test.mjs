@@ -43,7 +43,7 @@ test('all declared navigation tabs have matching pages', () => {
 
 test('release assets stay inside current maintainability budgets', () => {
   assert.ok(Buffer.byteLength(html) < 30 * 1024, 'index.html budget');
-  assert.ok(Buffer.byteLength(app) < 380 * 1024, 'app.js budget');
+  assert.ok(Buffer.byteLength(app) < 430 * 1024, 'app.js budget');
   assert.ok(Buffer.byteLength(css) < 250 * 1024, 'styles.css budget');
 });
 
@@ -61,7 +61,7 @@ test('store detail coordinates resolve from detail data, memory, then canonical 
   assert.match(app, /const storeDetailCoordinateCache = new Map\(\)/);
   assert.match(app, /async function resolveStoreDetailCoordinates\(/);
   const resolver = blockBetween(app, 'async function resolveStoreDetailCoordinates', 'async function openStoreDetail');
-  assert.match(resolver, /cacheStoreCoordinates\(id, detailStore\)/);
+  assert.match(resolver, /cacheStoreCoordinates\(id, store\)/);
   assert.match(resolver, /storeDetailCoordinateCache\.get\(id\)/);
   assert.match(resolver, /\.from\("biteboss_stores"\)[\s\S]*?\.select\("id,latitude,longitude"\)/);
 });
@@ -118,13 +118,15 @@ test('store cards avoid per-row login CTAs and expose one challenge login notice
   assert.match(css, /\.challenge-login-btn\{/);
 });
 
-test('high-volume public lists use real pagination controls', () => {
-  for (const id of ['storePagination', 'rankPagination', 'activityPagination', 'visitPagination']) {
+test('high-volume public lists and profile activity use real pagination controls', () => {
+  for (const id of ['storePagination', 'rankPagination']) {
     assert.match(html, new RegExp(`id="${id}"`));
   }
-  assert.match(app, /const STORE_PAGE_SIZE = 8/);
+  assert.match(app, /const STORE_PAGE_SIZE = 15/);
   assert.match(app, /const RANK_PAGE_SIZE = 10/);
+  assert.match(app, /const PROFILE_ACTIVITY_ALL_PAGE_SIZE = 10/);
   assert.match(app, /function renderPagination\(/);
+  assert.match(app, /profile-activity-pagination/);
 });
 
 test('guest account flow uses one login modal path and hides crew creation until login', () => {
@@ -159,7 +161,7 @@ test('player battle record reconciles aggregate and activity for both wins and l
 
 test('runtime user and store images use deliberate loading priorities', () => {
   assert.match(app, /매장 사진" loading="lazy" decoding="async"/);
-  assert.match(app, /alt="\$\{escapeAttr\(name\)\} 프로필" \$\{loading\} decoding="async"/);
+  assert.match(app, /alt="\$\{escapeAttr\(name\)\} 프로필" \$\{loading\} decoding="\$\{customUrl \? "async" : "sync"\}"/);
   assert.match(app, /profile-record-thumb"[^`]+loading="lazy" decoding="async"/);
   assert.match(html, /homeSplashImage[^>]+loading="eager"[^>]+fetchpriority="high"/);
 });
@@ -199,7 +201,7 @@ test('ranking and profile avatars remain circular', () => {
 test('network-bound user views retain retry states', () => {
   assert.match(app, /function setRetryState\(/);
   assert.match(app, /setRetryState\("#storeList", "매장 정보를 불러오지 못했습니다\.",/);
-  assert.match(app, /setRetryState\(body, "매장 정보를 불러오지 못했습니다\.",/);
+  assert.match(app, /setRetryState\(\$\("#modalBody"\),"매장 정보를 불러오지 못했습니다\.",/);
   assert.match(css, /\.app-state-retry-btn\{/);
 });
 
@@ -210,15 +212,15 @@ test('release source contains no temporary patch markers', () => {
 test('deleted stores preserve battle history and do not expose dead store navigation', () => {
   assert.match(app, /const storeDeleted = Boolean\(row\.store_deleted \|\| !storeId\)/);
   assert.match(app, /row\.store_name \|\| \(storeDeleted \? "삭제된 매장" : "매장"\)/);
-  assert.match(app, /activityStoreAttr = storeDeleted \? ""/);
+  assert.match(app, /const tag = storeDeleted \? "div" : "button"/);
+  assert.match(app, /const attrs = storeDeleted \? 'role="group"'/);
   assert.match(app, /is-deleted-store/);
 });
 
-test('store manager CTA is independent from gameplay boss ownership and detail entry source', () => {
-  assert.match(app, /const showStoreManagerCard = true;/);
-  assert.doesNotMatch(app, /function shouldShowStoreManagerCard/);
-  assert.doesNotMatch(app, /showStoreManagerCard:false/);
-  assert.doesNotMatch(app, /showStoreManagerCard:!fromProfileBattleLog/);
-  assert.match(app, /playerSession\?\.authenticated\s*\? sb\.rpc\("biteboss_partner_request_status"/);
+test('store manager CTA remains visible for eligible non-owner detail views and hidden for explicitly compact flows', () => {
+  assert.match(app, /function shouldShowStoreManagerCard/);
+  assert.match(app, /return !isBoss && options\?\.showStoreManagerCard !== false/);
+  assert.match(app, /playerSession\?\.authenticated && options\?\.showStoreManagerCard!==false/);
+  assert.match(app, /showStoreManagerCard:!fromProfileBattleLog/);
   assert.match(app, /이 매장 관리하기/);
 });

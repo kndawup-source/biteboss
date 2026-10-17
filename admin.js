@@ -94,12 +94,15 @@
       const username = String(form.get("admin_id") || "").trim().toLowerCase();
       const pin = String(form.get("pin") || "").trim();
       const status = $("#adminLoginStatus");
+      const submit = event.currentTarget.querySelector('button[type="submit"]');
 
+      if(submit?.disabled) return;
       if(!username || !/^\d{6}$/.test(pin)){
         if(status) status.textContent = "ID와 숫자 6자리 비밀번호을 확인하세요.";
         return;
       }
 
+      if(submit) submit.disabled = true;
       if(status) status.textContent = "로그인 중…";
 
       try{
@@ -124,6 +127,8 @@
       }catch(error){
         console.warn(error);
         if(status) status.textContent = "로그인에 실패했습니다.";
+      }finally{
+        if(submit) submit.disabled = false;
       }
     });
   }
@@ -2556,7 +2561,7 @@
     const {data,error}=await adminSb.rpc("biteboss_admin_ad_analytics_v8179",{p_days:days});
     if(error){
       console.warn("BiteBoss ad analytics:",error);
-      chart.innerHTML='<div class="analytics-empty">광고 성과 데이터를 불러오지 못했습니다. v81.97 SQL 적용 여부를 확인하세요.</div>';
+      chart.innerHTML='<div class="analytics-empty">광고 성과 데이터를 불러오지 못했습니다. 광고 분석 RPC와 데이터베이스 배포 상태를 확인하세요.</div>';
       return;
     }
     renderAdAnalytics(data || {});

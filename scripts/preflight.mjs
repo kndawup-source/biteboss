@@ -17,7 +17,7 @@ const appConfig = readFileSync(resolve(root, "app-config.js"), "utf8");
 if (appConfig.includes("PASTE_")) { console.error("INVALID: placeholder key remains."); failed = true; }
 
 const index = readFileSync(resolve(root, "index.html"), "utf8");
-if (!index.includes("./bootstrap.js")) { console.error("INVALID: bootstrap.js is not loaded."); failed = true; }
+if (!/(?:src=["\'](?:\.\/|\/)bootstrap\.js(?:\?[^"\']*)?["\'])/.test(index)) { console.error("INVALID: bootstrap.js is not loaded."); failed = true; }
 if (!index.includes('meta name="description"')) { console.error("INVALID: public description meta missing."); failed = true; }
 
 const appJs = readFileSync(resolve(root, "app.js"), "utf8");

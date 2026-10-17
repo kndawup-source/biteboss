@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.09";
+  const BITEBOSS_BUILD = "82.10";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -127,7 +127,7 @@
   }
   let homeSplashRequestId = 0;
   const HOME_SPLASH_CACHE_KEY = "biteboss:home-splash-url";
-  const PARTNER_BANNERS_CACHE_KEY = "biteboss-partner-banners-v81";
+  const PARTNER_BANNERS_CACHE_KEY = "biteboss:partner-banners";
 
   const config = {
     protect_minutes:60,
@@ -1012,7 +1012,7 @@ await handleClaimParam();
       void preloadDefaultProfileImage(config.default_profile_image_url);
     }
 
-    // v81 canonical banner payload. Legacy keys are read only as a temporary
+    // Canonical partner-banner payload. Older store-id entries are normalized on read.
     // compatibility source; the public renderer itself uses one payload only.
     if(!Array.isArray(config.partner_banners) || !config.partner_banners.length){
       const ids = Array.isArray(rows.partner_banner_store_ids) ? rows.partner_banner_store_ids.map(String) : [];
@@ -3057,7 +3057,7 @@ await handleClaimParam();
     if(!body) return;
 
     body.innerHTML = `
-      <div class="store-detail store-detail-v635">
+      <div class="store-detail">
         <header class="store-detail-head compact-store-head store-detail-identity">
           <div class="store-detail-primary-identity">
             ${occupiedStoreAvatarMarkup(store, "store-detail-avatar", { priority:true })}
@@ -3990,6 +3990,13 @@ await handleClaimParam();
     return [...battles,...visits].sort((a,b) => b.time-a.time);
   }
 
+  function activityStoreState(row = {}){
+    const storeId = String(row.store_id || "").trim();
+    const storeDeleted = Boolean(row.store_deleted || !storeId);
+    const storeName = String(row.store_name || (storeDeleted ? "삭제된 매장" : "매장")).trim();
+    return { storeId, storeDeleted, storeName };
+  }
+
   function battleActivityCopy(row){
     const result = String(row.result || "");
     const perspective = String(row.viewer_side || "");
@@ -4007,7 +4014,8 @@ await handleClaimParam();
     }else if(result === "boss_visit"){
       title = "방어 유지";
     }
-    return { title, storeName:String(row.store_name || "매장").trim() };
+    const { storeName } = activityStoreState(row);
+    return { title, storeName };
   }
 
   function renderProfileRecentActivity(limit = 5){
@@ -4021,22 +4029,27 @@ await handleClaimParam();
     box.innerHTML=visible.map(item => {
       const row=item.row || {};
       if(item.type === "visit"){
-        const storeName=String(row.store_name || "매장").trim();
+        const { storeId, storeDeleted, storeName } = activityStoreState(row);
+        const tag = storeDeleted ? "div" : "button";
+        const attrs = storeDeleted ? 'role="group"' : `type="button" data-visit-store="${escapeAttr(storeId)}"`;
         return `
-          <button class="profile-activity-line" type="button" data-visit-store="${escapeAttr(row.store_id || "")}">
+          <${tag} class="profile-activity-line ${storeDeleted ? "is-deleted-store" : ""}" ${attrs}>
             <span class="profile-activity-kind">방문</span>
             <span class="profile-activity-copy"><strong>${escapeHtml(storeName)}</strong><small>매장을 방문했습니다.</small></span>
             <time>${escapeHtml(formatActivityTime(row.claimed_at || row.visited_at || row.created_at))}</time>
-          </button>
+          </${tag}>
         `;
       }
       const copy=battleActivityCopy(row);
+      const { storeId, storeDeleted } = activityStoreState(row);
+      const tag = storeDeleted ? "div" : "button";
+      const attrs = storeDeleted ? 'role="group"' : `type="button" data-activity-store="${escapeAttr(storeId)}"`;
       return `
-        <button class="profile-activity-line" type="button" data-activity-store="${escapeAttr(row.store_id || "")}">
+        <${tag} class="profile-activity-line ${storeDeleted ? "is-deleted-store" : ""}" ${attrs}>
           <span class="profile-activity-kind">${escapeHtml(copy.title)}</span>
           <span class="profile-activity-copy"><strong>${escapeHtml(copy.storeName)}</strong><small>${escapeHtml(copy.title)} 기록</small></span>
           <time>${escapeHtml(formatActivityTime(row.created_at))}</time>
-        </button>
+        </${tag}>
       `;
     }).join("") || `<div class="profile-record-empty">아직 활동 기록이 없습니다.</div>`;
 
@@ -4076,19 +4089,24 @@ await handleClaimParam();
         ${pageItems.length ? pageItems.map(item => {
           const row=item.row || {};
           if(item.type === "visit"){
-            const storeName=String(row.store_name || "매장").trim();
-            return `<button class="profile-activity-line" type="button" data-visit-store="${escapeAttr(row.store_id || "")}">
+            const { storeId, storeDeleted, storeName } = activityStoreState(row);
+            const tag = storeDeleted ? "div" : "button";
+            const attrs = storeDeleted ? 'role="group"' : `type="button" data-visit-store="${escapeAttr(storeId)}"`;
+            return `<${tag} class="profile-activity-line ${storeDeleted ? "is-deleted-store" : ""}" ${attrs}>
               <span class="profile-activity-kind">방문</span>
               <span class="profile-activity-copy"><strong>${escapeHtml(storeName)}</strong><small>매장을 방문했습니다.</small></span>
               <time>${escapeHtml(formatActivityTime(row.claimed_at || row.visited_at || row.created_at))}</time>
-            </button>`;
+            </${tag}>`;
           }
           const copy=battleActivityCopy(row);
-          return `<button class="profile-activity-line" type="button" data-activity-store="${escapeAttr(row.store_id || "")}">
+          const { storeId, storeDeleted } = activityStoreState(row);
+          const tag = storeDeleted ? "div" : "button";
+          const attrs = storeDeleted ? 'role="group"' : `type="button" data-activity-store="${escapeAttr(storeId)}"`;
+          return `<${tag} class="profile-activity-line ${storeDeleted ? "is-deleted-store" : ""}" ${attrs}>
             <span class="profile-activity-kind">${escapeHtml(copy.title)}</span>
             <span class="profile-activity-copy"><strong>${escapeHtml(copy.storeName)}</strong><small>${escapeHtml(copy.title)} 기록</small></span>
             <time>${escapeHtml(formatActivityTime(row.created_at))}</time>
-          </button>`;
+          </${tag}>`;
         }).join("") : `<div class="profile-record-empty">아직 활동 기록이 없습니다.</div>`}
       </div>
       ${items.length > PROFILE_ACTIVITY_ALL_PAGE_SIZE ? `
@@ -4162,7 +4180,7 @@ await handleClaimParam();
       const result = String(row.result || "");
       const actor = row.actor_name || "사용자";
       const defender = row.defender_name || "보스";
-      const storeName = row.store_name || "매장";
+      const { storeId, storeDeleted, storeName } = activityStoreState(row);
 
       const perspective = String(row.viewer_side || "");
       let title = "보스 도전";
@@ -4187,8 +4205,12 @@ await handleClaimParam();
 
       if(compact){
         const scope = row.is_mine ? "나" : row.is_org ? "크루" : "";
+        const tag = storeDeleted ? "div" : "button";
+        const attrs = storeDeleted
+          ? `role="group" data-player-profile="${escapeAttr(row.actor_user_id || "")}"`
+          : `type="button" data-activity-store="${escapeAttr(storeId)}" data-player-profile="${escapeAttr(row.actor_user_id || "")}"`;
         return `
-          <button class="activity-row is-compact" type="button" data-activity-store="${escapeAttr(row.store_id)}" data-player-profile="${escapeAttr(row.actor_user_id || "")}">
+          <${tag} class="activity-row is-compact ${storeDeleted ? "is-deleted-store" : ""}" ${attrs}>
             <div class="activity-main">
               <div class="activity-title-row">
                 <strong>${escapeHtml(title)}</strong>
@@ -4197,11 +4219,11 @@ await handleClaimParam();
               <p><b>${escapeHtml(storeName)}</b><span>${escapeHtml(detail)}</span></p>
             </div>
             <time>${escapeHtml(formatActivityTime(row.created_at))}</time>
-          </button>
+          </${tag}>
         `;
       }
 
-      const cachedStore = stores.find(item => String(item.id) === String(row.store_id)) || null;
+      const cachedStore = stores.find(item => String(item.id) === storeId) || null;
       const photoUrl = String(
         row.store_photo_url ||
         row.photo_url ||
@@ -4213,14 +4235,18 @@ await handleClaimParam();
         ? `<img class="profile-record-thumb" src="${escapeAttr(photoUrl)}" alt="" loading="lazy" decoding="async" />`
         : `<span class="profile-record-thumb profile-record-thumb-fallback" aria-hidden="true">${escapeHtml(fallback)}</span>`;
 
+      const tag = storeDeleted ? "div" : "button";
+      const attrs = storeDeleted
+        ? `role="group" data-player-profile="${escapeAttr(row.actor_user_id || "")}"`
+        : `type="button" data-activity-store="${escapeAttr(storeId)}" data-player-profile="${escapeAttr(row.actor_user_id || "")}"`;
       return `
-        <button class="profile-record-row has-thumb" type="button" data-activity-store="${escapeAttr(row.store_id)}" data-player-profile="${escapeAttr(row.actor_user_id || "")}">
+        <${tag} class="profile-record-row has-thumb ${storeDeleted ? "is-deleted-store" : ""}" ${attrs}>
           ${thumb}
           <span class="profile-record-main">
             <strong class="profile-record-title">${escapeHtml(title)}</strong>
             <span class="profile-record-meta profile-record-meta-with-time"><span>${escapeHtml(storeName)} · ${escapeHtml(detail)}</span><time class="profile-record-time">${escapeHtml(formatActivityTime(row.created_at))}</time></span>
           </span>
-        </button>
+        </${tag}>
       `;
     }).join("");
   }
@@ -7689,24 +7715,26 @@ await handleClaimParam();
     openPlayerProfile(userId, avatarHint);
   }
 
+  function isMissingRpcError(error){
+    const message = String(error?.message || "");
+    return message.includes("Could not find the function") || message.includes("PGRST202");
+  }
+
   async function fetchPlayerProfileData(userId){
     const params = { p_user_id:userId };
+    const rpcNames = [
+      "biteboss_player_profile_v8129",
+      "biteboss_player_profile_v766",
+      "biteboss_player_profile_v7568",
+      "biteboss_player_profile"
+    ];
 
-    const corrected = await sb.rpc("biteboss_player_profile_v766", params);
-    if(!corrected.error) return corrected;
+    for(const rpcName of rpcNames){
+      const result = await sb.rpc(rpcName, params);
+      if(!result.error || !isMissingRpcError(result.error)) return result;
+    }
 
-    const correctedMessage = String(corrected.error?.message || "");
-    const correctedMissing = correctedMessage.includes("Could not find the function") || correctedMessage.includes("PGRST202");
-    if(!correctedMissing) return corrected;
-
-    const primary = await sb.rpc("biteboss_player_profile_v7568", params);
-    if(!primary.error) return primary;
-
-    const message = String(primary.error?.message || "");
-    const missingRpc = message.includes("Could not find the function") || message.includes("PGRST202");
-    if(!missingRpc) return primary;
-
-    return sb.rpc("biteboss_player_profile", params);
+    return { data:null, error:new Error("PLAYER_PROFILE_RPC_MISSING") };
   }
 
   async function openPlayerProfile(userId, avatarHint = ""){
@@ -7747,7 +7775,40 @@ await handleClaimParam();
     }
   }
 
-  function getPlayerBattleRecord(data, recentActivity){
+  function isBattleChallenger(row = {}, userId = ""){
+    if(row.as_challenger === true || row.as_challenger === 1 || row.as_challenger === "true") return true;
+    const side = String(row.viewer_side || row.perspective || row.side || "").toLowerCase();
+    if(side === "challenger" || side === "org_challenger") return true;
+    if(side === "defender" || side === "org_defender") return false;
+
+    const targetUserId = String(userId || "").trim();
+    if(!targetUserId) return false;
+    const actorUserId = String(row.actor_user_id || row.challenger_user_id || row.attacker_user_id || "").trim();
+    const defenderUserId = String(row.defender_user_id || row.boss_user_id || "").trim();
+    return actorUserId === targetUserId && defenderUserId !== targetUserId;
+  }
+
+  function classifyBattleResult(row = {}){
+    const result = String(row.result || row.outcome || row.status || "").toLowerCase();
+    if(["boss_win","claimed","challenger_win","win","victory"].includes(result)) return "win";
+    if(["crew","challenger_loss","boss_defense","defended","loss","lose","defeat","failed"].includes(result)) return "loss";
+    return "";
+  }
+
+  function battleRecordFromActivity(recentActivity, userId = ""){
+    return (Array.isArray(recentActivity) ? recentActivity : []).reduce((record, row) => {
+      if(!isBattleChallenger(row, userId)) return record;
+      const result = classifyBattleResult(row);
+      if(result === "win") record.wins += 1;
+      else if(result === "loss") record.losses += 1;
+      else return record;
+      record.total += 1;
+      return record;
+    }, { total:0, wins:0, losses:0 });
+  }
+
+  function getPlayerBattleRecord(data, recentActivity, userId = ""){
+    const activityRecord = battleRecordFromActivity(recentActivity, userId);
     const candidates = [
       data?.battle_record,
       data?.record,
@@ -7757,34 +7818,28 @@ await handleClaimParam();
 
     for(const candidate of candidates){
       if(!candidate || typeof candidate !== "object") continue;
-      const wins = Math.max(0, Number(candidate.wins ?? candidate.win_count ?? candidate.victories ?? 0));
-      const losses = Math.max(0, Number(candidate.losses ?? candidate.loss_count ?? candidate.defeats ?? 0));
+      let wins = Math.max(0, Number(candidate.wins ?? candidate.win_count ?? candidate.victories ?? 0));
+      let losses = Math.max(0, Number(candidate.losses ?? candidate.loss_count ?? candidate.defeats ?? 0));
       const explicitTotal = Number(candidate.total ?? candidate.total_battles ?? candidate.matches);
-      const total = Number.isFinite(explicitTotal) ? Math.max(0, explicitTotal) : wins + losses;
-      return { total:Math.max(total, wins + losses), wins, losses };
+      const hasTotal = Number.isFinite(explicitTotal);
+      let total = hasTotal ? Math.max(0, explicitTotal) : wins + losses;
+
+      if(hasTotal && total > wins + losses){
+        losses = Math.max(losses, total - wins);
+      }
+      wins = Math.max(wins, activityRecord.wins);
+      losses = Math.max(losses, activityRecord.losses);
+      total = Math.max(total, wins + losses, activityRecord.total);
+      return { total, wins, losses };
     }
 
-    // v76.x profile RPCs already return the target player's battle activity.
-    // Count only battles where that player was the challenger; visits, defenses and
-    // crew membership events are not a player's W/L record.
-    return (Array.isArray(recentActivity) ? recentActivity : []).reduce((record, row) => {
-      if(!row?.as_challenger) return record;
-      const result = String(row.result || "");
-      if(result === "boss_win"){
-        record.wins += 1;
-        record.total += 1;
-      }else if(result === "crew"){
-        record.losses += 1;
-        record.total += 1;
-      }
-      return record;
-    }, { total:0, wins:0, losses:0 });
+    return activityRecord;
   }
 
   function renderPlayerProfile(data, userId){
     const player = data.player || {};
     const recentAll = Array.isArray(data.recent_activity) ? data.recent_activity : [];
-    const battleRecord = getPlayerBattleRecord(data, recentAll);
+    const battleRecord = getPlayerBattleRecord(data, recentAll, userId);
     const recent = recentAll.slice(0, 3);
 
     // Modal shell is generic; the nickname is the hero title.
@@ -9517,7 +9572,7 @@ await handleClaimParam();
     });
   }
 
-  // Canonical level curve. Keep this in sync with sql/biteboss-level-curve-v8152.sql.
+  // Canonical level curve. Keep the client and database level curve synchronized.
   // XP is cumulative; only the requirement for the next level grows.
   function xpRequiredForNextLevel(level = 1){
     const lv = Math.max(1, Math.floor(Number(level) || 1));

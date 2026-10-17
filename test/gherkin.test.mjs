@@ -17,5 +17,5 @@ test('Gherkin challenge and crew contracts remain wired to production RPCs',()=>
   assert.match(app,/biteboss_create_crew_qr_invite_v624/);
   assert.match(app,/biteboss_takeover_session_ping_v7514/);
   assert.match(app,/biteboss_store_history_v71/);
-  assert.match(app,/biteboss_season_region_rank_v71/);
+  assert.match(app,/biteboss_period_rank_v8160/);
 });
