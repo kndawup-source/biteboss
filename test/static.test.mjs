@@ -302,3 +302,15 @@ test('advertising security layer enforces server-side config and analytics capab
   assert.match(admin, /biteboss_admin_ad_creative_analytics_v8217/);
   assert.doesNotMatch(admin, /from\("biteboss_app_config"\)\.upsert/);
 });
+
+
+test('82.18 routes legacy admin RPCs through a full-admin server proxy', () => {
+  const sql = read('sql/biteboss-82.18-admin-rpc-lockdown.sql');
+  assert.match(admin, /DIRECT_ADMIN_RPCS = new Set/);
+  assert.match(admin, /biteboss_admin_call_v8218/);
+  assert.match(admin, /if\(!rpcName\.startsWith\("biteboss_admin_"\) \|\| DIRECT_ADMIN_RPCS\.has\(rpcName\)\)/);
+  assert.match(sql, /biteboss_admin_require_capability_v8217\('admin\.full'\)/);
+  assert.match(sql, /revoke execute on function %s from public, anon, authenticated/);
+  assert.match(sql, /p\.proname like 'biteboss_admin_%'/);
+  assert.match(sql, /has_function_privilege\('authenticated'/);
+});

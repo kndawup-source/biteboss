@@ -694,7 +694,7 @@ body.admin-app{min-height:100dvh;background:#f1f1f3;color:#111}
   .admin-app .admin-ad-first-creative-label{display:grid;gap:4px}
 }
 
-/* 82.17 — ads operations / performance separation */
+/* 82.18 — ads operations / performance separation */
 .admin-app .admin-ad-performance-row{width:100%;border:0;background:transparent;color:inherit;text-align:left;font:inherit;cursor:pointer}
 .admin-app button.admin-ad-performance-row:hover{background:#f7f7f8}
 .admin-app button.admin-ad-performance-row:focus-visible{outline:2px solid #111;outline-offset:2px}

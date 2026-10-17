@@ -15,9 +15,35 @@
           detectSessionInUrl:false,
           storageKey:"biteboss-admin-auth"
         },
-        global:{ headers:{ "x-client-info":"biteboss-admin-web/82.17" } }
+        global:{ headers:{ "x-client-info":"biteboss-admin-web/82.18" } }
       })
     : null;
+
+
+  const DIRECT_ADMIN_RPCS = new Set([
+    "biteboss_admin_login",
+    "biteboss_admin_logout",
+    "biteboss_admin_session",
+    "biteboss_admin_has_capability_v8217",
+    "biteboss_admin_require_capability_v8217",
+    "biteboss_admin_config_upsert_v8217",
+    "biteboss_admin_list_campaigns_v8217",
+    "biteboss_admin_upsert_campaign_v8217",
+    "biteboss_admin_delete_campaign_v8217",
+    "biteboss_admin_ad_analytics_v8217",
+    "biteboss_admin_ad_creative_analytics_v8217"
+  ]);
+
+  async function adminRpc(name, args){
+    const rpcName=String(name || "");
+    if(!rpcName.startsWith("biteboss_admin_") || DIRECT_ADMIN_RPCS.has(rpcName)){
+      return adminSb.rpc(rpcName, args);
+    }
+    return adminSb.rpc("biteboss_admin_call_v8218", {
+      p_function:rpcName,
+      p_args:args && typeof args === "object" ? args : {}
+    });
+  }
 
   let session = null;
   let admin = null;
@@ -77,7 +103,7 @@
   }
 
   async function restoreAdminSession(){
-    const { data, error } = await adminSb.rpc("biteboss_admin_session");
+    const { data, error } = await adminRpc("biteboss_admin_session");
     if(error || !data?.authenticated){
       admin = null;
       showAuthGate();
@@ -112,7 +138,7 @@
 
       try{
         await ensureAdminAuthSession();
-        const { data, error } = await adminSb.rpc("biteboss_admin_login", {
+        const { data, error } = await adminRpc("biteboss_admin_login", {
           p_username:username,
           p_pin:pin
         });
@@ -252,7 +278,7 @@
 
   function bindActions(){
     $("#adminLogoutBtn")?.addEventListener("click", async () => {
-      try{ await adminSb.rpc("biteboss_admin_logout"); }catch(error){ console.warn(error); }
+      try{ await adminRpc("biteboss_admin_logout"); }catch(error){ console.warn(error); }
       await adminSb.auth.signOut();
       session = null;
       admin = null;
@@ -510,7 +536,7 @@
     }
     chart.innerHTML='<div class="analytics-loading">불러오는 중…</div>';
 
-    const {data,error}=await adminSb.rpc("biteboss_admin_analytics_v7582",{
+    const {data,error}=await adminRpc("biteboss_admin_analytics_v7582",{
       p_from:period.from.toISOString(), p_to:period.to.toISOString(),
       p_compare_from:period.compareFrom.toISOString(), p_compare_to:period.compareTo.toISOString(),
       p_bucket:period.bucket
@@ -581,7 +607,7 @@
     if(!list) return;
     list.innerHTML='<div class="admin-empty">불러오는 중…</div>';
 
-    const {data,error}=await adminSb.rpc("biteboss_admin_store_comments_overview_v7596",{
+    const {data,error}=await adminRpc("biteboss_admin_store_comments_overview_v7596",{
       p_page:Math.max(1,Number(page||1)),
       p_page_size:10,
       p_filter:adminCommentFilter
@@ -651,7 +677,7 @@
       const action=button.dataset.adminCommentAction;
       if(!id)return;
       if(action==='delete'&&!confirm('영구 삭제할까요?'))return;
-      const r=await adminSb.rpc('biteboss_store_comment_moderate_v7582',{p_comment_id:id,p_action:action});
+      const r=await adminRpc('biteboss_store_comment_moderate_v7582',{p_comment_id:id,p_action:action});
       if(r.error||!r.data?.ok){
         alert(r.data?.error==='PIN_LIMIT'?'고정은 매장당 최대 3개입니다.':'처리하지 못했습니다.');
         return;
@@ -668,8 +694,8 @@
     const filter = String($("#partnerRequestFilter")?.value || "pending");
     const statuses = ["pending", "approved", "rejected"];
     const [currentResult, ...countResults] = await Promise.all([
-      adminSb.rpc("biteboss_admin_partner_requests", {p_status: filter, p_limit: 1000}),
-      ...statuses.map(status => adminSb.rpc("biteboss_admin_partner_requests", {p_status: status, p_limit: 1000}))
+      adminRpc("biteboss_admin_partner_requests", {p_status: filter, p_limit: 1000}),
+      ...statuses.map(status => adminRpc("biteboss_admin_partner_requests", {p_status: status, p_limit: 1000}))
     ]);
     const {data,error} = currentResult;
     if(error){ console.warn("BiteBoss partner requests:", error); box.innerHTML = `<div class="timeline-item muted">제휴 신청을 불러오지 못했습니다.</div>`; return; }
@@ -724,7 +750,7 @@
     if(!requestId) return;
     if(button) button.disabled = true;
     try{
-      const { data, error } = await adminSb.rpc("biteboss_admin_review_partner_request", { p_request_id:requestId, p_decision:decision });
+      const { data, error } = await adminRpc("biteboss_admin_review_partner_request", { p_request_id:requestId, p_decision:decision });
       if(error) throw error;
       if(!data?.ok){ alert(data?.error || "처리하지 못했습니다."); return; }
       if(decision === "approve" && data.activation_code) alert(`제휴 승인 완료\n활성화 코드: ${data.activation_code}`);
@@ -737,7 +763,7 @@
 
   async function loadDashboard(){
     const [{ data:stats, error:statsError }, { data:logs, error:logsError }] = await Promise.all([
-      adminSb.rpc("biteboss_admin_dashboard"),
+      adminRpc("biteboss_admin_dashboard"),
       adminSb.from("biteboss_event_logs")
         .select("id,event_type,payload,created_at,biteboss_stores(name)")
         .order("created_at", { ascending:false })
@@ -777,7 +803,7 @@
     const box = $("#adminStoreRequestList");
     if(!box) return;
 
-    const { data, error } = await adminSb.rpc("biteboss_admin_store_requests", {
+    const { data, error } = await adminRpc("biteboss_admin_store_requests", {
       p_status:"pending",
       p_limit:1000
     });
@@ -847,7 +873,7 @@
 
     if(button) button.disabled = true;
     try{
-      const { data, error } = await adminSb.rpc("biteboss_admin_review_store_request", {
+      const { data, error } = await adminRpc("biteboss_admin_review_store_request", {
         p_request_id:requestId,
         p_decision:decision
       });
@@ -916,7 +942,7 @@
     try{
       await ensureAdminAuthSession();
 
-      const { data, error } = await adminSb.rpc("biteboss_admin_create_store", {
+      const { data, error } = await adminRpc("biteboss_admin_create_store", {
         p_name:name,
         p_brand_name:String(form.get("brand_name") || "").trim(),
         p_category:String(form.get("category") || "restaurant"),
@@ -1047,7 +1073,7 @@
         const original = btn.textContent;
         btn.textContent = "전환 중…";
         try{
-          const { data, error } = await adminSb.rpc("biteboss_admin_partner_store", { p_store_id:store.id });
+          const { data, error } = await adminRpc("biteboss_admin_partner_store", { p_store_id:store.id });
           if(error) throw error;
           if(!data?.ok) throw new Error(data?.error || "PARTNER_FAILED");
           activationCodes.set(String(store.id), {
@@ -1167,7 +1193,7 @@
     $$('[data-rotate]').forEach(btn => btn.onclick = async () => {
       const hasQr = btn.closest('.admin-qr-row')?.querySelector('.admin-qr-state.is-active');
       if(hasQr && !confirm("기존 QR은 즉시 무효화됩니다. 재발급할까요?")) return;
-      const { error } = await adminSb.rpc("biteboss_rotate_qr", { p_store_id:btn.dataset.rotate });
+      const { error } = await adminRpc("biteboss_rotate_qr", { p_store_id:btn.dataset.rotate });
       if(error) return alert(error.message.includes('PARTNER_ONLY_QR') ? '정식 제휴 매장만 QR을 사용할 수 있습니다.' : error.message);
       await renderQr();
     });
@@ -1234,7 +1260,7 @@
     const nav = $("#bossPagination");
     if(!box) return;
 
-    const { data, error } = await adminSb.rpc("biteboss_admin_bosses");
+    const { data, error } = await adminRpc("biteboss_admin_bosses");
 
     if(error){
       console.warn("BiteBoss admin bosses:", error);
@@ -1303,7 +1329,7 @@
     const box = $("#userList");
     if(!box) return;
     const keyword = String($("#userSearch")?.value || "").trim();
-    const { data, error } = await adminSb.rpc("biteboss_admin_list_users", { p_query:keyword || null, p_limit:100 });
+    const { data, error } = await adminRpc("biteboss_admin_list_users", { p_query:keyword || null, p_limit:100 });
     if(error){
       console.warn(error);
       box.innerHTML = `<div class="timeline-item muted">사용자를 불러오지 못했습니다.</div>`;
@@ -1332,7 +1358,7 @@
     `).join("") || `<div class="timeline-item muted">검색 결과가 없습니다.</div>`;
 
     $$('[data-user-status]').forEach(btn => btn.onclick = async () => {
-      const { data:updateData, error:updateError } = await adminSb.rpc("biteboss_admin_set_user_status", {
+      const { data:updateData, error:updateError } = await adminRpc("biteboss_admin_set_user_status", {
         p_user_id:btn.dataset.userStatus,
         p_status:btn.dataset.nextStatus
       });
@@ -1346,7 +1372,7 @@
       if(typed !== "DELETE") return;
       btn.disabled = true;
       try{
-        const { data:deleted, error:deleteError } = await adminSb.rpc("biteboss_admin_delete_user", { p_user_id:btn.dataset.deleteUser });
+        const { data:deleted, error:deleteError } = await adminRpc("biteboss_admin_delete_user", { p_user_id:btn.dataset.deleteUser });
         if(deleteError) throw deleteError;
         if(!deleted?.ok) throw new Error(deleted?.error || "USER_DELETE_FAILED");
         await Promise.all([loadUsers(), loadDashboard(), loadBosses()]);
@@ -1374,9 +1400,9 @@
     if(!summaryBox && !storesBox && !orgsBox) return;
 
     const [overviewResult, controlsResult, orgsResult] = await Promise.all([
-      adminSb.rpc("biteboss_admin_game_overview"),
-      adminSb.rpc("biteboss_admin_game_store_controls"),
-      adminSb.rpc("biteboss_admin_game_organizations")
+      adminRpc("biteboss_admin_game_overview"),
+      adminRpc("biteboss_admin_game_store_controls"),
+      adminRpc("biteboss_admin_game_organizations")
     ]);
 
     if(summaryBox){
@@ -1497,7 +1523,7 @@
     button.disabled = true;
 
     try{
-      const { data, error } = await adminSb.rpc("biteboss_admin_release_store_boss", {
+      const { data, error } = await adminRpc("biteboss_admin_release_store_boss", {
         p_store_id:storeId
       });
       if(error) throw error;
@@ -1725,9 +1751,9 @@
 
     try{
       const [{ data, error }, videoResult, seoResult, planResult, socialResult] = await Promise.all([
-        adminSb.rpc("biteboss_admin_store_detail", { p_store_id:storeId }),
-        adminSb.rpc("biteboss_admin_store_video", { p_store_id:storeId }),
-        adminSb.rpc("biteboss_store_seo_settings", { p_store_id:storeId }),
+        adminRpc("biteboss_admin_store_detail", { p_store_id:storeId }),
+        adminRpc("biteboss_admin_store_video", { p_store_id:storeId }),
+        adminRpc("biteboss_store_seo_settings", { p_store_id:storeId }),
         Promise.resolve({data:storePlanMap.get(String(storeId)) || {plan:"partner"},error:null}),
         adminSb.from("biteboss_stores").select("website_url,instagram_url,youtube_url,tiktok_url,naver_blog_url").eq("id",storeId).single()
       ]);
@@ -1833,8 +1859,8 @@
     sharedStoreSettingsBusy=true;
     try{
       const [videoResult,seoResult]=await Promise.all([
-        adminSb.rpc("biteboss_admin_store_video",{p_store_id:editingStoreId}),
-        adminSb.rpc("biteboss_store_seo_settings",{p_store_id:editingStoreId})
+        adminRpc("biteboss_admin_store_video",{p_store_id:editingStoreId}),
+        adminRpc("biteboss_store_seo_settings",{p_store_id:editingStoreId})
       ]);
       if(!seoResult.error){
         const seo=seoResult.data || {};
@@ -1862,9 +1888,9 @@
     if(!editingStoreId) return;
     await loadConfig();
     const [{ data, error }, videoResult, seoResult, planResult, socialResult] = await Promise.all([
-      adminSb.rpc("biteboss_admin_store_detail", { p_store_id:editingStoreId }),
-      adminSb.rpc("biteboss_admin_store_video", { p_store_id:editingStoreId }),
-      adminSb.rpc("biteboss_store_seo_settings", { p_store_id:editingStoreId }),
+      adminRpc("biteboss_admin_store_detail", { p_store_id:editingStoreId }),
+      adminRpc("biteboss_admin_store_video", { p_store_id:editingStoreId }),
+      adminRpc("biteboss_store_seo_settings", { p_store_id:editingStoreId }),
       Promise.resolve({data:storePlanMap.get(String(editingStoreId)) || {plan:"partner"},error:null}),
         adminSb.from("biteboss_stores").select("website_url,instagram_url,youtube_url,tiktok_url,naver_blog_url").eq("id",editingStoreId).single()
     ]);
@@ -2051,7 +2077,7 @@
     if(submit) submit.disabled = true;
     setStatusText(status, "저장 중…");
     try{
-      const { data, error } = await adminSb.rpc("biteboss_admin_update_store", {
+      const { data, error } = await adminRpc("biteboss_admin_update_store", {
         p_store_id:editingStoreId,
         p_name:String(form.get("name") || "").trim(),
         p_brand_name:String(form.get("brand_name") || "").trim(),
@@ -2121,7 +2147,7 @@
     if(button){ button.disabled=true; button.classList.remove("is-saved"); button.textContent="저장 중…"; }
     setStatusText(status,"저장 중…");
     try{
-      const {data,error}=await adminSb.rpc("biteboss_admin_set_store_seo_slug",{p_store_id:editingStoreId,p_slug:slug});
+      const {data,error}=await adminRpc("biteboss_admin_set_store_seo_slug",{p_store_id:editingStoreId,p_slug:slug});
       if(error || !data?.ok){
         const code=data?.error || "";
         const message=code==="SLUG_TAKEN"?"이미 사용 중인 주소입니다.":code==="INVALID_SLUG"?"영문 소문자, 숫자, 하이픈만 입력하세요.":error?.message || code || "저장 실패";
@@ -2200,7 +2226,7 @@
     const status=$("#adminVideoStatus");
     if(!url) return setStatusText(status,"YouTube 주소를 입력하세요.");
     setStatusText(status,"추가 중…");
-    const {data,error}=await adminSb.rpc("biteboss_admin_add_store_video",{p_store_id:editingStoreId,p_video_url:url});
+    const {data,error}=await adminRpc("biteboss_admin_add_store_video",{p_store_id:editingStoreId,p_video_url:url});
     if(error || !data?.ok) return setStatusText(status,`추가 실패 · ${error?.message || data?.error || "다시 시도하세요."}`);
     if($("#adminVideoUrl")) $("#adminVideoUrl").value="";
     setStatusText(status,"영상이 추가되었습니다.");
@@ -2211,7 +2237,7 @@
     if(!editingStoreId || !videoId) return;
     const status=$("#adminVideoStatus");
     setStatusText(status,"삭제 중…");
-    const {data,error}=await adminSb.rpc("biteboss_admin_delete_store_video",{p_store_id:editingStoreId,p_video_id:videoId});
+    const {data,error}=await adminRpc("biteboss_admin_delete_store_video",{p_store_id:editingStoreId,p_video_id:videoId});
     if(error || !data?.ok) return setStatusText(status,`삭제 실패 · ${error?.message || data?.error || "다시 시도하세요."}`);
     setStatusText(status,"영상이 삭제되었습니다.");
     await reloadStoreEditor();
@@ -2236,7 +2262,7 @@
           const removed = await adminSb.storage.from("biteboss-store-images").remove([path]);
           if(removed.error) throw removed.error;
         }
-        const { data, error } = await adminSb.rpc("biteboss_admin_delete_photo", { p_photo_id:btn.dataset.adminDeletePhoto });
+        const { data, error } = await adminRpc("biteboss_admin_delete_photo", { p_photo_id:btn.dataset.adminDeletePhoto });
         if(error) throw error;
         if(!data?.ok) throw new Error(data?.error || "PHOTO_DELETE_FAILED");
         await Promise.all([reloadStoreEditor(), loadStores()]);
@@ -2264,7 +2290,7 @@
         if(upload.error) throw upload.error;
         imageUrl = adminSb.storage.from("biteboss-store-images").getPublicUrl(storagePath).data.publicUrl;
       }
-      const { data, error } = await adminSb.rpc("biteboss_admin_add_photo", {
+      const { data, error } = await adminRpc("biteboss_admin_add_photo", {
         p_store_id:editingStoreId,
         p_image_url:imageUrl,
         p_storage_path:storagePath || null,
@@ -2318,7 +2344,7 @@
     const id = $("#adminMenuId")?.value || null;
     const name = String($("#adminMenuName")?.value || "").trim();
     if(!name) return;
-    const { data, error } = await adminSb.rpc("biteboss_admin_upsert_menu", {
+    const { data, error } = await adminRpc("biteboss_admin_upsert_menu", {
       p_store_id:editingStoreId,
       p_item_id:id || null,
       p_name:name,
@@ -2333,7 +2359,7 @@
 
   async function deleteAdminMenu(id){
     if(!confirm("이 메뉴를 삭제할까요?")) return;
-    const { data, error } = await adminSb.rpc("biteboss_admin_delete_menu", { p_item_id:id });
+    const { data, error } = await adminRpc("biteboss_admin_delete_menu", { p_item_id:id });
     if(error || !data?.ok) return alert(error?.message || data?.error || "메뉴 삭제 실패");
     await reloadStoreEditor();
   }
@@ -2373,7 +2399,7 @@
     if(!editingStoreId) return;
     const title = String($("#adminOfferTitle")?.value || "").trim();
     if(!title) return;
-    const { data, error } = await adminSb.rpc("biteboss_admin_upsert_offer_v2", {
+    const { data, error } = await adminRpc("biteboss_admin_upsert_offer_v2", {
       p_store_id:editingStoreId,
       p_offer_id:$("#adminOfferId")?.value || null,
       p_title:title,
@@ -2388,7 +2414,7 @@
 
   async function deleteAdminOffer(id){
     if(!confirm("이 혜택을 삭제할까요?")) return;
-    const { data, error } = await adminSb.rpc("biteboss_admin_delete_offer", { p_offer_id:id });
+    const { data, error } = await adminRpc("biteboss_admin_delete_offer", { p_offer_id:id });
     if(error || !data?.ok) return alert(error?.message || data?.error || "혜택 삭제 실패");
     await reloadStoreEditor();
   }
@@ -2399,14 +2425,14 @@
     const typed = prompt(`매장과 연결된 메뉴, 사진, 혜택, QR, 점령/방문 기록이 함께 삭제됩니다.\n계속하려면 매장명 “${store.name}”을 정확히 입력하세요.`);
     if(typed !== store.name) return;
     try{
-      const detail = await adminSb.rpc("biteboss_admin_store_detail", { p_store_id:storeId });
+      const detail = await adminRpc("biteboss_admin_store_detail", { p_store_id:storeId });
       if(detail.error) throw detail.error;
       const paths = (detail.data?.photos || []).map(x => x.storage_path).filter(Boolean);
       if(paths.length){
         const removed = await adminSb.storage.from("biteboss-store-images").remove(paths);
         if(removed.error) throw removed.error;
       }
-      const { data, error } = await adminSb.rpc("biteboss_admin_delete_store", { p_store_id:storeId });
+      const { data, error } = await adminRpc("biteboss_admin_delete_store", { p_store_id:storeId });
       if(error) throw error;
       if(!data?.ok) throw new Error(data?.error || "STORE_DELETE_FAILED");
       activationCodes.delete(String(storeId));
@@ -2433,14 +2459,14 @@
     setStatusText(status, "초기화 중…");
     try{
       if(mode === "factory"){
-        const { data:adPaths, error:adPathsError } = await adminSb.rpc("biteboss_admin_ad_storage_paths");
+        const { data:adPaths, error:adPathsError } = await adminRpc("biteboss_admin_ad_storage_paths");
         if(adPathsError) throw adPathsError;
         const adAssetPaths = (adPaths || []).map(x => x.storage_path).filter(Boolean);
         for(let i=0;i<adAssetPaths.length;i+=100){
           const removedAds = await adminSb.storage.from("biteboss-assets").remove(adAssetPaths.slice(i, i+100));
           if(removedAds.error) throw removedAds.error;
         }
-        const { data:allPhotos, error:pathsError } = await adminSb.rpc("biteboss_admin_storage_paths");
+        const { data:allPhotos, error:pathsError } = await adminRpc("biteboss_admin_storage_paths");
         if(pathsError) throw pathsError;
         const paths = (allPhotos || []).map(x => x.storage_path).filter(Boolean);
         for(let i=0;i<paths.length;i+=100){
@@ -2448,7 +2474,7 @@
           if(removed.error) throw removed.error;
         }
       }
-      const { data, error } = await adminSb.rpc("biteboss_admin_reset", { p_mode:mode });
+      const { data, error } = await adminRpc("biteboss_admin_reset", { p_mode:mode });
       if(error) throw error;
       if(!data?.ok) throw new Error(data?.error || "RESET_FAILED");
       setStatusText(status, `완료 · ${labels[mode]} 초기화`);
@@ -2466,7 +2492,7 @@
   async function secureAdminConfigUpsert(rows){
     const payload=Array.isArray(rows)?rows:[rows];
     const normalized=payload.map(row=>({ key:String(row?.key||""), value:row?.value }));
-    const {data,error}=await adminSb.rpc("biteboss_admin_config_upsert_v8217",{p_rows:normalized});
+    const {data,error}=await adminRpc("biteboss_admin_config_upsert_v8217",{p_rows:normalized});
     if(error) throw error;
     if(!data?.ok) throw new Error(data?.error||"CONFIG_SAVE_FAILED");
     return data;
@@ -2614,7 +2640,7 @@
     const chart=$("#adAnalyticsChart"); if(!chart) return;
     const days=Math.max(1,Number($("#adAnalyticsDays")?.value || 30));
     chart.innerHTML='<div class="analytics-loading">불러오는 중…</div>';
-    const {data,error}=await adminSb.rpc("biteboss_admin_ad_analytics_v8217",{p_days:days});
+    const {data,error}=await adminRpc("biteboss_admin_ad_analytics_v8217",{p_days:days});
     if(error){
       console.warn("BiteBoss ad analytics:",error);
       chart.innerHTML='<div class="analytics-empty">광고 성과 데이터를 불러오지 못했습니다. 광고 분석 RPC와 데이터베이스 배포 상태를 확인하세요.</div>';
@@ -2625,7 +2651,7 @@
 
   async function loadAdCreativeAnalytics(days){
     adCreativeAnalyticsMap.clear();
-    const {data,error}=await adminSb.rpc("biteboss_admin_ad_creative_analytics_v8217",{p_days:Math.max(1,Number(days||30))});
+    const {data,error}=await adminRpc("biteboss_admin_ad_creative_analytics_v8217",{p_days:Math.max(1,Number(days||30))});
     if(error){
       console.warn("BiteBoss creative analytics:",error);
       renderAdCreatives();
@@ -2679,7 +2705,7 @@
     if(!Object.keys(appConfig).length) await loadConfig();
     const box = $("#adCampaignList");
     if(!box) return;
-    const { data, error } = await adminSb.rpc("biteboss_admin_list_campaigns_v8217");
+    const { data, error } = await adminRpc("biteboss_admin_list_campaigns_v8217");
     if(error){
       console.warn(error);
       box.innerHTML = `<div class="admin-empty">광고 캠페인을 불러오지 못했습니다.</div>`;
@@ -3083,7 +3109,7 @@
         form.dataset.storeListStoragePath=storeListStoragePath;
       }
 
-      const { data, error } = await adminSb.rpc("biteboss_admin_upsert_campaign_v8217", {
+      const { data, error } = await adminRpc("biteboss_admin_upsert_campaign_v8217", {
         p_id:id || null,
         p_advertiser_name:String($("#adAdvertiserName")?.value || "").trim(),
         p_campaign_name:String($("#adCampaignName")?.value || "").trim(),
@@ -3099,7 +3125,7 @@
       if(!data?.ok) throw new Error(data?.error || "CAMPAIGN_SAVE_FAILED");
       let savedCampaignId=String(data?.id || data?.campaign_id || id || "");
       if(!savedCampaignId){
-        const listed=await adminSb.rpc("biteboss_admin_list_campaigns_v8217");
+        const listed=await adminRpc("biteboss_admin_list_campaigns_v8217");
         if(listed.error) throw listed.error;
         const saved=(Array.isArray(listed.data) ? listed.data : []).find(item => String(item.image_url || "") === String(imageUrl));
         savedCampaignId=String(saved?.id || "");
@@ -3137,7 +3163,7 @@
     if(!item) return;
     if(!confirm(`${item.campaign_name} 캠페인을 삭제할까요?`)) return;
     try{
-      const { data, error } = await adminSb.rpc("biteboss_admin_delete_campaign_v8217", { p_campaign_id:item.id });
+      const { data, error } = await adminRpc("biteboss_admin_delete_campaign_v8217", { p_campaign_id:item.id });
       if(error) throw error;
       if(!data?.ok) throw new Error(data?.error || "CAMPAIGN_DELETE_FAILED");
       if(data.storage_path){
