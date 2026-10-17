@@ -110,12 +110,17 @@
         <div class="page-meter-track"><span id="rankMeterBar"></span></div>
       </section>
       <section id="myRankSummary" class="my-rank-summary hidden" aria-label="내 순위"></section>
-      <div class="rank-tabs" role="group" aria-label="순위 종류">
+      <div class="rank-tabs rank-type-tabs" role="group" aria-label="순위 종류">
         <button class="chip active" data-rank="players" type="button">사용자</button>
         <button class="chip" data-rank="organizations" type="button">크루</button>
         <button class="chip" data-rank="local_crew" type="button">주변 크루</button>
         <button class="chip" data-rank="territory" type="button">현재 점령</button>
         <button class="chip" data-rank="season" type="button">시즌</button>
+      </div>
+      <div id="rankPeriodTabs" class="rank-tabs rank-period-tabs" role="group" aria-label="순위 기간">
+        <button class="chip active" data-rank-period="week" type="button" aria-pressed="true">이번 주</button>
+        <button class="chip" data-rank-period="month" type="button" aria-pressed="false">이번 달</button>
+        <button class="chip" data-rank-period="all" type="button" aria-pressed="false">전체</button>
       </div>
 
       <section id="territoryMapSection" class="territory-map-section hidden" aria-label="현재 점령 지도">
