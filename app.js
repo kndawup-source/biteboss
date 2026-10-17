@@ -5648,12 +5648,20 @@
       return;
     }
     openModal("QR 스캔", `
-      <div class="scan-direct">
-        <div id="qrReader" class="scanner-box"></div>
-        <p id="scannerHint" class="scanner-hint">매장 또는 크루 QR을 화면 안에 맞춰주세요.</p>
-        <button id="scannerRetry" class="secondary-btn hidden" type="button">다시 시도</button>
+      <div class="scan-direct" data-scanner-state="opening">
+        <div class="scanner-viewport">
+          <div id="qrReader" class="scanner-box" aria-label="QR 카메라"></div>
+          <div class="scanner-frame" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+          <div id="scannerError" class="scanner-error hidden" role="status" aria-live="polite">
+            <span class="scanner-error-icon" aria-hidden="true">!</span>
+            <strong>QR을 인식할 수 없습니다.</strong>
+            <p>매장 또는 크루 QR이 화면 안에 잘 보이도록 맞춰주세요.</p>
+            <button id="scannerRetry" class="scanner-retry" type="button">다시 시도</button>
+          </div>
+        </div>
+        <p id="scannerHint" class="scanner-hint">매장 또는 크루 QR을 스캔하세요.</p>
       </div>
-    `);
+    `, {type:"scanner"});
 
     requestAnimationFrame(() => startScanner());
   }
@@ -5675,17 +5683,24 @@
         }
       );
 
+      const scanDirect = $(".scan-direct");
+      if(scanDirect) scanDirect.dataset.scannerState = "scanning";
       const hint = $("#scannerHint");
-      if(hint) hint.textContent = "QR을 인식하는 중입니다…";
+      if(hint) hint.textContent = "매장 또는 크루 QR을 스캔하세요.";
     }catch(error){
       console.warn(error);
+      const scanDirect = $(".scan-direct");
+      if(scanDirect) scanDirect.dataset.scannerState = "error";
       const hint = $("#scannerHint");
-      if(hint) hint.textContent = "카메라 권한을 허용한 뒤 다시 시도해주세요.";
+      if(hint) hint.textContent = "카메라 권한을 확인한 뒤 다시 시도하세요.";
+      const errorPanel = $("#scannerError");
+      errorPanel?.classList.remove("hidden");
       const retry = $("#scannerRetry");
       if(retry){
-        retry.classList.remove("hidden");
         retry.onclick = async () => {
-          retry.classList.add("hidden");
+          await stopScanner();
+          errorPanel?.classList.add("hidden");
+          if(scanDirect) scanDirect.dataset.scannerState = "opening";
           if(hint) hint.textContent = "카메라를 여는 중입니다…";
           await startScanner();
         };
@@ -9245,7 +9260,7 @@
     modalReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const detailTypes = new Set(["detail-sheet", "store-detail", "player-profile", "partner-request"]);
     const isDetailSheet = detailTypes.has(modalType);
-    modal.classList.remove("modal-detail-sheet", "modal-compact", "store-detail-modal", "player-profile-modal", "partner-request-modal", "notice-modal", "victory-modal");
+    modal.classList.remove("modal-detail-sheet", "modal-compact", "store-detail-modal", "player-profile-modal", "partner-request-modal", "notice-modal", "victory-modal", "scanner-modal");
     modal.classList.toggle("modal-detail-sheet", isDetailSheet);
     modal.classList.toggle("modal-compact", !isDetailSheet);
     modal.classList.toggle("store-detail-modal", modalType === "store-detail");
@@ -9253,6 +9268,7 @@
     modal.classList.toggle("partner-request-modal", modalType === "partner-request");
     modal.classList.toggle("notice-modal", modalType === "notice");
     modal.classList.toggle("victory-modal", modalType === "victory");
+    modal.classList.toggle("scanner-modal", modalType === "scanner");
 
     setText("#modalTitle", title);
 
@@ -9279,7 +9295,7 @@
     const modal = $("#modal");
     takeoverChoiceOpen=false;
     modal?.classList.add("hidden");
-    modal?.classList.remove("modal-detail-sheet", "modal-compact", "store-detail-modal", "player-profile-modal", "partner-request-modal", "notice-modal", "victory-modal");
+    modal?.classList.remove("modal-detail-sheet", "modal-compact", "store-detail-modal", "player-profile-modal", "partner-request-modal", "notice-modal", "victory-modal", "scanner-modal");
     unlockModalScroll();
     const returnFocus = modalReturnFocus;
     modalReturnFocus = null;
