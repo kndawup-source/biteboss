@@ -526,14 +526,14 @@ body.biteboss-info-page{min-height:100dvh;background:var(--bg);color:#111}.info-
   .store-url-settings .asset-status,.store-url-settings .inline-status{overflow-wrap:anywhere;word-break:break-word}
 }
 
-/* 81.84 public PRO badge */
+/* Public PRO badge */
 .store-status-tag.pro{background:#111;color:#fff;border-color:#111;font-weight:900;letter-spacing:.04em}
 
 
 /* Store social channels and comment media */
 .store-detail-info>.store-detail-link-row{display:grid;grid-template-columns:72px minmax(0,1fr);gap:10px}
 .store-detail-link-row a{min-width:0;color:#111;font-size:11px;line-height:1.4;font-weight:800;text-decoration:none;overflow-wrap:anywhere}
-.store-detail-link-row a:hover,.store-detail-link-row a:focus-visible{text-decoration:underline;text-underline-offset:2px}
+.store-detail-link-row a:hover,.store-detail-link-row a:focus-visible{text-decoration:none}
 .store-comment-youtube{position:relative;width:100%;aspect-ratio:16/9;margin-top:10px;overflow:hidden;background:#000;border-radius:10px}
 .store-comment-youtube iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
 

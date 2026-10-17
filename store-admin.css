@@ -69,7 +69,7 @@ body.store-admin-app{min-height:100dvh;background:#f1f1f3;color:#111}
   .today-actions{grid-template-columns:1fr}.today-actions .text-btn{grid-column:1}.store-impact-grid{grid-template-columns:1fr 1fr}.benefit-pass-form{grid-template-columns:1fr}.benefit-pass-form .secondary-btn{width:100%}
 }
 
-/* 81.84 PARTNER / PRO */
+/* PARTNER / PRO */
 .store-admin-app .store-plan-card{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin:0 0 14px;padding:16px;border:1px solid #ececef;border-radius:16px;background:#fff}
 .store-admin-app .store-plan-card>div{min-width:0}
 .store-admin-app .store-plan-card>div>span{display:block;color:#999;font-size:9px;font-weight:800}

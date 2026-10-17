@@ -8,6 +8,9 @@ const failures = [];
 const index = read('index.html');
 const app = read('app.js');
 const styles = read('styles.css');
+const adminStyles = read('admin.css');
+const storeAdminStyles = read('store-admin.css');
+const appConfig = read('app-config.js');
 const serviceWorker = read('service-worker.js');
 const packageJson = JSON.parse(read('package.json'));
 
@@ -26,9 +29,12 @@ if (build) {
   for (const [label, ok] of checks) if (!ok) failures.push(`${label}: build/version contract mismatch`);
 }
 
-const publicText = `${app}\n${styles}\n${index}`;
+const publicText = `${app}\n${styles}\n${adminStyles}\n${storeAdminStyles}\n${appConfig}\n${index}`;
 if (/\b(TODO|FIXME|HACK|HOTFIX)\b/i.test(publicText)) {
   failures.push('release source still contains temporary-work markers');
+}
+if (/(?:release\s+66\.3|\/\*\s*81\.|\/\*\s*82\.18)/i.test(publicText)) {
+  failures.push('release source still contains stale historical version-tag comments');
 }
 if (/locallyOwnedStoreIds\.add\s*\(/.test(app)) {
   failures.push('local ownership registry uses Set API on a Map');

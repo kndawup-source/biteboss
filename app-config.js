@@ -1,4 +1,4 @@
-/* BiteBoss web-root release 66.3 */
+/* BiteBoss public runtime configuration */
 window.BITEBOSS_CONFIG = Object.freeze({
   supabaseUrl: "https://imumpyumchvctrpmfngr.supabase.co",
   supabaseAnonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImltdW1weXVtY2h2Y3RycG1mbmdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxODQ1MjksImV4cCI6MjA5OTc2MDUyOX0.oXpNENBuoaN9cTgQfiesRpQucsCS2XSDTr62M58ue7Y",

@@ -358,7 +358,7 @@ test('82.20 dashboard performance and partner request controls use direct button
 });
 
 
-test('82.22 home hook copy paints before network config resolves', () => {
+test('82.23 home hook copy paints before network config resolves', () => {
   const initBlock = blockBetween(app, 'async function init()', 'function readPartnerBannerPhotoCache');
   assert.match(app, /HOME_COPY_CACHE_KEY = "biteboss:home-copy-v1"/);
   assert.match(app, /function restoreCachedHomeCopy\(\)/);
@@ -374,7 +374,7 @@ test('82.22 home hook copy paints before network config resolves', () => {
 });
 
 
-test('store info renders every supported social account as an information row', () => {
+test('store info renders every supported social account as an information row without link decoration', () => {
   assert.match(app, /\["웹사이트",store\.website_url\]/);
   assert.match(app, /\["Instagram",store\.instagram_url\]/);
   assert.match(app, /\["YouTube",store\.youtube_url\]/);
@@ -382,4 +382,11 @@ test('store info renders every supported social account as an information row', 
   assert.match(app, /\["네이버 블로그",store\.naver_blog_url\]/);
   assert.match(app, /class="store-detail-link-row"/);
   assert.doesNotMatch(css, /\.store-social-links/);
+  assert.match(css, /\.store-detail-link-row a\{[^}]*text-decoration:none/);
+  assert.match(css, /\.store-detail-link-row a:hover,\.store-detail-link-row a:focus-visible\{text-decoration:none\}/);
+});
+
+test('release source contains no stale historical version-tag comments', () => {
+  const releaseText = `${app}\n${css}\n${read('admin.css')}\n${read('store-admin.css')}\n${read('app-config.js')}`;
+  assert.doesNotMatch(releaseText, /(?:release\s+66\.3|\/\*\s*81\.|\/\*\s*82\.18)/i);
 });

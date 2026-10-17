@@ -711,7 +711,7 @@ body.admin-app{min-height:100dvh;background:#f1f1f3;color:#111}
 }
 
 
-/* 81.83 store avatar fallback text — visible and centered */
+/* Store avatar fallback text — visible and centered */
 .admin-app .admin-store-thumb{
   display:flex;
   align-items:center;
@@ -729,7 +729,7 @@ body.admin-app{min-height:100dvh;background:#f1f1f3;color:#111}
   text-align:center;
 }
 
-/* 81.84 PARTNER / PRO */
+/* PARTNER / PRO */
 .admin-app .store-plan-badge{display:inline-flex;align-items:center;justify-content:center;height:24px;padding:0 8px;border-radius:7px;background:#f0f0f2;color:#777;font-size:8px;font-weight:950;letter-spacing:.04em}
 .admin-app .store-plan-badge.is-pro{background:#111;color:#fff}
 .admin-app .store-plan-feature-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -755,7 +755,7 @@ body.admin-app{min-height:100dvh;background:#f1f1f3;color:#111}
   .admin-app .admin-ad-first-creative-label{display:grid;gap:4px}
 }
 
-/* 82.18 — ads operations / performance separation */
+/* Ads operations / performance separation */
 .admin-app .admin-ad-performance-row{width:100%;border:0;background:transparent;color:inherit;text-align:left;font:inherit;cursor:pointer}
 .admin-app button.admin-ad-performance-row:hover{background:#f7f7f8}
 .admin-app button.admin-ad-performance-row:focus-visible{outline:2px solid #111;outline-offset:2px}
