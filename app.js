@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.84";
+  const BITEBOSS_BUILD = "81.90";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -155,6 +155,7 @@
     home_primary_cta:"QR 스캔하기",
     home_secondary_cta:"내 주변 보스 찾기",
     partner_banners:[],
+    store_plans:[],
     ad_public_campaigns:[],
     crew_qr_invite_hours:72,
     crew_qr_max_uses:30,
@@ -2284,7 +2285,7 @@
       const offerPromise=sb.rpc("biteboss_store_offer_access",{p_store_id:storeId});
       const videoPromise=sb.rpc("biteboss_store_video",{p_store_id:storeId});
       const seoPromise=sb.rpc("biteboss_store_seo_settings",{p_store_id:storeId});
-      const planPromise=sb.rpc("biteboss_store_plan",{p_store_id:storeId});
+      const planPromise=Promise.resolve({data:{ok:true,plan:publicStorePlan(storeId)},error:null});
       const secondaryPromise=Promise.all([
         playerSession?.authenticated && options?.showStoreManagerCard!==false
           ? sb.rpc("biteboss_partner_request_status",{p_store_id:storeId})
@@ -4685,6 +4686,25 @@
         store_id:String(item.store.id),
         store_name:item.store.name || item.row.store_name
       }));
+  }
+
+  function normalizedPublicStorePlans(){
+    return Array.isArray(config.store_plans)
+      ? config.store_plans.map(item=>({
+          store_id:String(item?.store_id || ""),
+          plan:String(item?.plan || "partner")==="pro" ? "pro" : "partner",
+          started_at:item?.started_at || null,
+          expires_at:item?.expires_at || null
+        })).filter(item=>item.store_id)
+      : [];
+  }
+
+  function publicStorePlan(storeId){
+    const id=String(storeId || "");
+    const item=normalizedPublicStorePlans().find(row=>row.store_id===id);
+    if(!item) return {plan:"partner",started_at:null,expires_at:null};
+    const expired=item.plan==="pro" && item.expires_at && new Date(item.expires_at).getTime()<=Date.now();
+    return {...item,plan:expired ? "partner" : item.plan};
   }
 
   function currentPartnerBanner(){

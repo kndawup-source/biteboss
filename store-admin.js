@@ -15,7 +15,7 @@
           detectSessionInUrl:false,
           storageKey:"biteboss-store-auth"
         },
-        global:{ headers:{ "x-client-info":"biteboss-store-admin-web/81.84" } }
+        global:{ headers:{ "x-client-info":"biteboss-store-admin-web/81.90" } }
       })
     : null;
 
@@ -263,6 +263,19 @@
     libraryInput?.addEventListener("change", quickAddPhoto);
   }
 
+  async function loadCurrentStorePlan(){
+    const storeId=String(currentStore?.id || "");
+    if(!storeId) return {plan:"partner",started_at:null,expires_at:null};
+    const {data,error}=await storeSb.from("biteboss_app_config").select("value").eq("key","store_plans").maybeSingle();
+    if(error) return {plan:"partner",started_at:null,expires_at:null};
+    const rows=Array.isArray(data?.value) ? data.value : [];
+    const item=rows.find(row=>String(row?.store_id || "")===storeId);
+    if(!item) return {plan:"partner",started_at:null,expires_at:null};
+    const plan=String(item?.plan || "partner")==="pro" ? "pro" : "partner";
+    const expired=plan==="pro" && item?.expires_at && new Date(item.expires_at).getTime()<=Date.now();
+    return {store_id:storeId,plan:expired ? "partner" : plan,started_at:item?.started_at || null,expires_at:item?.expires_at || null};
+  }
+
   async function refreshStore(){
     if(!currentStore) return;
     setText("#storeSyncStatus", "syncing");
@@ -274,7 +287,7 @@
 
     const [snapshotResult,planResult] = await Promise.all([
       storeSb.rpc("biteboss_store_snapshot", { p_store_id:currentStore.id }),
-      storeSb.rpc("biteboss_store_plan", { p_store_id:currentStore.id }),
+      Promise.resolve().then(async()=>({data:{ok:true,plan:await loadCurrentStorePlan()},error:null})),
       loadPhotos(), loadStoreVideo(), loadStoreSeo(), loadMenu(), loadOffers(), loadQr(), loadActivity()
     ]);
 
