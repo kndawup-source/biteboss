@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.07";
+  const BITEBOSS_BUILD = "82.08";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -269,7 +269,7 @@
   }
   let rankLoadSeq = 0;
   let storePage = 1;
-  const STORE_PAGE_SIZE = 8;
+  const STORE_PAGE_SIZE = 15;
   let storeViewRows = [];
   let rankPage = 1;
   const RANK_PAGE_SIZE = 10;
@@ -334,6 +334,8 @@
   let notificationPage = 1;
   const NOTIFICATION_PAGE_SIZE = 8;
   const adSessionKey = getAdSessionKey();
+  const storeListAdSelection = new Map();
+  let storeListAdObserver = null;
 
 
 
@@ -1154,7 +1156,9 @@ await handleClaimParam();
 
   function campaignMatchesPlacement(campaign, placement){
     const value=String(campaign?.placement || "both");
-    return value === "both" || value === placement;
+    if(value === "all") return true;
+    if(value === "both") return placement === "home" || placement === "takeover";
+    return value === placement;
   }
 
   function campaignMatchesRegion(campaign){
@@ -1203,6 +1207,79 @@ await handleClaimParam();
     const highestPriority=eligible.reduce((max,item) => Math.max(max,Number(item.sort_order || 0)), -Infinity);
     const topTier=eligible.filter(item => Number(item.sort_order || 0) === highestPriority);
     return topTier[Math.floor(Math.random()*topTier.length)] || null;
+  }
+
+  function storeListCampaignFor(page=1){
+    const now=Date.now();
+    const rows=Array.isArray(config.ad_public_campaigns) ? config.ad_public_campaigns : [];
+    const eligible=rows.filter(item=>{
+      if(!item?.id || !item?.image_url || !item.is_active) return false;
+      const start=item.starts_at ? new Date(item.starts_at).getTime() : 0;
+      const end=item.ends_at ? new Date(item.ends_at).getTime() : Infinity;
+      return start <= now && end > now && campaignMatchesPlacement(item,"store_list") && campaignMatchesRegion(item);
+    });
+    if(!eligible.length) return null;
+
+    const highestPriority=eligible.reduce((max,item)=>Math.max(max,Number(item.sort_order || 0)),-Infinity);
+    const topTier=eligible.filter(item=>Number(item.sort_order || 0)===highestPriority);
+    const signature=topTier.map(item=>String(item.id)).sort().join(",");
+    const key=`${Number(page)||1}:${signature}`;
+    const cachedId=storeListAdSelection.get(key);
+    const cached=topTier.find(item=>String(item.id)===String(cachedId));
+    if(cached) return cached;
+
+    const selected=topTier[Math.floor(Math.random()*topTier.length)] || null;
+    if(selected) storeListAdSelection.set(key,String(selected.id));
+    return selected;
+  }
+
+  function storeListAdMarkup(campaign){
+    if(!campaign?.id || !campaign?.image_url) return "";
+    const clickUrl=/^https?:\/\//i.test(String(campaign.click_url || "")) ? String(campaign.click_url) : "";
+    const tag=clickUrl ? "a" : "div";
+    const href=clickUrl ? ` href="${escapeAttr(clickUrl)}" target="_blank" rel="noopener noreferrer"` : "";
+    return `<${tag} class="store-list-ad" data-store-list-ad="${escapeAttr(campaign.id)}" data-store-list-ad-store="${escapeAttr(campaign.target_store_id || "")}"${href}><img src="${escapeAttr(campaign.image_url)}" alt="" loading="lazy" decoding="async" /></${tag}>`;
+  }
+
+  function bindStoreListAd(campaign){
+    storeListAdObserver?.disconnect();
+    storeListAdObserver=null;
+    const node=$("#storeList [data-store-list-ad]");
+    if(!node || !campaign?.id) return;
+
+    node.addEventListener("click",event=>{
+      const clickUrl=/^https?:\/\//i.test(String(campaign.click_url || "")) ? String(campaign.click_url) : "";
+      if(!clickUrl){
+        event.preventDefault();
+        return;
+      }
+      trackAdEvent(campaign.id,"click",`${adSessionKey}:store-list:${storePage}`,{
+        store_id:campaign.target_store_id || "",
+        placement:"store_list"
+      });
+    });
+
+    const trackVisible=()=>{
+      if(node.dataset.impressionTracked==="1") return;
+      node.dataset.impressionTracked="1";
+      trackAdEvent(campaign.id,"impression",`${adSessionKey}:store-list:${storePage}`,{
+        store_id:campaign.target_store_id || "",
+        placement:"store_list"
+      });
+    };
+
+    if("IntersectionObserver" in window){
+      storeListAdObserver=new IntersectionObserver(entries=>{
+        if(entries.some(entry=>entry.isIntersecting && entry.intersectionRatio>=0.5)){
+          trackVisible();
+          storeListAdObserver?.disconnect();
+          storeListAdObserver=null;
+        }
+      },{threshold:[0.5]});
+      storeListAdObserver.observe(node);
+    }else{
+      trackVisible();
+    }
   }
 
   async function loadBanner(){
@@ -1891,14 +1968,31 @@ await handleClaimParam();
 
     const canPatch = options.patch === true && box.children.length > 0;
     if(!canPatch || !patchVisibleStoreCards(view.rows)){
-      box.innerHTML = view.rows.map(store => {
+      const cards=view.rows.map(store => {
         const html = storeCard(store);
         return html.replace(
           /(<[^>]+data-store-detail="[^"]+")/,
           `$1 data-render-signature="${escapeAttr(storeRenderSignature(store))}"`
         );
-      }).join("") || `<div class="app-state">검색 결과가 없습니다.</div>`;
+      });
+      const listCampaign=storeListCampaignFor(storePage);
+      if(listCampaign && cards.length > 8) cards.splice(8,0,storeListAdMarkup(listCampaign));
+      box.innerHTML = cards.join("") || `<div class="app-state">검색 결과가 없습니다.</div>`;
       $$("#storeList [data-store-detail]").forEach(bindStoreCard);
+      bindStoreListAd(listCampaign);
+    }else{
+      const listCampaign=storeListCampaignFor(storePage);
+      const existingAd=box.querySelector("[data-store-list-ad]");
+      if(listCampaign && !existingAd){
+        const cards=[...box.querySelectorAll("[data-store-detail]")];
+        const after=cards[7];
+        if(after) after.insertAdjacentHTML("afterend",storeListAdMarkup(listCampaign));
+      }else if(!listCampaign && existingAd){
+        existingAd.remove();
+      }else if(listCampaign && existingAd && String(existingAd.dataset.storeListAd)!==String(listCampaign.id)){
+        existingAd.outerHTML=storeListAdMarkup(listCampaign);
+      }
+      bindStoreListAd(listCampaign);
     }
 
     updateChallengeCommand(storeViewRows);

@@ -348,13 +348,13 @@
 <label>종료일시<div class="admin-datetime-control"><input id="adEndsDatePicker" class="input admin-picker-input admin-date-part" type="date" aria-label="날짜 선택"><input id="adEndsTimePicker" class="input admin-picker-input admin-time-part" type="time" step="60" aria-label="시간 선택"></div><input aria-hidden="true" class="admin-native-datetime-value" id="adEndsAt" tabindex="-1" type="datetime-local"/></label>
 <label>상태<select class="input" id="adIsActive"><option value="true">활성</option><option value="false">비활성</option></select></label>
 <label>우선순위<input class="input" id="adSortOrder" step="1" type="number" value="0"/><small class="field-help">숫자가 높을수록 우선 노출됩니다.</small></label>
-<label>노출 위치<select class="input" id="adPlacement"><option value="both">홈 + 점령 대기</option><option value="home">홈만</option><option value="takeover">점령 대기만</option></select></label>
+<label>노출 위치<select class="input" id="adPlacement"><option value="store_list">매장 목록</option><option value="home">홈</option><option value="takeover">점령 대기</option><option value="both">홈 + 점령 대기</option><option value="all">전체 위치</option></select></label>
 <label>타게팅<select class="input" id="adTargetType"><option value="all">전체</option><option value="region">지역</option></select></label>
 <label class="wide hidden" id="adTargetRegionField">지역<input class="input" id="adTargetRegion" maxlength="40" placeholder="예: 서울 강남구"/></label>
 <div class="admin-form-actions wide"><button class="primary-btn" type="submit">캠페인 저장</button><button class="text-btn hidden" id="adCampaignCancel" type="button">수정 취소</button></div>
 <p aria-live="polite" class="asset-status wide" id="adCampaignStatus"></p>
 </form>
-<div class="admin-ad-guide"><span>권장 비율 3:1 · 1200×400</span><span>같은 우선순위는 랜덤 노출됩니다.</span></div>
+<div class="admin-ad-guide"><span>권장 비율 3:1 · 1200×400</span><span>같은 우선순위는 랜덤 노출됩니다. 매장 목록 광고는 15개 중 8번째 매장 뒤에 이미지로 표시됩니다.</span></div>
 </details>
 </div></section>
 <section class="admin-page" id="admin-maintenance">
@@ -588,6 +588,6 @@
 </div>
 </section>
 </div>
-<script src="./admin.js?v=82.07"></script>
+<script src="./admin.js?v=82.08"></script>
 </body>
 </html>

@@ -2444,9 +2444,10 @@
   function campaignSetting(id){
     const value = adPlacementConfig()[String(id)] || {};
     return {
-      placement:["home","takeover","both"].includes(String(value.placement)) ? String(value.placement) : "both",
+      placement:["home","takeover","store_list","both","all"].includes(String(value.placement)) ? String(value.placement) : "both",
       target_type:String(value.target_type) === "region" ? "region" : "all",
-      target_region:String(value.target_region || "").trim()
+      target_region:String(value.target_region || "").trim(),
+      target_store_id:String(value.target_store_id || "").trim()
     };
   }
 
@@ -2480,7 +2481,8 @@
         id:item.id, advertiser_name:item.advertiser_name || "", campaign_name:item.campaign_name || "",
         image_url:item.image_url || "", click_url:item.click_url || "", starts_at:item.starts_at || null,
         ends_at:item.ends_at || null, is_active:Boolean(item.is_active), sort_order:Number(item.sort_order || 0),
-        placement:setting.placement, target_type:setting.target_type, target_region:setting.target_region
+        placement:setting.placement, target_type:setting.target_type, target_region:setting.target_region,
+        target_store_id:setting.target_store_id
       };
     });
     const { error }=await adminSb.from("biteboss_app_config").upsert({
@@ -2579,7 +2581,10 @@
       const measured = adAnalyticsCampaignMap.get(String(item.id)) || {};
       const visits = Number(measured.visits || 0);
       const captures = Number(measured.captures || 0);
-      const placementLabel = setting.placement === "home" ? "홈" : (setting.placement === "takeover" ? "점령 대기" : "홈 + 점령 대기");
+      const placementLabel = ({
+        home:"홈", takeover:"점령 대기", store_list:"매장 목록",
+        both:"홈 + 점령 대기", all:"전체 위치"
+      })[setting.placement] || "홈 + 점령 대기";
       const targetLabel = setting.target_type === "region" && setting.target_region ? ` · ${setting.target_region}` : " · 전체";
       return `
         <article class="admin-ad-row">
