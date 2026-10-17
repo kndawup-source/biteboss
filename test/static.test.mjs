@@ -342,3 +342,17 @@ test('82.19 admin layout uses unified hierarchy and explicit moderation/ad actio
   assert.match(adminCss, /admin-ad-thumb\.admin-ad-placeholder/);
   assert.match(admin, /이름 없는 캠페인/);
 });
+
+test('82.20 dashboard performance and partner request controls use direct button choices', () => {
+  const adminHtml = read('admin.html');
+  const adminCss = read('admin.css');
+  assert.match(adminHtml, /data-analytics-compare="previous"[^>]*>이전 기간<\/button>/);
+  assert.match(adminHtml, /data-analytics-compare="year"[^>]*>전년 동기<\/button>/);
+  assert.doesNotMatch(adminHtml, /id="analyticsCompareMode"/);
+  assert.match(admin, /function analyticsCompareLabel\(period\)/);
+  assert.match(adminHtml, /data-partner-filter="pending"[^>]*>확인 대기<\/button>/);
+  assert.match(adminHtml, /data-partner-filter="approved"[^>]*>승인 완료<\/button>/);
+  assert.doesNotMatch(adminHtml, /id="partnerRequestFilter"/);
+  assert.match(adminCss, /analytics-compare-tabs button\.active\{background:#111;color:#fff\}/);
+  assert.match(adminCss, /partner-request-filters button\.active\{background:#111;color:#fff\}/);
+});

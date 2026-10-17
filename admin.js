@@ -15,7 +15,7 @@
           detectSessionInUrl:false,
           storageKey:"biteboss-admin-auth"
         },
-        global:{ headers:{ "x-client-info":"biteboss-admin-web/82.19" } }
+        global:{ headers:{ "x-client-info":"biteboss-admin-web/82.20" } }
       })
     : null;
 
@@ -70,6 +70,7 @@
   let adminStorePage = 1;
   let adminStoreFilter = "all";
   let partnerRequestPage = 1;
+  let partnerRequestStatus = "pending";
   let storeRequestPage = 1;
   let adminUserPage = 1;
   let bossPage = 1;
@@ -299,7 +300,12 @@
     $("#adPerformanceExportCsv")?.addEventListener("click", exportAdPerformanceCsv);
     $("#adPerformanceCreativeClose")?.addEventListener("click", closeAdPerformanceCreativePanel);
     $("#adTargetType")?.addEventListener("change", syncAdTargetRegionField);
-    $("#partnerRequestFilter")?.addEventListener("change", () => { partnerRequestPage = 1; loadPartnerRequests(); });
+    $$('[data-partner-filter]').forEach(button => button.addEventListener("click", () => {
+      partnerRequestStatus = String(button.dataset.partnerFilter || "pending");
+      partnerRequestPage = 1;
+      $$('[data-partner-filter]').forEach(item => item.classList.toggle("active", item === button));
+      loadPartnerRequests();
+    }));
     $("#refreshPartnerRequests")?.addEventListener("click", loadPartnerRequests);
     $("#refreshAdminComments")?.addEventListener("click", () => loadAdminComments(adminCommentPage));
     $$("[data-comment-filter]").forEach(button => button.addEventListener("click", () => {
@@ -309,7 +315,11 @@
       loadAdminComments(1);
     }));
     $$('[data-analytics-range]').forEach(btn => btn.addEventListener("click", () => selectAnalyticsRange(btn.dataset.analyticsRange)));
-    $("#analyticsCompareMode")?.addEventListener("change", event => { analyticsCompareMode = String(event.currentTarget.value || "previous"); loadAnalytics(); });
+    $$('[data-analytics-compare]').forEach(button => button.addEventListener("click", () => {
+      analyticsCompareMode = String(button.dataset.analyticsCompare || "previous");
+      syncAnalyticsCompareUi();
+      loadAnalytics();
+    }));
     $("#analyticsApplyCustom")?.addEventListener("click", () => { analyticsRange = "custom"; syncAnalyticsPresetUi(); loadAnalytics(); });
     $("#refreshAccessAnalytics")?.addEventListener("click", () => loadAccessAnalytics(resolveAnalyticsPeriod()));
 
@@ -473,6 +483,22 @@
   function syncAnalyticsPresetUi(){
     $$('[data-analytics-range]').forEach(btn => btn.classList.toggle("active", btn.dataset.analyticsRange === analyticsRange));
     $("#analyticsCustomRange")?.classList.toggle("hidden", analyticsRange !== "custom");
+    syncAnalyticsCompareUi();
+  }
+
+  function syncAnalyticsCompareUi(){
+    $$('[data-analytics-compare]').forEach(button => button.classList.toggle("active", button.dataset.analyticsCompare === analyticsCompareMode));
+  }
+
+  function analyticsCompareLabel(period){
+    if(analyticsCompareMode === "year") return "전년 동기 대비";
+    const days = Math.max(1, Math.ceil((period.to.getTime()-period.from.getTime()+1)/86400000));
+    if(analyticsRange === "today") return "어제 대비";
+    if(analyticsRange === "this_month") return "직전 동일 기간 대비";
+    if(analyticsRange === "last_month") return "전월 대비";
+    if(analyticsRange === "this_year") return "직전 동일 기간 대비";
+    if(analyticsRange === "last_year") return "전년도 대비";
+    return `이전 ${days}일 대비`;
   }
 
   function startOfDay(date){
@@ -530,6 +556,7 @@
     syncAnalyticsPresetUi();
     const period = resolveAnalyticsPeriod();
     setText("#analyticsPeriodLabel", period.label);
+    setText("#analyticsCompareLabel", analyticsCompareLabel(period));
     setText("#analyticsTrendMeta", period.bucket === "month" ? "월별" : period.bucket === "week" ? "주별" : "일별");
     if(analyticsRange === "custom"){
       if($("#analyticsFrom") && !$("#analyticsFrom").value) $("#analyticsFrom").value=formatInputDate(period.from);
@@ -584,7 +611,7 @@
     });
     if(error){
       console.warn("BiteBoss access analytics:",error);
-      const empty='<div class="analytics-empty">접속 데이터를 불러오지 못했습니다. 82.19 접속 분석 SQL 배포 상태를 확인하세요.</div>';
+      const empty='<div class="analytics-empty">접속 데이터를 불러오지 못했습니다. 접속 분석 SQL 배포 상태를 확인하세요.</div>';
       tierBox.innerHTML=empty; surfaceBox.innerHTML=empty; recentBox.innerHTML=empty;
       return;
     }
@@ -776,7 +803,7 @@
   async function loadPartnerRequests(){
     const box = $("#partnerRequestList");
     if(!box) return;
-    const filter = String($("#partnerRequestFilter")?.value || "pending");
+    const filter = String(partnerRequestStatus || "pending");
     const statuses = ["pending", "approved", "rejected"];
     const [currentResult, ...countResults] = await Promise.all([
       adminRpc("biteboss_admin_partner_requests", {p_status: filter, p_limit: 1000}),

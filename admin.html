@@ -7,9 +7,9 @@
 <meta content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" name="viewport"/>
 <meta content="yes" name="mobile-web-app-capable"/>
 <title>BiteBoss Admin</title>
-<link href="./styles.css?v=82.19" rel="stylesheet"/>
-<link href="./admin.css?v=82.19" rel="stylesheet"/>
-<script src="./app-config.js?v=82.19"></script>
+<link href="./styles.css?v=82.20" rel="stylesheet"/>
+<link href="./admin.css?v=82.20" rel="stylesheet"/>
+<script src="./app-config.js?v=82.20"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="admin-app">
@@ -94,8 +94,11 @@
 <button class="secondary-btn" id="analyticsApplyCustom" type="button">적용</button>
 </div>
 <div class="analytics-compare-row">
-<strong id="analyticsPeriodLabel">최근 7일</strong>
-<select aria-label="비교 기준" class="input" id="analyticsCompareMode"><option value="previous">이전 기간 대비</option><option value="year">전년 동기 대비</option></select>
+<div class="analytics-period-copy"><strong id="analyticsPeriodLabel">최근 7일</strong><span id="analyticsCompareLabel">이전 7일 대비</span></div>
+<div class="analytics-compare-tabs" aria-label="성과 비교 기준">
+<button class="active" data-analytics-compare="previous" type="button">이전 기간</button>
+<button data-analytics-compare="year" type="button">전년 동기</button>
+</div>
 </div>
 </section>
 <section aria-label="핵심 성과" class="analytics-kpis">
@@ -205,8 +208,16 @@
 <section class="admin-page" id="admin-partner-requests">
 <div class="admin-page-head"><div><span class="eyebrow">매장</span><h2>제휴 신청</h2><p>매장 관리자 인증 신청을 확인합니다.</p></div></div><div class="admin-page-body">
 <section class="admin-section-card admin-page-section partner-request-section">
-<div class="partner-request-counters" id="partnerRequestCounters"><div><span>대기</span><strong id="partnerCountPending">0</strong></div><div><span>승인</span><strong id="partnerCountApproved">0</strong></div><div><span>반려</span><strong id="partnerCountRejected">0</strong></div></div>
-<div class="partner-request-toolbar"><label><span>상태</span><select class="input" id="partnerRequestFilter"><option value="pending">확인 대기</option><option value="approved">승인 완료</option><option value="rejected">반려</option><option value="all">전체</option></select></label><button class="secondary-btn admin-small-btn" id="refreshPartnerRequests" type="button">새로고침</button></div>
+<div class="partner-request-counters" id="partnerRequestCounters"><div><span>확인 대기</span><strong id="partnerCountPending">0</strong><small>검토 필요</small></div><div><span>승인 완료</span><strong id="partnerCountApproved">0</strong><small>누적 승인</small></div><div><span>반려</span><strong id="partnerCountRejected">0</strong><small>누적 반려</small></div></div>
+<div class="partner-request-toolbar">
+<div class="partner-request-filters" id="partnerRequestFilters" aria-label="제휴 신청 상태 필터">
+<button class="active" data-partner-filter="pending" type="button">확인 대기</button>
+<button data-partner-filter="approved" type="button">승인 완료</button>
+<button data-partner-filter="rejected" type="button">반려</button>
+<button data-partner-filter="all" type="button">전체</button>
+</div>
+<button class="secondary-btn admin-small-btn" id="refreshPartnerRequests" type="button">새로고침</button>
+</div>
 <div class="partner-request-list" id="partnerRequestList"></div>
 <nav aria-label="제휴 신청 페이지" class="list-pagination hidden" id="partnerRequestPagination"></nav>
 </section>
@@ -645,6 +656,6 @@
 </div>
 </section>
 </div>
-<script src="./admin.js?v=82.19"></script>
+<script src="./admin.js?v=82.20"></script>
 </body>
 </html>
