@@ -430,7 +430,7 @@ test('82.26 keeps PRO store-manager features visible but disabled for PARTNER st
 });
 
 
-test('82.30 benefit passes keep eligibility secure while removing duplicate pass copy and visual noise', () => {
+test('82.31 benefit passes keep eligibility secure while removing duplicate pass copy and visual noise', () => {
   const storeAdminHtml = read('store-admin.html');
   assert.match(html, /id="benefitPassScreen" class="benefit-pass-screen hidden"/);
   assert.match(html, /id="benefitPassClock"/);
@@ -456,4 +456,13 @@ test('82.30 benefit passes keep eligibility secure while removing duplicate pass
   assert.doesNotMatch(app, /label:"BOSS PASS"/);
   assert.doesNotMatch(app, /점령 인증 패스/);
   assert.doesNotMatch(app, /패스 보기/);
+});
+
+
+test('82.31 current territory ranking and territory store modal have no decorative arrows', () => {
+  assert.doesNotMatch(app, /territory-rank-result[\s\S]{0,220}<i[^>]*>→<\/i>/);
+  assert.doesNotMatch(app, /rank-territory-store-arrow/);
+  assert.doesNotMatch(css, /rank-territory-store-arrow/);
+  assert.match(css, /\.territory-rank-result\{display:block\}/);
+  assert.match(css, /\.rank-territory-store\{[^}]*display:block/);
 });
