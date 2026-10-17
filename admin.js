@@ -30,8 +30,8 @@
     "biteboss_admin_list_campaigns_v8217",
     "biteboss_admin_upsert_campaign_v8217",
     "biteboss_admin_delete_campaign_v8217",
-    "biteboss_admin_upsert_campaign_v8236",
-    "biteboss_admin_delete_campaign_v8236",
+    "biteboss_admin_upsert_campaign_v8237",
+    "biteboss_admin_delete_campaign_v8237",
     "biteboss_admin_ad_analytics_v8217",
     "biteboss_admin_ad_creative_analytics_v8217"
   ]);
@@ -3244,6 +3244,7 @@
     const status = $("#adCampaignStatus");
     const submit = form?.querySelector('button[type="submit"]');
     const id = String($("#adCampaignId")?.value || "").trim();
+    const campaignId = id || globalThis.crypto?.randomUUID?.();
     const previous = id ? adCampaigns.find(item => String(item.id) === id) : null;
     const file = $("#adImageFile")?.files?.[0] || null;
     const storeListFile = $("#adStoreListImageFile")?.files?.[0] || null;
@@ -3262,6 +3263,10 @@
 
     if(!startsRaw){
       setStatusText(status, "시작일시를 입력하세요.");
+      return;
+    }
+    if(!campaignId){
+      setStatusText(status, "캠페인 ID를 생성하지 못했습니다.");
       return;
     }
 
@@ -3306,8 +3311,8 @@
         form.dataset.primaryImageKind=usesStoreListFallback ? "store_list" : "home";
       }
 
-      const { data, error } = await adminRpc("biteboss_admin_upsert_campaign_v8236", {
-        p_id:id || null,
+      const { data, error } = await adminRpc("biteboss_admin_upsert_campaign_v8237", {
+        p_id:campaignId,
         p_advertiser_name:String($("#adAdvertiserName")?.value || "").trim(),
         p_campaign_name:String($("#adCampaignName")?.value || "").trim(),
         p_image_url:canonicalImageUrl,
@@ -3320,7 +3325,7 @@
       });
       if(error) throw error;
       if(!data?.ok) throw new Error(data?.error || "CAMPAIGN_SAVE_FAILED");
-      const savedCampaignId=String(data?.campaign_id || data?.id || data?.campaign?.id || id || "").trim();
+      const savedCampaignId=String(data?.campaign_id || data?.id || campaignId).trim();
       if(!savedCampaignId) throw new Error("CAMPAIGN_ID_NOT_RETURNED");
 
       // From this point the database may already reference the new asset.
@@ -3371,7 +3376,7 @@
     const uniquePaths=[...new Set(paths)];
 
     try{
-      const { data, error } = await adminRpc("biteboss_admin_delete_campaign_v8236", { p_campaign_id:item.id });
+      const { data, error } = await adminRpc("biteboss_admin_delete_campaign_v8237", { p_campaign_id:item.id });
       if(error) throw error;
       if(!data?.ok) throw new Error(data?.error || "CAMPAIGN_DELETE_FAILED");
 
