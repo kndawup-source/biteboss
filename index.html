@@ -10,7 +10,7 @@
   <meta property="og:title" content="BiteBoss" />
   <meta property="og:description" content="주변 매장을 발견하고 도전해 보스를 차지하세요." />
   <meta property="og:type" content="website" />
-  <meta name="biteboss-build" content="82.29" />
+  <meta name="biteboss-build" content="82.30" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -22,8 +22,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet" />
-  <link rel="manifest" href="/manifest.webmanifest?v=82.29" />
-  <link rel="stylesheet" href="/styles.css?v=82.29" />
+  <link rel="manifest" href="/manifest.webmanifest?v=82.30" />
+  <link rel="stylesheet" href="/styles.css?v=82.30" />
 </head>
 <body class="user-app home-active">
 <div id="app" class="app-shell">
@@ -252,23 +252,18 @@
   <button id="benefitPassClose" class="benefit-pass-close" type="button" aria-label="혜택 화면 닫기">&times;</button>
   <div class="benefit-pass-live" aria-hidden="true"><span></span>LIVE / VERIFIED</div>
   <div class="benefit-pass-stage">
-    <div class="benefit-pass-brand">BITEBOSS</div>
-    <div id="benefitPassRole" class="benefit-pass-role">BOSS BENEFIT</div>
-    <div id="benefitPassStore" class="benefit-pass-store">PARTNER STORE</div>
-    <h2 id="benefitPassTitle" class="benefit-pass-title">BENEFIT</h2>
+    <div id="benefitPassStore" class="benefit-pass-store">매장</div>
+    <h2 id="benefitPassTitle" class="benefit-pass-title">BOSS</h2>
     <p id="benefitPassDescription" class="benefit-pass-description hidden"></p>
+    <div id="benefitPassIdentity" class="benefit-pass-identity"></div>
     <div class="benefit-pass-proof" aria-label="실시간 인증 정보">
       <div><span>NOW</span><strong id="benefitPassClock">--:--:--</strong></div>
       <div><span>VALID</span><strong id="benefitPassCountdown">--:--</strong></div>
     </div>
-    <div id="benefitPassIdentity" class="benefit-pass-identity"></div>
-    <div class="benefit-pass-signal" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
   </div>
   <div class="benefit-pass-footer">
-    <p id="benefitPassInstruction">직원에게 이 실시간 화면을 보여주세요.</p>
-    <span>캡처본이 아닌 움직이는 LIVE 표시와 현재 시간을 확인해 주세요.</span>
-    <button id="benefitPassRetry" class="benefit-pass-retry hidden" type="button">혜택 다시 열기</button>
-    <small id="benefitPassCode"></small>
+    <p id="benefitPassInstruction">직원에게 이 화면을 보여주세요.</p>
+    <button id="benefitPassRetry" class="benefit-pass-retry hidden" type="button">다시 인증하기</button>
   </div>
 </section>
 
@@ -280,6 +275,6 @@
   </div>
 </div>
 
-<script src="/bootstrap.js?v=82.29"></script>
+<script src="/bootstrap.js?v=82.30"></script>
 </body>
 </html>
