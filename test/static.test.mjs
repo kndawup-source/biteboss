@@ -430,21 +430,30 @@ test('82.26 keeps PRO store-manager features visible but disabled for PARTNER st
 });
 
 
-test('82.28 benefit passes support partner offers and non-partner boss verification without promising discounts', () => {
+test('82.30 benefit passes keep eligibility secure while removing duplicate pass copy and visual noise', () => {
   const storeAdminHtml = read('store-admin.html');
   assert.match(html, /id="benefitPassScreen" class="benefit-pass-screen hidden"/);
   assert.match(html, /id="benefitPassClock"/);
   assert.match(html, /id="benefitPassCountdown"/);
+  assert.doesNotMatch(html, /benefit-pass-signal/);
+  assert.doesNotMatch(html, /id="benefitPassRole"/);
+  assert.doesNotMatch(html, /id="benefitPassCode"/);
   assert.match(app, /sb\.rpc\("biteboss_create_offer_pass"/);
   assert.match(app, /openBenefitPassScreen\(data, offerId\)/);
   assert.match(app, /ROLE_REQUIRED/);
   assert.match(css, /\.benefit-pass-screen\{position:fixed;z-index:1800;inset:0/);
+  assert.doesNotMatch(css, /benefitSignal/);
   assert.match(storeAdminHtml, /<option value="crew" selected>크루 \+ 보스<\/option>/);
   assert.match(app, /async function createDefaultBossPass\(storeId, storeName\)/);
   assert.match(app, /sb\.rpc\("biteboss_my_store_status",\{p_store_id:id\}\)/);
   assert.match(app, /data-default-benefit-store/);
+  assert.match(app, /data-default-benefit-name/);
+  assert.match(app, />인증하기<\/button>/);
   assert.match(app, /\$\$\("\[data-default-benefit-store\]", body\)\.forEach/);
   assert.match(app, /createDefaultBossPass\(\s*button\.dataset\.defaultBenefitStore,\s*button\.dataset\.defaultBenefitName\s*\)/s);
-  assert.match(app, /할인·서비스 제공 여부는 매장 정책에 따릅니다/);
+  assert.match(app, /혜택 제공 여부는 매장 정책에 따라 달라질 수 있습니다/);
   assert.match(app, /defaultBossPassEligible = !isPartner && \(isBoss \|\| isCrew\)/);
+  assert.doesNotMatch(app, /label:"BOSS PASS"/);
+  assert.doesNotMatch(app, /점령 인증 패스/);
+  assert.doesNotMatch(app, /패스 보기/);
 });
