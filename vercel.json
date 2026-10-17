@@ -36,8 +36,8 @@
       "destination": "/api/store-seo?id=:id&slug=:slug"
     },
     {
-      "source": "/store/:id",
-      "destination": "/api/store-seo?id=:id"
+      "source": "/store/:slug",
+      "destination": "/api/store-seo?slug=:slug"
     },
     {
       "source": "/sitemap.xml",

@@ -15,7 +15,7 @@ export default async function handler(req,res){
       return {...x,slug:String(seo?.slug || autoSlug(x.id))};
     }catch{return {...x,slug:autoSlug(x.id)};}
   }));
-  const items=enriched.map(x=>`<url><loc>${esc(`https://biteboss.kr/store/${encodeURIComponent(x.id)}/${encodeURIComponent(x.slug)}`)}</loc>${x.updated_at?`<lastmod>${esc(new Date(x.updated_at).toISOString())}</lastmod>`:""}</url>`).join("");
+  const items=enriched.map(x=>`<url><loc>${esc(`https://biteboss.dasaft.com/store/${encodeURIComponent(x.slug)}`)}</loc>${x.updated_at?`<lastmod>${esc(new Date(x.updated_at).toISOString())}</lastmod>`:""}</url>`).join("");
   res.setHeader("Content-Type","application/xml; charset=utf-8");
   res.setHeader("Cache-Control","public, s-maxage=3600, stale-while-revalidate=86400");
   res.status(200).send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${items}</urlset>`);

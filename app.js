@@ -403,7 +403,10 @@
 
     const initialStoreRoute=storeRouteFromPath(location.pathname);
     if(initialStoreRoute){
-      await openStoreDetail(initialStoreRoute.id,{historyMode:"replace",fromRoute:true});
+      const resolvedStoreRoute=await resolveStoreRoute(initialStoreRoute);
+      if(resolvedStoreRoute?.id){
+        await openStoreDetail(resolvedStoreRoute.id,{historyMode:"replace",fromRoute:true});
+      }
     }
 
     const initialPositionPromise = getPositionSafe(false, {
@@ -572,11 +575,14 @@
   function bindUi(){
     document.addEventListener("touchmove", blockHomeViewportScroll, { passive:false });
     document.addEventListener("wheel", blockHomeViewportScroll, { passive:false });
-    window.addEventListener("popstate", () => {
+    window.addEventListener("popstate", async () => {
       const storeRoute=storeRouteFromPath(location.pathname);
       if(storeRoute){
-        openStoreDetail(storeRoute.id,{historyMode:"replace",fromRoute:true});
-        return;
+        const resolvedStoreRoute=await resolveStoreRoute(storeRoute);
+        if(resolvedStoreRoute?.id){
+          openStoreDetail(resolvedStoreRoute.id,{historyMode:"replace",fromRoute:true});
+          return;
+        }
       }
       if(activeStoreDetailId) closeModal({restoreUrl:false});
       resetPublicSeoMeta();
@@ -716,17 +722,27 @@
     const id=String(store?.id || "").trim();
     if(!id) return "";
     const slug=String(seoSlug || store?.seo_slug || partnerStoreAutoSlug(id)).trim().toLowerCase();
-    return `/store/${encodeURIComponent(id)}/${encodeURIComponent(slug)}`;
+    return slug ? `/store/${encodeURIComponent(slug)}` : "";
   }
 
   function storeRouteFromPath(pathname=location.pathname){
-    const match=String(pathname || "").match(/^\/store\/([^/]+)(?:\/([^/?#]+))?\/?$/);
-    if(!match) return null;
+    const parts=String(pathname || "").match(/^\/store\/([^/]+)(?:\/([^/?#]+))?\/?$/);
+    if(!parts) return null;
     try{
-      return { id:decodeURIComponent(match[1]), slug:match[2] ? decodeURIComponent(match[2]) : "" };
-    }catch{
-      return null;
-    }
+      const first=decodeURIComponent(parts[1]);
+      const second=parts[2] ? decodeURIComponent(parts[2]) : "";
+      const legacyId=/^[0-9a-f-]{36}$/i.test(first) ? first : "";
+      return legacyId ? {id:legacyId,slug:second,legacy:true} : {id:"",slug:first.toLowerCase(),legacy:false};
+    }catch{return null;}
+  }
+
+  async function resolveStoreRoute(route){
+    if(route?.id) return route;
+    const slug=String(route?.slug || "").trim().toLowerCase();
+    if(!slug) return null;
+    const {data,error}=await sb.rpc("biteboss_store_resolve_slug",{p_slug:slug});
+    if(error || !data?.store_id) return null;
+    return {id:String(data.store_id),slug:String(data.slug || slug),legacy:false};
   }
 
   function syncPartnerStoreUrl(store, historyMode="push"){

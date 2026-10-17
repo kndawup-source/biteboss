@@ -379,7 +379,7 @@
   }
 
   function storePublicUrl(slug){
-    return currentStore?.id && slug ? `${location.origin}/store/${encodeURIComponent(currentStore.id)}/${encodeURIComponent(slug)}` : "";
+    return currentStore?.id && slug ? `${location.origin}/store/${encodeURIComponent(slug)}` : "";
   }
   async function loadStoreSeo(){
     if(!currentStore) return;

@@ -19,7 +19,7 @@ async function rpc(name, body){
 function page({store,photos=[],video={},seo={}}){
   const name=String(store.name || "매장");
   const publicSlug=String(seo?.slug || autoSlug(store.id));
-  const canonical=`https://biteboss.kr/store/${encodeURIComponent(store.id)}/${encodeURIComponent(publicSlug)}`;
+  const canonical=`https://biteboss.dasaft.com/store/${encodeURIComponent(publicSlug)}`;
   const place=[store.city,store.district].filter(Boolean).join(" ");
   const description=[place,store.category,store.notice].filter(Boolean).join(" · ").slice(0,155) || `${name}의 BiteBoss 매장 정보입니다.`;
   const cover=(photos.find(p=>p?.is_cover) || photos[0] || {}).image_url || "";
@@ -42,6 +42,7 @@ function page({store,photos=[],video={},seo={}}){
 export default async function handler(req,res){
   try{
     const id=String(req.query?.id || "").trim();
+    const requestedSlug=String(req.query?.slug || "").trim().toLowerCase();
     if(String(req.query?.app || "")==="1"){
       const origin=`${req.headers["x-forwarded-proto"] || "https"}://${req.headers.host}`;
       const shell=await fetch(`${origin}/index.html`,{headers:{"user-agent":"BiteBoss-Store-Shell/1.0"}});
@@ -49,14 +50,26 @@ export default async function handler(req,res){
       res.setHeader("Cache-Control","no-cache");
       return res.status(200).send(await shell.text());
     }
-    if(!/^[0-9a-f-]{36}$/i.test(id)) return res.status(404).send("Not found");
-    const detail=await rpc("biteboss_store_detail",{p_store_id:id});
+
+    let storeId=id;
+    let seo=null;
+    if(!storeId){
+      const resolved=await rpc("biteboss_store_resolve_slug",{p_slug:requestedSlug});
+      if(!resolved?.store_id) return res.status(404).send("Not found");
+      storeId=String(resolved.store_id);
+      seo={slug:String(resolved.slug || requestedSlug)};
+    }
+    if(!/^[0-9a-f-]{36}$/i.test(storeId)) return res.status(404).send("Not found");
+
+    const detail=await rpc("biteboss_store_detail",{p_store_id:storeId});
     const store=detail?.store;
     if(!store || store.status!=="active" || store.partnership_status!=="partnered") return res.status(404).send("Not found");
-    const seo=await rpc("biteboss_store_seo_settings",{p_store_id:id});
-    const canonicalSlug=String(seo?.slug || autoSlug(id));
-    const requestedSlug=String(req.query?.slug || "");
-    if(requestedSlug && requestedSlug!==canonicalSlug) return res.redirect(308,`/store/${encodeURIComponent(id)}/${encodeURIComponent(canonicalSlug)}`);
+    seo=seo || await rpc("biteboss_store_seo_settings",{p_store_id:storeId});
+    const canonicalSlug=String(seo?.slug || autoSlug(storeId));
+
+    if(id) return res.redirect(308,`/store/${encodeURIComponent(canonicalSlug)}`);
+    if(requestedSlug!==canonicalSlug) return res.redirect(308,`/store/${encodeURIComponent(canonicalSlug)}`);
+
     res.setHeader("Cache-Control","public, s-maxage=300, stale-while-revalidate=86400");
     res.status(200).send(page({store,photos:Array.isArray(detail.photos)?detail.photos:[],seo}));
   }catch(error){

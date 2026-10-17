@@ -1847,7 +1847,7 @@
 
   function adminStorePublicUrl(slug){
     if(!editingStoreId || !slug) return "";
-    return `${location.origin}/store/${encodeURIComponent(editingStoreId)}/${encodeURIComponent(slug)}`;
+    return `${location.origin}/store/${encodeURIComponent(slug)}`;
   }
   function renderAdminStoreSeo(seo){
     const input=$("#adminStoreSlug");
