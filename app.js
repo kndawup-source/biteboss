@@ -2531,32 +2531,27 @@
       const url=new URL(raw);
       const host=url.hostname.replace(/^www\./,"").toLowerCase();
       let id="";
-      let vertical=false;
       if(host==="youtu.be") id=url.pathname.split("/").filter(Boolean)[0] || "";
-      else if(host==="youtube.com" || host==="m.youtube.com" || host==="music.youtube.com"){
+      else if(["youtube.com","m.youtube.com","music.youtube.com"].includes(host)){
         const parts=url.pathname.split("/").filter(Boolean);
-        if(parts[0]==="shorts"){ id=parts[1] || ""; vertical=true; }
-        else if(parts[0]==="embed") id=parts[1] || "";
+        if(parts[0]==="shorts" || parts[0]==="embed") id=parts[1] || "";
         else id=url.searchParams.get("v") || "";
       }
       if(!/^[A-Za-z0-9_-]{6,20}$/.test(id)) return null;
-      return {id,vertical,thumbnail:`https://i.ytimg.com/vi/${id}/hqdefault.jpg`,embed:`https://www.youtube-nocookie.com/embed/${id}?autoplay=1&playsinline=1&rel=0`};
+      return {id,embed:`https://www.youtube-nocookie.com/embed/${id}?playsinline=1&rel=0`};
     }catch{return null;}
   }
 
-  function storeVideoMarkup(videoUrl,storeName){
-    const video=youtubeVideoMeta(videoUrl);
-    if(!video) return "";
-    return `<section class="store-detail-video-section ${video.vertical ? "is-vertical" : "is-landscape"}" aria-label="${escapeAttr(storeName || "매장")} 영상"><button class="store-video-player" type="button" data-youtube-play="${escapeAttr(video.id)}" data-youtube-embed="${escapeAttr(video.embed)}" aria-label="영상 재생"><img src="${escapeAttr(video.thumbnail)}" alt="" loading="lazy" decoding="async"/><span class="store-video-play" aria-hidden="true"></span></button></section>`;
-  }
-
-  function bindStoreVideoPlayers(root){
-    $$('[data-youtube-play]',root).forEach(button=>button.addEventListener("click",()=>{
-      const embed=String(button.dataset.youtubeEmbed || ""); if(!embed) return;
-      const iframe=document.createElement("iframe"); iframe.src=embed; iframe.title="YouTube video player";
-      iframe.allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"; iframe.allowFullscreen=true; iframe.referrerPolicy="strict-origin-when-cross-origin";
-      button.replaceWith(iframe);
-    },{once:true}));
+  function storeVideoMarkup(items,storeName){
+    const videos=(Array.isArray(items) ? items : [])
+      .map(item=>({item,meta:youtubeVideoMeta(item?.video_url)}))
+      .filter(entry=>entry.meta);
+    if(!videos.length) return "";
+    return `<section class="store-detail-video-gallery" aria-label="${escapeAttr(storeName || "매장")} 영상">
+      <div class="store-detail-video-track">
+        ${videos.map(({meta})=>`<div class="store-detail-video-slide"><iframe src="${escapeAttr(meta.embed)}" title="${escapeAttr(storeName || "매장")} YouTube 영상" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`).join("")}
+      </div>
+    </section>`;
   }
 
   function renderStoreDetail(data, options = {}){
@@ -2571,7 +2566,7 @@
     const growth = game.growth || {};
     const defenseActivity = game.defense_activity || {};
     const photos = Array.isArray(data.photos) ? data.photos : [];
-    const videoUrl = String(data.video?.video_url || "").trim();
+    const videos = Array.isArray(data.video?.videos) ? data.video.videos : [];
     const menu = Array.isArray(data.menu) ? data.menu : [];
     const offers = Array.isArray(offerAccess.offers)
       ? offerAccess.offers
@@ -2651,7 +2646,7 @@
             </figure>`).join("")}
         </div>
       </section>` : "";
-    const videoHtml = isPartner ? storeVideoMarkup(videoUrl, store.name) : "";
+    const videoHtml = isPartner ? storeVideoMarkup(videos, store.name) : "";
 
     const managerManagedStore = hasStoreManagerAccount(store, partnerRequest) || isPartner;
     const prioritizedMenu = [...menu].sort((a,b) => Number(Boolean(b?.is_signature)) - Number(Boolean(a?.is_signature)));
@@ -3028,7 +3023,6 @@
       </div>
     `;
 
-    bindStoreVideoPlayers(body);
     void renderStoreDetailMap(store);
     bindStoreComments(store.id);
 

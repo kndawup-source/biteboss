@@ -231,9 +231,10 @@
         <div class="store-section-head"><div><h3>영상</h3><p>YouTube 주소만 등록하면 매장 페이지에 바로 표시됩니다.</p></div></div>
         <form id="storeVideoForm" class="store-form compact">
           <label class="wide">YouTube 주소<input name="video_url" class="input" type="url" inputmode="url" placeholder="https://www.youtube.com/watch?v=..." /></label>
-          <div class="wide store-form-actions"><button class="primary-btn" type="submit">영상 저장</button><button id="storeVideoDelete" class="text-btn danger-text" type="button">영상 삭제</button></div>
+          <div class="wide store-form-actions"><button class="primary-btn" type="submit">영상 추가</button></div>
           <div id="storeVideoStatus" class="inline-status wide" aria-live="polite"></div>
         </form>
+        <div id="storeVideoList" class="store-video-admin-list"></div>
         <form id="storeSeoForm" class="store-form compact store-url-settings">
           <label class="wide">매장 고유주소<input name="slug" class="input" type="text" inputmode="url" autocomplete="off" placeholder="예: sample-store"/></label>
           <div id="storeUrlPreview" class="inline-status wide"></div>

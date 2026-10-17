@@ -236,7 +236,6 @@
     $("#adminStoreEditForm")?.addEventListener("submit", saveAdminStoreInfo);
     $("#adminPhotoForm")?.addEventListener("submit", addAdminStorePhoto);
     $("#adminVideoForm")?.addEventListener("submit", saveAdminStoreVideo);
-    $("#adminVideoDelete")?.addEventListener("click", deleteAdminStoreVideo);
     $("#adminStoreSlugSave")?.addEventListener("click", saveAdminStoreSlug);
     $("#adminStoreUrlCopy")?.addEventListener("click", copyAdminStoreUrl);
     bindAdminDateTimeControl("#adStartsAt", "#adStartsDate", "#adStartsTime");
@@ -1900,23 +1899,41 @@
   }
 
   function renderAdminVideo(video){
+    const rows=Array.isArray(video?.videos) ? video.videos : [];
     const input=$("#adminVideoUrl");
-    if(input) input.value=String(video?.video_url || "");
+    if(input) input.value="";
+    const box=$("#adminVideoList");
+    if(!box) return;
+    box.innerHTML=rows.map((item,index)=>`
+      <article class="admin-media-row">
+        <div><strong>영상 ${index+1}</strong><p>${escapeHtml(item.video_url || "")}</p></div>
+        <button class="text-btn danger-text" data-admin-delete-video="${escapeAttr(item.id)}" type="button">삭제</button>
+      </article>`).join("") || `<div class="admin-empty">등록된 영상이 없습니다.</div>`;
+    $$("[data-admin-delete-video]").forEach(button=>button.onclick=()=>deleteAdminStoreVideo(button.dataset.adminDeleteVideo));
   }
 
   async function saveAdminStoreVideo(event){
-    event.preventDefault(); if(!editingStoreId) return;
-    const url=String($("#adminVideoUrl")?.value || "").trim(); const status=$("#adminVideoStatus"); setStatusText(status,"저장 중…");
-    const {data,error}=await adminSb.rpc("biteboss_admin_set_store_video",{p_store_id:editingStoreId,p_video_url:url});
-    if(error || !data?.ok) return setStatusText(status,`저장 실패 · ${error?.message || data?.error || "다시 시도하세요."}`);
-    setStatusText(status,"영상이 저장되었습니다."); await reloadStoreEditor();
+    event.preventDefault();
+    if(!editingStoreId) return;
+    const url=String($("#adminVideoUrl")?.value || "").trim();
+    const status=$("#adminVideoStatus");
+    if(!url) return setStatusText(status,"YouTube 주소를 입력하세요.");
+    setStatusText(status,"추가 중…");
+    const {data,error}=await adminSb.rpc("biteboss_admin_add_store_video",{p_store_id:editingStoreId,p_video_url:url});
+    if(error || !data?.ok) return setStatusText(status,`추가 실패 · ${error?.message || data?.error || "다시 시도하세요."}`);
+    if($("#adminVideoUrl")) $("#adminVideoUrl").value="";
+    setStatusText(status,"영상이 추가되었습니다.");
+    await reloadStoreEditor();
   }
 
-  async function deleteAdminStoreVideo(){
-    if(!editingStoreId) return; const status=$("#adminVideoStatus"); setStatusText(status,"삭제 중…");
-    const {data,error}=await adminSb.rpc("biteboss_admin_set_store_video",{p_store_id:editingStoreId,p_video_url:""});
+  async function deleteAdminStoreVideo(videoId){
+    if(!editingStoreId || !videoId) return;
+    const status=$("#adminVideoStatus");
+    setStatusText(status,"삭제 중…");
+    const {data,error}=await adminSb.rpc("biteboss_admin_delete_store_video",{p_store_id:editingStoreId,p_video_id:videoId});
     if(error || !data?.ok) return setStatusText(status,`삭제 실패 · ${error?.message || data?.error || "다시 시도하세요."}`);
-    if($("#adminVideoUrl")) $("#adminVideoUrl").value=""; setStatusText(status,"영상이 삭제되었습니다."); await reloadStoreEditor();
+    setStatusText(status,"영상이 삭제되었습니다.");
+    await reloadStoreEditor();
   }
 
   function renderAdminPhotos(rows){
