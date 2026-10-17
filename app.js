@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.31";
+  const BITEBOSS_BUILD = "82.32";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -5932,6 +5932,8 @@ await handleClaimParam();
     };
     const area = [target.city,target.district].filter(Boolean).join(" ") || "현재 점령 지역";
     const organizationName = target.organizationName || "크루";
+    const TERRITORY_STORE_PAGE_SIZE = 10;
+    let territoryStorePage = 1;
 
     openModal(area, `
       <div class="rank-territory-detail">
@@ -5940,6 +5942,7 @@ await handleClaimParam();
           <strong>현재 점령 매장</strong>
         </div>
         <div class="rank-territory-store-list"><div class="app-state">점령 매장을 불러오는 중…</div></div>
+        <nav class="list-pagination rank-territory-pagination hidden" aria-label="현재 점령 매장 페이지"></nav>
       </div>
     `);
 
@@ -5953,28 +5956,46 @@ await handleClaimParam();
       return;
     }
 
-    const list = $(".rank-territory-store-list", $("#modalBody"));
-    if(!list) return;
-    list.innerHTML = rows.length ? rows.map(row => {
-      const protectedNow = Boolean(row.protected_until && new Date(row.protected_until).getTime() > Date.now());
-      const status = protectedNow ? `보호 ${formatRemaining(row.protected_until)} 남음` : "도전 가능";
-      return `
-        <button class="rank-territory-store" type="button" data-territory-store="${escapeAttr(row.store_id || "")}">
-          <span class="rank-territory-store-copy">
-            <strong>${escapeHtml(row.store_name || "매장")}</strong>
-            <small>${escapeHtml(row.boss_name || "보스")} · 방어력 ${Number(row.boss_defense || 0)} · ${escapeHtml(status)}</small>
-          </span>
-        </button>`;
-    }).join("") : `<div class="app-state">현재 점령 중인 매장이 없습니다.</div>`;
+    const body = $("#modalBody");
+    const list = $(".rank-territory-store-list", body);
+    const nav = $(".rank-territory-pagination", body);
+    const head = $(".rank-territory-detail-head", body);
+    if(!list || !nav) return;
 
-    $$('[data-territory-store]', list).forEach(button => {
-      button.addEventListener("click", async () => {
-        const storeId = String(button.dataset.territoryStore || "").trim();
-        if(!storeId) return;
-        closeModal();
-        await openStoreDetail(storeId);
+    const bindStoreRows = () => {
+      $$('[data-territory-store]', list).forEach(button => {
+        button.addEventListener("click", async () => {
+          const storeId = String(button.dataset.territoryStore || "").trim();
+          if(!storeId) return;
+          closeModal();
+          await openStoreDetail(storeId);
+        });
       });
-    });
+    };
+
+    const renderTerritoryStorePage = () => {
+      const slice = pageSlice(rows, territoryStorePage, TERRITORY_STORE_PAGE_SIZE);
+      territoryStorePage = slice.page;
+      list.innerHTML = slice.rows.length ? slice.rows.map(row => {
+        const protectedNow = Boolean(row.protected_until && new Date(row.protected_until).getTime() > Date.now());
+        const status = protectedNow ? `보호 ${formatRemaining(row.protected_until)} 남음` : "도전 가능";
+        return `
+          <button class="rank-territory-store" type="button" data-territory-store="${escapeAttr(row.store_id || "")}">
+            <span class="rank-territory-store-copy">
+              <strong>${escapeHtml(row.store_name || "매장")}</strong>
+              <small>${escapeHtml(row.boss_name || "보스")} · 방어력 ${Number(row.boss_defense || 0)} · ${escapeHtml(status)}</small>
+            </span>
+          </button>`;
+      }).join("") : `<div class="app-state">현재 점령 중인 매장이 없습니다.</div>`;
+      bindStoreRows();
+      renderPagination(nav, territoryStorePage, rows.length, TERRITORY_STORE_PAGE_SIZE, nextPage => {
+        territoryStorePage = nextPage;
+        renderTerritoryStorePage();
+        head?.scrollIntoView?.({block:"nearest"});
+      });
+    };
+
+    renderTerritoryStorePage();
   }
 
   async function loadTerritoryMap(){
