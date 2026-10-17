@@ -37,7 +37,7 @@
     },
     {
       "source": "/store/:slug",
-      "destination": "/api/store-seo?slug=:slug"
+      "destination": "/index.html"
     },
     {
       "source": "/sitemap.xml",
