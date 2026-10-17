@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.28";
+  const BITEBOSS_BUILD = "82.29";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -3497,6 +3497,12 @@ await handleClaimParam();
 
     $$("[data-benefit-offer]", body).forEach(button => {
       button.addEventListener("click", () => createBenefitPass(button.dataset.benefitOffer));
+    });
+    $$("[data-default-benefit-store]", body).forEach(button => {
+      button.addEventListener("click", () => createDefaultBossPass(
+        button.dataset.defaultBenefitStore,
+        button.dataset.defaultBenefitName
+      ));
     });
   }
 
