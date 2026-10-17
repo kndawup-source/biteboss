@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.79";
+  const BITEBOSS_BUILD = "81.84";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -2284,6 +2284,7 @@
       const offerPromise=sb.rpc("biteboss_store_offer_access",{p_store_id:storeId});
       const videoPromise=sb.rpc("biteboss_store_video",{p_store_id:storeId});
       const seoPromise=sb.rpc("biteboss_store_seo_settings",{p_store_id:storeId});
+      const planPromise=sb.rpc("biteboss_store_plan",{p_store_id:storeId});
       const secondaryPromise=Promise.all([
         playerSession?.authenticated && options?.showStoreManagerCard!==false
           ? sb.rpc("biteboss_partner_request_status",{p_store_id:storeId})
@@ -2292,8 +2293,8 @@
         sb.rpc("biteboss_store_game_board_v631",{p_store_id:storeId}),
         sb.rpc("biteboss_store_history_v71",{p_store_id:storeId,p_limit:12})
       ]);
-      const [detailResult,statusResult,orgResult,offerResult,videoResult,seoResult]=await Promise.all([
-        detailPromise,statusPromise,orgPromise,offerPromise,videoPromise,seoPromise
+      const [detailResult,statusResult,orgResult,offerResult,videoResult,seoResult,planResult]=await Promise.all([
+        detailPromise,statusPromise,orgPromise,offerPromise,videoPromise,seoPromise,planPromise
       ]);
       if(detailResult.error) throw detailResult.error;
       if(!detailResult.data?.store) throw new Error("STORE_NOT_FOUND");
@@ -2308,6 +2309,7 @@
       data.offerAccess=offerResult.error ? null : (offerResult.data || null);
       data.video=videoResult?.error ? null : (videoResult.data || null);
       data.seo=seoResult?.error ? null : (seoResult.data || null);
+      data.plan=planResult?.error ? null : (planResult.data || null);
       data.partnerRequest=null; data.publicGrowth=null; data.arena=null; data.history=[];
       const cachedReclaim=getCachedStoreReclaimState(storeId);
       data.reclaim=cachedReclaim?.data || deriveOptimisticStoreReclaimState([],String(data.game?.my_role||"visitor")==="boss");
@@ -2585,6 +2587,8 @@
       ? offerAccess.offers
       : (Array.isArray(data.offers) ? data.offers.filter(item => item.status === "active") : []);
     const isPartner = String(store.partnership_status || "unclaimed") === "partnered";
+    const storePlan=String(data.plan?.plan || "partner");
+    const isProStore=isPartner && storePlan==="pro";
     if(isPartner){
       const seoSlug=String(data.seo?.slug || store.seo_slug || "").trim();
       syncPartnerStoreUrl({...store,seo_slug:seoSlug}, options.historyMode || (options.fromRoute ? "replace" : "push"));
@@ -2758,6 +2762,7 @@
       relationshipBadge,
       opportunityBadge,
       isPartner ? {label:"제휴",cls:"partner"} : null,
+      isProStore ? {label:"PRO",cls:"pro"} : null,
       offers.length ? {label:"혜택",cls:"benefit"} : null
     ].filter(Boolean);
 

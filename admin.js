@@ -15,13 +15,14 @@
           detectSessionInUrl:false,
           storageKey:"biteboss-admin-auth"
         },
-        global:{ headers:{ "x-client-info":"biteboss-admin-web/76.6" } }
+        global:{ headers:{ "x-client-info":"biteboss-admin-web/81.84" } }
       })
     : null;
 
   let session = null;
   let admin = null;
   let stores = [];
+  const storePlanMap = new Map();
   let appConfig = {};
   const activationCodes = new Map();
   let editingStoreId = null;
@@ -247,6 +248,7 @@
     bindAdminDateTimeControl("#adEndsAt", "#adEndsDate", "#adEndsTime");
     $("#adminMenuForm")?.addEventListener("submit", saveAdminMenu);
     $("#adminOfferForm")?.addEventListener("submit", saveAdminOffer);
+    $("#adminStorePlanForm")?.addEventListener("submit", saveAdminStorePlan);
     $("#adminPartnerPromotionForm")?.addEventListener("submit", saveAdminPartnerPromotion);
     $("#adminPartnerBannerEnabled")?.addEventListener("change", () => {
       if(!editingStoreBundle?.store) return;
@@ -821,6 +823,11 @@
     }
 
     stores = allStores;
+    const planResult=await adminSb.rpc("biteboss_admin_store_plans");
+    storePlanMap.clear();
+    if(!planResult.error && planResult.data?.ok){
+      (planResult.data.plans || []).forEach(item=>storePlanMap.set(String(item.store_id),item));
+    }
     renderStores();
     await renderQr();
   }
@@ -888,7 +895,8 @@
     const partnerBannerIds = normalizedPartnerBannerIds();
     const filtered = stores.filter(store => {
       const isPartner = String(store.partnership_status || "") === "partnered";
-      const bannerEnabled = partnerBannerIds.includes(String(store.id));
+      const plan=storePlanMap.get(String(store.id))?.plan || (isPartner ? "partner" : "none");
+      const bannerEnabled = plan==="pro" && partnerBannerIds.includes(String(store.id));
       if(adminStoreFilter === "partner" && !isPartner) return false;
       if(adminStoreFilter === "banner" && !bannerEnabled) return false;
       if(!query) return true;
@@ -906,20 +914,21 @@
 
     box.innerHTML = pageRows.map(store => {
       const isPartner = store.partnership_status === "partnered";
-      const bannerEnabled = partnerBannerIds.includes(String(store.id));
+      const plan=storePlanMap.get(String(store.id))?.plan || (isPartner ? "partner" : "none");
+      const bannerEnabled = plan==="pro" && partnerBannerIds.includes(String(store.id));
       const location = [store.city, store.district].filter(Boolean).join(" ") || "지역 미등록";
       return `
         <article class="admin-store-row">
           <div class="admin-store-summary">
             <div class="admin-store-thumb-wrap">${store.photo_url ? `<img class="admin-store-thumb" src="${escapeAttr(store.photo_url)}" alt="" loading="lazy" decoding="async" />` : `<span class="admin-store-thumb admin-store-thumb-empty" aria-hidden="true">${escapeHtml(storeInitial(store.name))}</span>`}</div>
             <div class="admin-store-copy">
-              <div class="admin-store-title-line"><strong>${escapeHtml(store.name)}</strong><span class="partner-badge ${partnershipClass(store.partnership_status)}">${escapeHtml(partnershipLabel(store.partnership_status))}</span>${(() => { const state = bannerOperationalState(store, bannerEnabled); return `<span class="admin-banner-state ${state.className}">${escapeHtml(state.label)}</span>`; })()}</div>
+              <div class="admin-store-title-line"><strong>${escapeHtml(store.name)}</strong><span class="partner-badge ${partnershipClass(store.partnership_status)}">${escapeHtml(partnershipLabel(store.partnership_status))}</span>${isPartner ? `<span class="store-plan-badge ${plan==="pro" ? "is-pro" : ""}">${plan==="pro" ? "PRO" : "PARTNER"}</span>` : ""}${(() => { const state = bannerOperationalState(store, bannerEnabled); return `<span class="admin-banner-state ${state.className}">${escapeHtml(state.label)}</span>`; })()}</div>
               <p>${escapeHtml(location)} · ${escapeHtml(categoryLabel(store.category))}</p>
             </div>
           </div>
           <div class="admin-store-actions">
             <button class="secondary-btn admin-store-edit-btn admin-action-btn" data-edit-store="${escapeAttr(store.id)}" type="button">매장 수정</button>
-            <button class="secondary-btn admin-banner-toggle admin-action-btn ${bannerEnabled ? "is-on" : ""}" data-banner-store="${escapeAttr(store.id)}" data-banner-enabled="${bannerEnabled ? "true" : "false"}" type="button">${bannerEnabled ? "배너 끄기" : "배너 켜기"}</button>
+            <button class="secondary-btn admin-banner-toggle admin-action-btn ${bannerEnabled ? "is-on" : ""}" data-banner-store="${escapeAttr(store.id)}" data-banner-enabled="${bannerEnabled ? "true" : "false"}" type="button" ${isPartner && plan!=="pro" ? `disabled title="PRO 플랜에서 사용할 수 있습니다."` : ""}>${isPartner && plan!=="pro" ? "PRO 전용 배너" : (bannerEnabled ? "배너 끄기" : "배너 켜기")}</button>
             ${isPartner
               ? `<a class="secondary-btn admin-action-btn" href="./store-admin.html">매장 어드민</a>`
               : `<button class="secondary-btn admin-action-btn" data-partner-store="${escapeAttr(store.id)}" type="button">제휴 전환</button>`}
@@ -1585,13 +1594,15 @@
     resetAdminOfferForm();
 
     try{
-      const [{ data, error }, videoResult, seoResult] = await Promise.all([
+      const [{ data, error }, videoResult, seoResult, planResult] = await Promise.all([
         adminSb.rpc("biteboss_admin_store_detail", { p_store_id:storeId }),
-        adminSb.rpc("biteboss_admin_store_video", { p_store_id:storeId })
+        adminSb.rpc("biteboss_admin_store_video", { p_store_id:storeId }),
+        adminSb.rpc("biteboss_store_seo_settings", { p_store_id:storeId }),
+        adminSb.rpc("biteboss_admin_store_plan", { p_store_id:storeId })
       ]);
       if(error) throw error;
       if(!data?.ok) throw new Error(data?.error || "STORE_LOAD_FAILED");
-      editingStoreBundle = { ...data, video:videoResult.error ? null : (videoResult.data || null), seo:seoResult?.error ? null : (seoResult?.data || null) };
+      editingStoreBundle = { ...data, video:videoResult.error ? null : (videoResult.data || null), seo:seoResult?.error ? null : (seoResult?.data || null), plan:planResult?.error ? null : (planResult?.data?.plan || null) };
       renderAdminStoreEditor();
     }catch(error){
       console.error(error);
@@ -1678,6 +1689,7 @@
     renderAdminPhotos(bundle.photos || []);
     renderAdminVideo(bundle.video || null);
     renderAdminStoreSeo(bundle.seo || null);
+    renderAdminStorePlan(store,bundle.plan || null);
     renderAdminMenu(bundle.menu || []);
     renderAdminOffers(bundle.offers || []);
     renderAdminPartnerPromotion(store);
@@ -1717,15 +1729,68 @@
 
   async function reloadStoreEditor(){
     if(!editingStoreId) return;
-    const [{ data, error }, videoResult, seoResult] = await Promise.all([
+    const [{ data, error }, videoResult, seoResult, planResult] = await Promise.all([
       adminSb.rpc("biteboss_admin_store_detail", { p_store_id:editingStoreId }),
       adminSb.rpc("biteboss_admin_store_video", { p_store_id:editingStoreId }),
-      adminSb.rpc("biteboss_store_seo_settings", { p_store_id:editingStoreId })
+      adminSb.rpc("biteboss_store_seo_settings", { p_store_id:editingStoreId }),
+      adminSb.rpc("biteboss_admin_store_plan", { p_store_id:editingStoreId })
     ]);
     if(error) throw error;
     if(!data?.ok) throw new Error(data?.error || "STORE_LOAD_FAILED");
-    editingStoreBundle = { ...data, video:videoResult.error ? null : (videoResult.data || null), seo:seoResult?.error ? null : (seoResult?.data || null) };
+    editingStoreBundle = { ...data, video:videoResult.error ? null : (videoResult.data || null), seo:seoResult?.error ? null : (seoResult?.data || null), plan:planResult?.error ? null : (planResult?.data?.plan || null) };
     renderAdminStoreEditor();
+  }
+
+  function renderAdminStorePlan(store={},planData=null){
+    const section=$("#adminStorePlanSection");
+    if(!section) return;
+    const partnered=String(store.partnership_status || "")==="partnered";
+    section.classList.toggle("hidden",!partnered);
+    if(!partnered) return;
+    const plan=String(planData?.plan || storePlanMap.get(String(store.id))?.plan || "partner");
+    const select=$("#adminStorePlanSelect");
+    if(select) select.value=plan==="pro" ? "pro" : "partner";
+    const expires=$("#adminStorePlanExpires");
+    if(expires) expires.value=planData?.expires_at ? String(planData.expires_at).slice(0,10) : "";
+    const badge=$("#adminStorePlanBadge");
+    if(badge){
+      badge.textContent=plan==="pro" ? "PRO" : "PARTNER";
+      badge.classList.toggle("is-pro",plan==="pro");
+    }
+    const promo=$("#adminPartnerPromotionSection");
+    promo?.classList.toggle("is-plan-locked",plan!=="pro");
+    const bannerSelect=$("#adminPartnerBannerEnabled");
+    if(bannerSelect) bannerSelect.disabled=plan!=="pro";
+  }
+
+  async function saveAdminStorePlan(event){
+    event.preventDefault();
+    if(!editingStoreId) return;
+    const plan=String($("#adminStorePlanSelect")?.value || "partner");
+    const expiresRaw=String($("#adminStorePlanExpires")?.value || "").trim();
+    const expires=plan==="pro" && expiresRaw ? `${expiresRaw}T23:59:59+09:00` : null;
+    const status=$("#adminStorePlanStatus");
+    const button=event.currentTarget.querySelector('button[type="submit"]');
+    if(button) button.disabled=true;
+    setStatusText(status,"저장 중…");
+    try{
+      const {data,error}=await adminSb.rpc("biteboss_admin_set_store_plan",{p_store_id:editingStoreId,p_plan:plan,p_expires_at:expires});
+      if(error || !data?.ok) throw error || new Error(data?.error || "PLAN_SAVE_FAILED");
+
+      // Downgrading immediately removes paid banner exposure.
+      if(plan!=="pro"){
+        const banners=normalizedPartnerBanners().filter(item=>item.id!==String(editingStoreId));
+        const syncResult=await adminSb.from("biteboss_app_config").upsert([{
+          key:"partner_banners",value:banners,updated_by:session.user.id,updated_at:new Date().toISOString()
+        }],{onConflict:"key"});
+        if(syncResult.error) throw syncResult.error;
+        await loadConfig();
+      }
+      setStatusText(status,plan==="pro" ? "PRO 플랜이 적용되었습니다." : "PARTNER 플랜이 적용되었습니다.");
+      await Promise.all([reloadStoreEditor(),loadStores()]);
+    }catch(error){
+      setStatusText(status,`저장 실패 · ${error?.message || "다시 시도하세요."}`);
+    }finally{ if(button) button.disabled=false; }
   }
 
   function normalizedPartnerBanners(){
@@ -1754,9 +1819,13 @@
     if(!section) return;
     section.classList.remove("hidden");
 
-    const banner = bannerConfigForStore(store);
+    const plan=String(editingStoreBundle?.plan?.plan || storePlanMap.get(String(store.id))?.plan || "partner");
+    const isPro=plan==="pro";
+    const banner = isPro ? bannerConfigForStore(store) : null;
     const enabled = Boolean(banner);
+    section.classList.toggle("is-plan-locked",!isPro);
     $("#adminPartnerBannerEnabled").value = enabled ? "true" : "false";
+    $("#adminPartnerBannerEnabled").disabled = !isPro;
     $("#adminPartnerBannerDistance").value = String(banner?.distance_km ?? 5);
     $("#adminPartnerBannerPriority").value = String(banner?.priority ?? 3);
     const defaultCopy = String(store.partnership_status || "") === "partnered"
@@ -1777,6 +1846,11 @@
     event.preventDefault();
     if(!editingStoreId || !editingStoreBundle?.store) return;
     const store = editingStoreBundle.store;
+    const plan=String(editingStoreBundle?.plan?.plan || storePlanMap.get(String(store.id))?.plan || "partner");
+    if(plan!=="pro"){
+      setStatusText($("#adminPartnerPromotionStatus"),"추천 배너는 PRO 플랜에서 사용할 수 있습니다.");
+      return;
+    }
     const enabled = $("#adminPartnerBannerEnabled")?.value === "true";
     const copyText = String($("#adminPartnerBannerCopy")?.value || "").trim();
     const distanceValue = String($("#adminPartnerBannerDistance")?.value || "5");

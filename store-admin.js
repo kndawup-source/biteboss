@@ -15,7 +15,7 @@
           detectSessionInUrl:false,
           storageKey:"biteboss-store-auth"
         },
-        global:{ headers:{ "x-client-info":"biteboss-store-admin-web/81.79" } }
+        global:{ headers:{ "x-client-info":"biteboss-store-admin-web/81.84" } }
       })
     : null;
 
@@ -23,6 +23,7 @@
   let storeAccount = null;
   let accessibleStores = [];
   let currentStore = null;
+  let currentStorePlan = { plan:"partner", label:"PARTNER", features:{} };
   let currentRole = null;
   let snapshot = {};
   let activeQr = null;
@@ -271,13 +272,15 @@
     currentStore = fresh.data;
     accessibleStores = accessibleStores.map(store => store.id === currentStore.id ? currentStore : store);
 
-    const [snapshotResult] = await Promise.all([
+    const [snapshotResult,planResult] = await Promise.all([
       storeSb.rpc("biteboss_store_snapshot", { p_store_id:currentStore.id }),
+      storeSb.rpc("biteboss_store_plan", { p_store_id:currentStore.id }),
       loadPhotos(), loadStoreVideo(), loadStoreSeo(), loadMenu(), loadOffers(), loadQr(), loadActivity()
     ]);
 
     if(snapshotResult.error) throw snapshotResult.error;
     snapshot = snapshotResult.data || {};
+    currentStorePlan = planResult.error ? {plan:"partner",label:"PARTNER",features:{}} : (planResult.data || {plan:"partner",label:"PARTNER",features:{}});
     renderOverview();
     renderStoreForm();
     renderBoss();
@@ -292,6 +295,21 @@
     setText("#storeMetricCheckins", snapshot.checkins || 0);
     setText("#storeMetricExpire", snapshot.protected_until ? formatRemaining(snapshot.protected_until) : "-");
     setText("#storeMetricPartner", partnershipLabel(currentStore.partnership_status));
+    const plan=String(currentStorePlan?.plan || "partner");
+    const isPro=plan==="pro";
+    setText("#storePlanName",isPro ? "PRO" : "PARTNER");
+    setText("#storePlanBadge",isPro ? "PRO" : "PARTNER");
+    setText("#storePlanDescription",isPro
+      ? "추천 노출과 상세 성과 분석을 사용할 수 있습니다."
+      : "매장 관리·혜택·사진·영상·고유주소와 기본 통계를 사용할 수 있습니다.");
+    $("#storePlanBadge")?.classList.toggle("is-pro",isPro);
+    $("#storePlanCard")?.classList.toggle("is-pro",isPro);
+    $("#storeAdminApp")?.classList.toggle("store-plan-pro",isPro);
+    $("#storeAdminApp")?.classList.toggle("store-plan-partner",!isPro);
+    ["#impactUnique","#impactNew","#impactRepeat","#impactBenefits"].forEach(selector=>{
+      const el=$(selector);
+      if(el && !isPro) el.textContent="—";
+    });
 
     const card = $("#storeBossCard");
     if(card){

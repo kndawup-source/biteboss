@@ -69,6 +69,13 @@ body.store-admin-app{min-height:100dvh;background:#f1f1f3;color:#111}
   .today-actions{grid-template-columns:1fr}.today-actions .text-btn{grid-column:1}.store-impact-grid{grid-template-columns:1fr 1fr}.benefit-pass-form{grid-template-columns:1fr}.benefit-pass-form .secondary-btn{width:100%}
 }
 
-.store-ad-performance{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 16px;border-top:1px solid #ececef}
-.store-ad-performance article{padding:13px 0;border-bottom:1px solid #ececef}.store-ad-performance span,.store-ad-performance small{display:block;color:#96969c;font-size:9px}.store-ad-performance strong{display:block;margin:6px 0;font-size:23px;font-weight:950}.store-ad-mini-bars{grid-column:1/-1;height:130px;display:flex;align-items:flex-end;gap:5px;padding:14px 0;border-bottom:1px solid #ececef}.store-ad-mini-bars i{flex:1;min-width:4px;background:#111;border-radius:2px 2px 0 0}
-@media(min-width:720px){.store-ad-performance{grid-template-columns:repeat(5,minmax(0,1fr))}}
+/* 81.84 PARTNER / PRO */
+.store-admin-app .store-plan-card{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin:0 0 14px;padding:16px;border:1px solid #ececef;border-radius:16px;background:#fff}
+.store-admin-app .store-plan-card>div{min-width:0}
+.store-admin-app .store-plan-card>div>span{display:block;color:#999;font-size:9px;font-weight:800}
+.store-admin-app .store-plan-card strong{display:block;margin-top:5px;font-size:18px;line-height:1;font-weight:950}
+.store-admin-app .store-plan-card p{margin:7px 0 0;color:#777;font-size:10px;line-height:1.45}
+.store-admin-app .store-plan-badge{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;height:26px;padding:0 9px;border-radius:8px;background:#f0f0f2;color:#777;font-size:9px;font-weight:950}
+.store-admin-app .store-plan-badge.is-pro{background:#111;color:#fff}
+.store-admin-app.store-plan-partner .store-impact-grid>div:not(:first-child){background:#f7f7f8}
+.store-admin-app.store-plan-partner .store-impact-grid>div:not(:first-child) small{visibility:hidden}

@@ -524,3 +524,6 @@ body.biteboss-info-page{min-height:100dvh;background:var(--bg);color:#111}.info-
   .store-url-settings .store-form-actions,.store-url-settings .admin-form-actions{width:100%;min-width:0}
   .store-url-settings .asset-status,.store-url-settings .inline-status{overflow-wrap:anywhere;word-break:break-word}
 }
+
+/* 81.84 public PRO badge */
+.store-status-tag.pro{background:#111;color:#fff;border-color:#111;font-weight:900;letter-spacing:.04em}

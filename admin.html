@@ -7,9 +7,9 @@
 <meta content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" name="viewport"/>
 <meta content="yes" name="mobile-web-app-capable"/>
 <title>BiteBoss Admin</title>
-<link href="./styles.css?v=81.79" rel="stylesheet"/>
-<link href="./admin.css?v=81.83" rel="stylesheet"/>
-<script src="./app-config.js?v=81.79"></script>
+<link href="./styles.css?v=81.84" rel="stylesheet"/>
+<link href="./admin.css?v=81.84" rel="stylesheet"/>
+<script src="./app-config.js?v=81.84"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="admin-app">
@@ -486,6 +486,20 @@
 <p aria-live="polite" class="asset-status wide" id="adminStoreEditStatus"></p>
 </form>
 </section>
+<section class="admin-edit-section hidden" id="adminStorePlanSection">
+<div class="section-head"><div><h3>매장 플랜</h3><p>게임 밸런스와 무관한 마케팅·분석 기능만 차등 적용합니다.</p></div><span id="adminStorePlanBadge" class="store-plan-badge">PARTNER</span></div>
+<form class="form-grid admin-form compact-admin-form" id="adminStorePlanForm">
+<label>플랜<select class="input" id="adminStorePlanSelect"><option value="partner">PARTNER · 무료</option><option value="pro">PRO · 마케팅</option></select></label>
+<label>PRO 만료일<input class="input" id="adminStorePlanExpires" type="date"/></label>
+<div class="wide store-plan-feature-grid">
+<div><strong>PARTNER</strong><span>매장 관리 · 메뉴/사진/영상 · 혜택 · 고유주소 · 기본 통계</span></div>
+<div><strong>PRO</strong><span>추천 배너 · 지역 우선 노출 · 상세 성과 분석 · 캠페인 기능</span></div>
+</div>
+<p class="field-help wide">PRO는 점령 Power·방어력·랭킹에 영향을 주지 않습니다.</p>
+<div class="admin-form-actions wide"><button class="secondary-btn" type="submit">플랜 저장</button></div>
+<p aria-live="polite" class="asset-status wide" id="adminStorePlanStatus"></p>
+</form>
+</section>
 <section class="admin-edit-section hidden" id="adminPartnerPromotionSection">
 <div class="section-head"><h3>매장 노출</h3><span>도전 페이지 배너</span></div>
 <form class="form-grid admin-form compact-admin-form" id="adminPartnerPromotionForm">
@@ -560,6 +574,6 @@
 </div>
 </section>
 </div>
-<script src="./admin.js?v=81.79"></script>
+<script src="./admin.js?v=81.84"></script>
 </body>
 </html>
