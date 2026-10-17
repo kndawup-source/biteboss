@@ -530,7 +530,7 @@ test('82.43 ad performance drills down from overall to campaign to creative', ()
 });
 
 
-test('82.45 app notice supports an optional tappable external link', () => {
+test('82.46 app notice supports an optional tappable external link', () => {
   const adminHtml = read('admin.html');
   const adminJs = read('admin.js');
   const appJs = read('app.js');
@@ -545,4 +545,10 @@ test('82.45 app notice supports an optional tappable external link', () => {
   assert.match(appJs, /is-guide is-linked/);
   assert.match(appJs, /noopener noreferrer/);
   assert.match(styles, /is-guide\.is-linked/);
+});
+
+test('public app config schema includes app notice link so saved URL is hydrated', () => {
+  assert.match(app, /first_capture_guide_link_url:\s*""/);
+  assert.match(app, /Object\.keys\(config\)\.forEach\(key\s*=>\s*\{/);
+  assert.match(app, /config\.first_capture_guide_link_url/);
 });

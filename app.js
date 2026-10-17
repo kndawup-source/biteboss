@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.45";
+  const BITEBOSS_BUILD = "82.46";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -159,6 +159,7 @@
     first_capture_guide_icon:"💡",
     first_capture_guide_title:"첫 점령 가이드",
     first_capture_guide_body:"가까운 미점령 매장부터 시작해 보세요.",
+    first_capture_guide_link_url:"",
     partner_banners:[],
     store_plans:[],
     ad_public_campaigns:[],
