@@ -63,7 +63,7 @@ export default async function handler(req,res){
 
     const detail=await rpc("biteboss_store_detail",{p_store_id:storeId});
     const store=detail?.store;
-    if(!store || store.status!=="active" || store.partnership_status!=="partnered") return res.status(404).send("Not found");
+    if(!store) return res.status(404).send("Not found");
     seo=seo || await rpc("biteboss_store_seo_settings",{p_store_id:storeId});
     const canonicalSlug=String(seo?.slug || autoSlug(storeId));
 
