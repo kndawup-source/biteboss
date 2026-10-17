@@ -18,7 +18,7 @@
 <span>BITEBOSS / ADMIN</span><h1>슈퍼 어드민</h1>
 <p>운영자 ID와 6자리 PIN으로 로그인하세요.</p>
 <input autocapitalize="none" autocomplete="username" class="input" maxlength="40" name="admin_id" placeholder="Admin ID" required="" spellcheck="false" type="text"/>
-<input autocomplete="current-password" class="input" inputmode="numeric" maxlength="6" name="pin" pattern="[0-9]{6}" placeholder="6-digit PIN" required="" type="password"/>
+<input class="input" name="pin" required="" type="password"/ inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="숫자 6자리" autocomplete="current-password">
 <button class="primary-btn" type="submit">로그인</button>
 <small id="adminLoginStatus"></small>
 </form>
@@ -216,7 +216,7 @@
 <label>GPS 허용 반경(m)<input class="input" min="1" name="gps_radius_m" required="" type="number"/></label>
 <label>최대 GPS 오차(m)<input class="input" min="1" name="max_location_accuracy_m" required="" type="number"/></label>
 <label>GPS 체류시간(초)<input class="input" min="30" name="gps_dwell_seconds" required="" type="number"/></label>
-<label>GPS 확인간격(초)<input class="input" min="5" name="gps_presence_ping_seconds" required="" type="number"/></label>
+<label>GPS 확인간격(초)<input class="input" min="5" name="gps_presence_ping_seconds" required="" type="number"/ inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="숫자 6자리" autocomplete="current-password"></label>
 <label>하루 매장별 점령 제한<input class="input" min="1" name="daily_store_limit" required="" type="number"/></label>
 <label>주변 매장 반경(m)<input class="input" min="100" name="nearby_radius_m" required="" type="number"/></label>
 <label>주변 매장 표시 수<input class="input" max="100" min="1" name="nearby_limit" required="" type="number"/></label>
@@ -579,6 +579,6 @@
 </div>
 </section>
 </div>
-<script src="./admin.js?v=81.93"></script>
+<script src="./admin.js?v=81.96"></script>
 </body>
 </html>

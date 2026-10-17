@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.94";
+  const BITEBOSS_BUILD = "81.96";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -6340,7 +6340,7 @@ await handleClaimParam();
     openModal("로그인", `
       <div class="form-grid member-auth-form">
         <label class="wide">ID<input id="memberLoginId" class="input" maxlength="32" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="yourid" /></label>
-        <label class="wide">6자리 PIN<input id="memberLoginPin" class="input" type="password" inputmode="numeric" maxlength="6" autocomplete="current-password" placeholder="000000" /></label>
+        <label class="wide">숫자 6자리 비밀번호<input id="memberLoginPin" class="input" type="password" inputmode="numeric" maxlength="6" autocomplete="current-password" placeholder="000000" /></label>
         <button id="memberLoginSubmit" class="primary-btn wide" type="button">로그인</button>
         <button id="memberAuthSwitchToRegister" class="auth-switch-btn wide" type="button">계정이 없나요? 계정 만들기</button>
         <p id="memberAuthStatus" class="inline-status wide" aria-live="polite"></p>
@@ -6361,7 +6361,7 @@ await handleClaimParam();
       return;
     }
     if(!/^\d{6}$/.test(pin)){
-      setStatus(status, "PIN은 숫자 6자리입니다.");
+      setStatus(status, "비밀번호는 숫자 6자리입니다.");
       return;
     }
 
@@ -6466,7 +6466,7 @@ await handleClaimParam();
         <label class="wide">ID<input id="memberRegisterId" class="input" maxlength="32" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="yourid" /></label>
         <label class="wide">닉네임<input id="memberRegisterNick" class="input" maxlength="40" value="${escapeAttr(suggestedNickname)}" placeholder="${escapeAttr(suggestedNickname)}" /></label>
         <p class="member-nickname-hint wide">BiteBoss가 만든 기본 별명입니다. 지금 바꾸거나 프로필에서 나중에 변경할 수 있습니다.</p>
-        <label class="wide">6자리 PIN<input id="memberRegisterPin" class="input" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" placeholder="000000" /></label>
+        <label class="wide">숫자 6자리 비밀번호<input id="memberRegisterPin" class="input" type="password" inputmode="numeric" maxlength="6" autocomplete="new-password" placeholder="000000" /></label>
         <button id="memberRegisterSubmit" class="primary-btn wide" type="button">계정 만들기</button>
         <button id="memberAuthSwitchToLogin" class="auth-switch-btn wide" type="button">이미 계정이 있나요? 로그인</button>
         <p id="memberAuthStatus" class="inline-status wide" aria-live="polite"></p>
@@ -6488,7 +6488,7 @@ await handleClaimParam();
     const status = $("#memberAuthStatus");
     const button = $("#memberRegisterSubmit");
     if(!/^[a-z0-9][a-z0-9._-]{2,31}$/.test(username)) return setStatus(status, "ID는 영문 소문자/숫자/._- 조합 3~32자입니다.");
-    if(!/^\d{6}$/.test(pin)) return setStatus(status, "PIN은 숫자 6자리입니다.");
+    if(!/^\d{6}$/.test(pin)) return setStatus(status, "비밀번호는 숫자 6자리입니다.");
     if(button) button.disabled = true;
     setStatus(status, "계정을 만드는 중…");
     try{
@@ -9182,7 +9182,7 @@ await handleClaimParam();
     const button = $("#deleteAccountConfirmBtn");
 
     if(!/^\\d{6}$/.test(pin)){
-      setStatus(status, "PIN은 숫자 6자리입니다.");
+      setStatus(status, "비밀번호는 숫자 6자리입니다.");
       return;
     }
     if(phrase !== "DELETE"){

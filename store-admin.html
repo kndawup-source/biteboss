@@ -17,7 +17,7 @@
     <span>BITEBOSS / STORE</span><h1>매장 관리자</h1>
     <p>발급받은 매장 ID와 6자리 PIN으로 로그인하세요.</p>
     <input class="input" name="store_id" type="text" placeholder="Store ID" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="32" required />
-    <input class="input" name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="6-digit PIN" autocomplete="current-password" required />
+    <input class="input" name="pin" type="password" required / inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="숫자 6자리" autocomplete="current-password">
     <button class="primary-btn" type="submit">로그인</button>
     <small id="storeLoginStatus"></small>
     <button id="openStoreActivationBtn" class="text-btn auth-switch" type="button">처음 등록 · 활성화 코드 사용</button>
@@ -28,7 +28,7 @@
     <p>제휴 승인 후 받은 활성화 코드로 매장 직원 계정을 만듭니다.</p>
     <input class="input" name="activation_code" type="text" placeholder="Activation code" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" maxlength="16" required />
     <input class="input" name="store_id" type="text" placeholder="새 Store Admin ID" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="32" required />
-    <input class="input" name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="새 6-digit PIN" autocomplete="new-password" required />
+    <input class="input" name="pin" type="password" required / inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="숫자 6자리" autocomplete="current-password">
     <button class="primary-btn" type="submit">매장 계정 만들기</button>
     <small id="storeActivationStatus"></small>
     <button id="backToStoreLoginBtn" class="text-btn auth-switch" type="button">기존 계정 로그인</button>
@@ -321,6 +321,6 @@
     </section>
   </main>
 </div>
-<script src="./store-admin.js?v=81.93"></script>
+<script src="./store-admin.js?v=81.96"></script>
 </body>
 </html>
