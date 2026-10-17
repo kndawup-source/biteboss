@@ -15,7 +15,7 @@
           detectSessionInUrl:false,
           storageKey:"biteboss-admin-auth"
         },
-        global:{ headers:{ "x-client-info":"biteboss-admin-web/81.84" } }
+        global:{ headers:{ "x-client-info":"biteboss-admin-web/81.85" } }
       })
     : null;
 
@@ -823,11 +823,7 @@
     }
 
     stores = allStores;
-    const planResult=await adminSb.rpc("biteboss_admin_store_plans");
     storePlanMap.clear();
-    if(!planResult.error && planResult.data?.ok){
-      (planResult.data.plans || []).forEach(item=>storePlanMap.set(String(item.store_id),item));
-    }
     renderStores();
     await renderQr();
   }
@@ -887,6 +883,27 @@
       if(submit) submit.disabled = false;
     }
   }
+  async function hydrateVisibleStorePlans(rows=[]){
+    const targets=rows.filter(store=>
+      String(store.partnership_status || "")==="partnered" &&
+      !storePlanMap.has(String(store.id))
+    );
+    if(!targets.length) return;
+
+    const results=await Promise.all(targets.map(async store=>{
+      const {data,error}=await adminSb.rpc("biteboss_admin_store_plan",{p_store_id:store.id});
+      if(error || !data?.ok) return [String(store.id),{plan:"partner"}];
+      return [String(store.id),data.plan || {plan:"partner"}];
+    }));
+    let changed=false;
+    results.forEach(([id,plan])=>{
+      const before=storePlanMap.get(id)?.plan;
+      storePlanMap.set(id,plan);
+      if(before!==plan?.plan) changed=true;
+    });
+    if(changed) renderStores();
+  }
+
   function renderStores(){
     const box = $("#adminStoreList");
     if(!box) return;
@@ -928,7 +945,7 @@
           </div>
           <div class="admin-store-actions">
             <button class="secondary-btn admin-store-edit-btn admin-action-btn" data-edit-store="${escapeAttr(store.id)}" type="button">매장 수정</button>
-            <button class="secondary-btn admin-banner-toggle admin-action-btn ${bannerEnabled ? "is-on" : ""}" data-banner-store="${escapeAttr(store.id)}" data-banner-enabled="${bannerEnabled ? "true" : "false"}" type="button" ${isPartner && plan!=="pro" ? `disabled title="PRO 플랜에서 사용할 수 있습니다."` : ""}>${isPartner && plan!=="pro" ? "PRO 전용 배너" : (bannerEnabled ? "배너 끄기" : "배너 켜기")}</button>
+            <button class="secondary-btn admin-banner-toggle admin-action-btn ${bannerEnabled ? "is-on" : ""}" data-banner-store="${escapeAttr(store.id)}" data-banner-enabled="${bannerEnabled ? "true" : "false"}" data-store-plan="${escapeAttr(plan)}" type="button">${isPartner && plan!=="pro" ? "PRO 전용 배너" : (bannerEnabled ? "배너 끄기" : "배너 켜기")}</button>
             ${isPartner
               ? `<a class="secondary-btn admin-action-btn" href="./store-admin.html">매장 어드민</a>`
               : `<button class="secondary-btn admin-action-btn" data-partner-store="${escapeAttr(store.id)}" type="button">제휴 전환</button>`}
@@ -938,6 +955,8 @@
           ${activationCodes.has(String(store.id)) ? (() => { const item = activationCodes.get(String(store.id)); return `<div class="activation-result" data-activation-result="${escapeAttr(store.id)}"><strong>직원 활성화 코드</strong><code>${escapeHtml(item.code)}</code><button class="secondary-btn" data-copy-code="${escapeAttr(item.code)}" type="button">코드 복사</button><p>${escapeHtml(item.expires || "7일 안에 매장 어드민에서 ID/PIN을 등록합니다.")}</p></div>`; })() : `<div class="activation-result hidden" data-activation-result="${escapeAttr(store.id)}"></div>`}
         </article>`;
     }).join("") || `<div class="admin-empty">${query ? "검색 결과가 없습니다." : "등록된 매장이 없습니다."}</div>`;
+
+    void hydrateVisibleStorePlans(pageRows);
 
     $$('[data-edit-store]').forEach(btn => {
       btn.onclick = () => openStoreEditor(btn.dataset.editStore);
@@ -979,6 +998,13 @@
         const id = String(btn.dataset.bannerStore || "");
         const store = stores.find(item => String(item.id) === id);
         if(!store) return;
+        const plan=String(btn.dataset.storePlan || storePlanMap.get(id)?.plan || (store.partnership_status==="partnered" ? "partner" : "none"));
+        if(String(store.partnership_status || "")==="partnered" && plan!=="pro"){
+          await openStoreEditor(id);
+          setStatusText($("#adminStorePlanStatus"),"추천 배너를 사용하려면 이 매장을 PRO로 변경하세요.");
+          $("#adminStorePlanSection")?.scrollIntoView({block:"start",behavior:"smooth"});
+          return;
+        }
         const enabled = btn.dataset.bannerEnabled === "true";
         const banners = normalizedPartnerBanners().filter(item => item.id !== id);
         if(!enabled){
