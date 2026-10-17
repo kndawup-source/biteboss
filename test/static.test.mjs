@@ -8,6 +8,7 @@ const html = read('index.html');
 const app = read('app.js');
 const css = read('styles.css');
 const admin = read('admin.js');
+const adminHtmlGlobal = read('admin.html');
 const storeAdmin = read('store-admin.js');
 const serviceWorker = read('service-worker.js');
 
@@ -249,4 +250,55 @@ test('owned stores never expose reclaim timers during the player-wide capture co
   assert.match(app, /if\(captureCooldownActive\(\)\)\{\n\s*card\.classList\.add\("hidden"\);\n\s*storeReclaimTimer = clearIntervalRef\(storeReclaimTimer\);/);
   assert.match(app, /globalCaptureCooldownNow \? "" : \(reclaimAvailableAt \?/);
   assert.match(app, /const captureCooldownNow = captureCooldownActive\(\);[\s\S]*?node\.removeAttribute\("data-store-reclaim-at"\)/);
+});
+
+test('admin separates ad operations from ad performance reporting', () => {
+  const adminHtml = read('admin.html');
+  assert.match(adminHtml, /data-admin="ad-performance"[^>]*data-admin-group="overview"[^>]*>광고 성과<\/button>/);
+  assert.match(adminHtml, /data-admin="ads"[^>]*data-admin-group="settings"[^>]*>광고 관리<\/button>/);
+  assert.match(adminHtml, /id="admin-ad-performance"/);
+  assert.match(adminHtml, /id="adPerformanceCampaignList"/);
+  assert.match(adminHtml, /id="adPerformanceCreativeList"/);
+  assert.match(admin, /overview:\["dashboard","ad-performance"\]/);
+  assert.match(admin, /function renderAdPerformanceCampaigns\(/);
+  assert.match(admin, /function renderAdPerformanceCreatives\(/);
+  const manageRender = blockBetween(admin, 'function renderAds', 'function openAdCreativePanel');
+  assert.doesNotMatch(manageRender, /admin-ad-stats/);
+  const creativeManageRender = blockBetween(admin, 'function renderAdCreatives', 'function renderAdPerformanceCampaigns');
+  assert.doesNotMatch(creativeManageRender, /admin-ad-stats/);
+});
+
+test('admin ad operations support search and performance supports filtered CSV export', () => {
+  const adminHtml = read('admin.html');
+  assert.match(adminHtml, /id="adCampaignSearch"/);
+  assert.match(adminHtml, /id="adPerformanceSearch"/);
+  assert.match(adminHtml, /id="adPerformanceExportCsv"[^>]*>CSV 내보내기<\/button>/);
+  assert.match(admin, /function exportAdPerformanceCsv\(\)/);
+  assert.match(admin, /biteboss-ad-performance-\$\{days\}d-/);
+});
+
+
+test('advertising manager is scoped to ad performance and ad management only', () => {
+  assert.match(admin, /AD_MANAGER_ROLES = new Set\(\["ad_manager","ads","advertising","advertising_manager"\]\)/);
+  assert.match(admin, /AD_MANAGER_PAGES = new Set\(\["ad-performance","ads"\]\)/);
+  assert.match(admin, /if\(!canOpenAdminPage\(page\)\)/);
+  assert.match(admin, /if\(isAdManager\(\)\)\{\s*await loadAds\(\);\s*return;/);
+  assert.match(adminHtmlGlobal, /data-super-admin-only href="\.\/store-admin\.html"/);
+});
+
+test('advertising security layer enforces server-side config and analytics capabilities', () => {
+  const sql = read('sql/biteboss-82.17-ad-security.sql');
+  assert.match(sql, /biteboss_admin_has_capability_v8217/);
+  assert.match(sql, /AD_CONFIG_KEY_FORBIDDEN/);
+  assert.match(sql, /ad_campaign_settings','ad_creatives','ad_public_campaigns/);
+  assert.match(sql, /revoke insert, update, delete on table public\.biteboss_app_config from anon, authenticated/);
+  assert.match(sql, /AD_EVENT_INPUT_TOO_LONG/);
+  assert.match(sql, /name like 'ads\/%'/);
+  assert.match(admin, /biteboss_admin_config_upsert_v8217/);
+  assert.match(admin, /biteboss_admin_list_campaigns_v8217/);
+  assert.match(admin, /biteboss_admin_upsert_campaign_v8217/);
+  assert.match(admin, /biteboss_admin_delete_campaign_v8217/);
+  assert.match(admin, /biteboss_admin_ad_analytics_v8217/);
+  assert.match(admin, /biteboss_admin_ad_creative_analytics_v8217/);
+  assert.doesNotMatch(admin, /from\("biteboss_app_config"\)\.upsert/);
 });

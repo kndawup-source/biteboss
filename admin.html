@@ -7,15 +7,15 @@
 <meta content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" name="viewport"/>
 <meta content="yes" name="mobile-web-app-capable"/>
 <title>BiteBoss Admin</title>
-<link href="./styles.css?v=82.13" rel="stylesheet"/>
-<link href="./admin.css?v=82.13" rel="stylesheet"/>
-<script src="./app-config.js?v=82.13"></script>
+<link href="./styles.css?v=82.17" rel="stylesheet"/>
+<link href="./admin.css?v=82.17" rel="stylesheet"/>
+<script src="./app-config.js?v=82.17"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="admin-app">
 <div class="auth-gate" id="adminAuthGate">
 <form class="auth-panel" id="adminLoginForm">
-<span>BITEBOSS / ADMIN</span><h1>슈퍼 어드민</h1>
+<span>BITEBOSS / ADMIN</span><h1>관리자</h1>
 <p>운영자 ID와 6자리 PIN으로 로그인하세요.</p>
 <input autocapitalize="none" autocomplete="username" class="input" maxlength="40" name="admin_id" placeholder="Admin ID" required="" spellcheck="false" type="text"/>
 <input class="input" name="pin" required="" type="password"/ inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="숫자 6자리" autocomplete="current-password">
@@ -47,7 +47,8 @@
 </button>
 </nav>
 <nav aria-label="관리자 세부 메뉴" class="admin-secondary-nav">
-<button class="admin-section-nav active" data-admin="dashboard" data-admin-group="overview" type="button">현황</button>
+<button class="admin-section-nav active" data-admin="dashboard" data-admin-group="overview" type="button">서비스 현황</button>
+<button class="admin-section-nav hidden" data-admin="ad-performance" data-admin-group="overview" type="button">광고 성과</button>
 <button class="admin-section-nav hidden" data-admin="stores" data-admin-group="stores" type="button">매장 관리</button>
 <button class="admin-section-nav hidden" data-admin="partner-requests" data-admin-group="stores" type="button">제휴 신청</button>
 <button class="admin-section-nav hidden" data-admin="comments" data-admin-group="stores" type="button">한마디</button>
@@ -56,12 +57,12 @@
 <button class="admin-section-nav hidden" data-admin="rules" data-admin-group="game" type="button">게임 규칙</button>
 <button class="admin-section-nav hidden" data-admin="users" data-admin-group="game" type="button">사용자</button>
 <button class="admin-section-nav hidden" data-admin="assets" data-admin-group="settings" type="button">앱 설정</button>
-<button class="admin-section-nav hidden" data-admin="ads" data-admin-group="settings" type="button">광고</button>
+<button class="admin-section-nav hidden" data-admin="ads" data-admin-group="settings" type="button">광고 관리</button>
 <button class="admin-section-nav hidden" data-admin="maintenance" data-admin-group="settings" type="button">유지보수</button>
 </nav>
 <div class="admin-side-actions">
 <a class="admin-side-link" href="./index.html">사용자 앱</a>
-<a class="admin-side-link" href="./store-admin.html">매장 어드민</a>
+<a class="admin-side-link" data-super-admin-only href="./store-admin.html">매장 어드민</a>
 <button class="admin-side-link" id="adminLogoutBtn" type="button">로그아웃</button>
 </div>
 </aside>
@@ -306,11 +307,11 @@
 <p class="asset-status" id="firstCaptureGuideStatus"></p></div>
 </section>
 </div></section>
-<section class="admin-page" id="admin-ads">
-<div class="admin-page-head"><div><span class="eyebrow">설정</span><h2>광고</h2><p>광고가 실제 매장 관심과 방문·점령으로 이어지는지 확인하고 캠페인을 관리합니다.</p></div></div><div class="admin-page-body">
+<section class="admin-page" id="admin-ad-performance">
+<div class="admin-page-head"><div><span class="eyebrow">현황</span><h2>광고 성과</h2><p>전체 광고 성과에서 캠페인, 광고 소재 순으로 내려가며 확인합니다.</p></div></div><div class="admin-page-body">
 <section class="admin-section-card admin-ad-performance">
 <div class="admin-section-title admin-section-title-row">
-<div><h3>광고 성과</h3><p>선택한 기간의 전체 캠페인 성과입니다.</p></div>
+<div><h3>전체 성과</h3><p>선택한 기간에 집계된 모든 캠페인의 광고 성과입니다.</p></div>
 <select aria-label="광고 성과 기간" class="input admin-ad-period" id="adAnalyticsDays">
 <option value="7">7일</option><option selected="" value="30">30일</option><option value="90">90일</option>
 </select>
@@ -328,12 +329,23 @@
 </div>
 <div aria-label="광고 전환 퍼널" class="admin-ad-funnel" id="adAnalyticsFunnel"></div>
 </section>
+<section class="admin-section-card admin-ad-performance-campaigns">
+<div class="admin-section-title admin-section-title-row"><div><h3>캠페인별 성과</h3><p>캠페인을 선택하면 해당 캠페인의 광고 소재별 성과를 확인할 수 있습니다.</p></div><div class="admin-ad-toolbar"><input class="input" id="adPerformanceSearch" type="search" placeholder="캠페인 · 광고주 검색" aria-label="광고 성과 검색"/><button class="text-btn" id="adPerformanceExportCsv" type="button">CSV 내보내기</button></div></div>
+<div class="admin-ad-list" id="adPerformanceCampaignList"></div>
+</section>
+<section class="admin-section-card admin-ad-performance-creatives hidden" id="adPerformanceCreativePanel">
+<div class="admin-section-title admin-section-title-row"><div><h3>소재별 성과</h3><p id="adPerformanceCreativeDescription">선택한 캠페인의 개별 광고 소재 성과입니다.</p></div><button class="text-btn" id="adPerformanceCreativeClose" type="button">닫기</button></div>
+<div class="admin-ad-list admin-ad-creative-list" id="adPerformanceCreativeList"></div>
+</section>
+</div></section>
+<section class="admin-page" id="admin-ads">
+<div class="admin-page-head"><div><span class="eyebrow">설정</span><h2>광고 관리</h2><p>캠페인과 광고 소재의 노출 조건을 등록하고 수정합니다.</p></div></div><div class="admin-page-body">
 <section class="admin-section-card admin-ad-campaigns-section">
-<div class="admin-section-title"><div><h3>캠페인</h3><p>광고 운영 단위입니다. 기간·대상·노출 위치와 캠페인 전체 성과를 관리합니다.</p></div></div>
+<div class="admin-section-title admin-section-title-row"><div><h3>캠페인</h3><p>광고 운영 단위입니다. 기간·대상·노출 위치를 관리합니다.</p></div><div class="admin-ad-toolbar"><input class="input" id="adCampaignSearch" type="search" placeholder="캠페인 · 광고주 검색" aria-label="광고 캠페인 검색"/></div></div>
 <div class="admin-ad-list" id="adCampaignList"></div>
 </section>
 <section class="admin-section-card admin-ad-creatives-section hidden" id="adCreativePanel">
-<div class="admin-section-title admin-section-title-row"><div><h3>광고 소재</h3><p id="adCreativePanelDescription">선택한 캠페인에 실제 노출되는 이미지를 관리하고 소재별 성과를 확인합니다.</p></div><button class="text-btn" id="adCreativePanelClose" type="button">닫기</button></div>
+<div class="admin-section-title admin-section-title-row"><div><h3>광고 소재</h3><p id="adCreativePanelDescription">선택한 캠페인에 실제 노출되는 이미지를 관리합니다.</p></div><button class="text-btn" id="adCreativePanelClose" type="button">닫기</button></div>
 <div class="admin-ad-list admin-ad-creative-list" id="adCreativeList"></div>
 <details class="admin-ad-creative-editor admin-collapsible" id="adCreativeEditor">
 <summary class="admin-collapse-summary"><div><h3>광고 소재 추가</h3><p>같은 캠페인 안에 여러 소재를 등록하면 같은 우선순위에서 랜덤 노출됩니다.</p></div><span>열기</span></summary>
@@ -371,7 +383,7 @@
 <div class="admin-form-actions wide"><button class="primary-btn" type="submit">캠페인 저장</button><button class="text-btn hidden" id="adCampaignCancel" type="button">수정 취소</button></div>
 <p aria-live="polite" class="asset-status wide" id="adCampaignStatus"></p>
 </form>
-<div class="admin-ad-guide"><span>캠페인은 기간·대상·위치를 관리하고, 광고 소재는 실제 이미지를 관리합니다.</span><span>같은 캠페인의 활성 소재는 랜덤 노출되며 소재별 노출·클릭·CTR·방문·점령 성과를 따로 집계합니다.</span></div>
+<div class="admin-ad-guide"><span>캠페인은 기간·대상·위치를 관리하고, 광고 소재는 실제 이미지를 관리합니다.</span><span>성과 확인은 현황 → 광고 성과에서 전체 → 캠페인 → 소재 순으로 확인합니다.</span></div>
 </details>
 </div></section>
 <section class="admin-page" id="admin-maintenance">
@@ -605,6 +617,6 @@
 </div>
 </section>
 </div>
-<script src="./admin.js?v=82.13"></script>
+<script src="./admin.js?v=82.17"></script>
 </body>
 </html>

@@ -693,3 +693,16 @@ body.admin-app{min-height:100dvh;background:#f1f1f3;color:#111}
 @media(max-width:720px){
   .admin-app .admin-ad-first-creative-label{display:grid;gap:4px}
 }
+
+/* 82.17 — ads operations / performance separation */
+.admin-app .admin-ad-performance-row{width:100%;border:0;background:transparent;color:inherit;text-align:left;font:inherit;cursor:pointer}
+.admin-app button.admin-ad-performance-row:hover{background:#f7f7f8}
+.admin-app button.admin-ad-performance-row:focus-visible{outline:2px solid #111;outline-offset:2px}
+.admin-app .admin-ad-performance-row.is-selected{background:#f2f2f4}
+.admin-app .admin-ad-performance-meta{display:block;margin-top:4px;color:#8f8f96;font-size:8px;line-height:1.35}
+.admin-app .admin-ad-performance-row .admin-ad-stats{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:7px}
+.admin-app .admin-ad-performance-creatives{border-top:2px solid #111}
+
+.admin-app .admin-ad-toolbar{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}.admin-app .admin-ad-toolbar .input{width:min(260px,52vw);min-height:38px}.admin-app .admin-ad-toolbar .text-btn{white-space:nowrap}@media(max-width:640px){.admin-app .admin-ad-toolbar{width:100%;justify-content:stretch}.admin-app .admin-ad-toolbar .input{width:100%;flex:1 1 100%}.admin-app .admin-ad-toolbar .text-btn{margin-left:auto}}
+
+.role-hidden{display:none!important}

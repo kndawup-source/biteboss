@@ -15,7 +15,7 @@
           detectSessionInUrl:false,
           storageKey:"biteboss-admin-auth"
         },
-        global:{ headers:{ "x-client-info":"biteboss-admin-web/82.12" } }
+        global:{ headers:{ "x-client-info":"biteboss-admin-web/82.17" } }
       })
     : null;
 
@@ -33,6 +33,7 @@
   let editingStoreBundle = null;
   let adCampaigns = [];
   let selectedAdCampaignId = "";
+  let selectedAdPerformanceCampaignId = "";
   const adCreativeAnalyticsMap = new Map();
   let partnerRequests = [];
   let storeRequests = [];
@@ -85,8 +86,10 @@
 
     admin = data;
     hideAuthGate();
-    setText("#adminRole", admin.role || "admin");
+    setText("#adminRole", isAdManager() ? "광고 관리자" : (admin.role || "admin"));
+    applyAdminRoleScope();
     await refreshAll();
+    if(isAdManager()) await openAdminPage("ad-performance", "overview");
   }
 
   function bindLogin(){
@@ -146,11 +149,43 @@
   }
 
   const ADMIN_GROUPS = {
-    overview:["dashboard"],
+    overview:["dashboard","ad-performance"],
     stores:["stores","partner-requests","comments","qr"],
     game:["gameops","rules","users"],
     settings:["assets","ads","maintenance"]
   };
+
+  const AD_MANAGER_ROLES = new Set(["ad_manager","ads","advertising","advertising_manager"]);
+  const AD_MANAGER_PAGES = new Set(["ad-performance","ads"]);
+
+  function normalizedAdminRole(){
+    return String(admin?.role || "admin").trim().toLowerCase();
+  }
+
+  function isAdManager(){
+    return AD_MANAGER_ROLES.has(normalizedAdminRole());
+  }
+
+  function canOpenAdminPage(page){
+    return !isAdManager() || AD_MANAGER_PAGES.has(String(page || ""));
+  }
+
+  function applyAdminRoleScope(){
+    const adOnly=isAdManager();
+    document.body.classList.toggle("admin-ad-manager", adOnly);
+    $$("[data-admin-group]").forEach(node=>{
+      const page=String(node.dataset.admin || node.dataset.adminDefault || "");
+      const group=String(node.dataset.adminGroup || "");
+      const allowed = !adOnly || AD_MANAGER_PAGES.has(page) || (group === "overview" && !page) || (group === "settings" && !page);
+      if(node.classList.contains("admin-primary-nav-btn")){
+        const groupAllowed = !adOnly || group === "overview" || group === "settings";
+        node.classList.toggle("role-hidden", !groupAllowed);
+      }else if(node.classList.contains("admin-section-nav")){
+        node.classList.toggle("role-hidden", !allowed);
+      }
+    });
+    $$("[data-super-admin-only]").forEach(node=>node.classList.toggle("role-hidden", adOnly));
+  }
 
   let activeAdminGroup = "overview";
   let activeAdminPage = "dashboard";
@@ -171,6 +206,10 @@
   }
 
   async function openAdminPage(page, group = null){
+    if(!canOpenAdminPage(page)){
+      if(isAdManager() && page !== "ad-performance") return openAdminPage("ad-performance", "overview");
+      return;
+    }
     const target = $(`#admin-${page}`);
     if(!target) return;
 
@@ -192,14 +231,12 @@
     $$(".admin-primary-nav-btn").forEach(button => {
       button.addEventListener("click", async () => {
         const group = String(button.dataset.adminGroup || "overview");
-        const fallback = String(
-          button.dataset.adminDefault ||
-          ADMIN_GROUPS[group]?.[0] ||
-          "dashboard"
-        );
+        const roleFallback = isAdManager()
+          ? (group === "settings" ? "ads" : "ad-performance")
+          : String(button.dataset.adminDefault || ADMIN_GROUPS[group]?.[0] || "dashboard");
 
-        const currentStillValid = ADMIN_GROUPS[group]?.includes(activeAdminPage);
-        await openAdminPage(currentStillValid ? activeAdminPage : fallback, group);
+        const currentStillValid = ADMIN_GROUPS[group]?.includes(activeAdminPage) && canOpenAdminPage(activeAdminPage);
+        await openAdminPage(currentStillValid ? activeAdminPage : roleFallback, group);
       });
     });
 
@@ -231,6 +268,10 @@
     }));
     $("#adCampaignCancel")?.addEventListener("click", resetAdCampaignForm);
     $("#adAnalyticsDays")?.addEventListener("change", loadAdAnalytics);
+    $("#adCampaignSearch")?.addEventListener("input", renderAds);
+    $("#adPerformanceSearch")?.addEventListener("input", renderAdPerformanceCampaigns);
+    $("#adPerformanceExportCsv")?.addEventListener("click", exportAdPerformanceCsv);
+    $("#adPerformanceCreativeClose")?.addEventListener("click", closeAdPerformanceCreativePanel);
     $("#adTargetType")?.addEventListener("change", syncAdTargetRegionField);
     $("#partnerRequestFilter")?.addEventListener("change", () => { partnerRequestPage = 1; loadPartnerRequests(); });
     $("#refreshPartnerRequests")?.addEventListener("click", loadPartnerRequests);
@@ -359,14 +400,20 @@
   }
 
   async function refreshAll(){
+    // Advertising-only operators must not fan out into unrelated admin RPCs.
+    await loadConfig();
+    if(isAdManager()){
+      await loadAds();
+      return;
+    }
     // Store banner state depends on appConfig.partner_banners. Resolve config first
     // so the first store render cannot race against configuration loading.
-    await loadConfig();
     await Promise.all([loadDashboard(), loadAnalytics(), loadStores(), loadStoreRequests(), loadBosses(), loadUsers(), loadGameOps(), loadAssets(), loadAds(), loadPartnerRequests(), loadAdminComments()]);
     renderRules();
   }
 
   async function refreshPage(page){
+    if(!canOpenAdminPage(page)) return;
     if(page === "dashboard"){
       await Promise.all([loadDashboard(), loadAnalytics(), loadBosses()]);
     }
@@ -384,6 +431,7 @@
     if(page === "gameops") await loadGameOps();
     if(page === "assets") await loadAssets();
     if(page === "ads") await loadAds();
+    if(page === "ad-performance") await loadAds();
     if(page === "partner-requests") await loadPartnerRequests();
     if(page === "comments") await loadAdminComments();
   }
@@ -1047,11 +1095,7 @@
         }
         btn.disabled = true;
         try{
-          const { error } = await adminSb.from("biteboss_app_config").upsert([{
-            key:"partner_banners", value:banners,
-            updated_by:session.user.id, updated_at:new Date().toISOString()
-          }], { onConflict:"key" });
-          if(error) throw error;
+          await secureAdminConfigUpsert({ key:"partner_banners", value:banners });
           await loadConfig();
           renderStores();
           if(editingStoreId === id && editingStoreBundle?.store) renderAdminPartnerPromotion(editingStoreBundle.store);
@@ -1174,8 +1218,7 @@
     }
 
     try{
-      const { error } = await adminSb.from("biteboss_app_config").upsert(rows, { onConflict:"key" });
-      if(error) throw error;
+      await secureAdminConfigUpsert(rows);
       await loadConfig();
       renderRules();
       alert("게임 규칙을 저장했습니다.");
@@ -1526,8 +1569,7 @@
       if(upload.error) throw upload.error;
       const { data } = adminSb.storage.from("biteboss-assets").getPublicUrl(path);
       const url = `${data.publicUrl}?v=${Date.now()}`;
-      const { error } = await adminSb.from("biteboss_app_config").upsert({ key:"home_splash_image_url", value:url, updated_by:session.user.id, updated_at:new Date().toISOString() }, { onConflict:"key" });
-      if(error) throw error;
+      await secureAdminConfigUpsert({ key:"home_splash_image_url", value:url });
       appConfig.home_splash_image_url = url;
       await loadAssets();
       if(status) status.textContent = "저장되었습니다.";
@@ -1575,13 +1617,7 @@
         image.src = url;
       });
 
-      const { error } = await adminSb.from("biteboss_app_config").upsert({
-        key:"default_profile_image_url",
-        value:url,
-        updated_by:session.user.id,
-        updated_at:new Date().toISOString()
-      }, { onConflict:"key" });
-      if(error) throw error;
+      await secureAdminConfigUpsert({ key:"default_profile_image_url", value:url });
 
       appConfig.default_profile_image_url = url;
       await loadAssets();
@@ -1622,8 +1658,7 @@
     ];
 
     try{
-      const { error } = await adminSb.from("biteboss_app_config").upsert(rows, { onConflict:"key" });
-      if(error) throw error;
+      await secureAdminConfigUpsert(rows);
       rows.forEach(row => { appConfig[row.key] = row.value; });
       await loadAssets();
       if(status) status.textContent = "저장되었습니다.";
@@ -1662,8 +1697,7 @@
     ];
 
     try{
-      const { error }=await adminSb.from("biteboss_app_config").upsert(rows,{onConflict:"key"});
-      if(error) throw error;
+      await secureAdminConfigUpsert(rows);
       rows.forEach(row=>{ appConfig[row.key]=row.value; });
       if(status) status.textContent="저장되었습니다.";
     }catch(error){
@@ -1882,13 +1916,7 @@
         started_at:String(existing.plan || "partner")===plan && existing.started_at ? existing.started_at : now,
         expires_at:plan==="pro" ? expires : null
       });
-      const {error}=await adminSb.from("biteboss_app_config").upsert([{
-        key:"store_plans",
-        value:plans,
-        updated_by:session.user.id,
-        updated_at:now
-      }],{onConflict:"key"});
-      if(error) throw error;
+      await secureAdminConfigUpsert({ key:"store_plans", value:plans });
       appConfig.store_plans=plans;
       hydrateStorePlanMap();
       if(editingStoreBundle){
@@ -1903,10 +1931,7 @@
       // Downgrading immediately removes paid banner exposure.
       if(plan!=="pro"){
         const banners=normalizedPartnerBanners().filter(item=>item.id!==String(editingStoreId));
-        const syncResult=await adminSb.from("biteboss_app_config").upsert([{
-          key:"partner_banners",value:banners,updated_by:session.user.id,updated_at:new Date().toISOString()
-        }],{onConflict:"key"});
-        if(syncResult.error) throw syncResult.error;
+        await secureAdminConfigUpsert({ key:"partner_banners", value:banners });
         await loadConfig();
       }
       setStatusText(status,plan==="pro" ? "PRO 플랜이 적용되었습니다." : "PARTNER 플랜이 적용되었습니다.");
@@ -2000,13 +2025,7 @@
     if(submit) submit.disabled = true;
     setStatusText($("#adminPartnerPromotionStatus"), "저장 중…");
     try{
-      const { error } = await adminSb.from("biteboss_app_config").upsert([{
-        key:"partner_banners",
-        value:banners,
-        updated_by:session.user.id,
-        updated_at:new Date().toISOString()
-      }], { onConflict:"key" });
-      if(error) throw error;
+      await secureAdminConfigUpsert({ key:"partner_banners", value:banners });
       await loadConfig();
       renderAdminPartnerPromotion(store);
       renderStores();
@@ -2069,11 +2088,7 @@
           latitude:lat,
           longitude:lng
         });
-        const syncResult = await adminSb.from("biteboss_app_config").upsert([{
-          key:"partner_banners", value:banners,
-          updated_by:session.user.id, updated_at:new Date().toISOString()
-        }], { onConflict:"key" });
-        if(syncResult.error) throw syncResult.error;
+        await secureAdminConfigUpsert({ key:"partner_banners", value:banners });
         await loadConfig();
       }
 
@@ -2448,6 +2463,15 @@
 
   function setStatusText(node, text){ if(node) node.textContent = String(text || ""); }
 
+  async function secureAdminConfigUpsert(rows){
+    const payload=Array.isArray(rows)?rows:[rows];
+    const normalized=payload.map(row=>({ key:String(row?.key||""), value:row?.value }));
+    const {data,error}=await adminSb.rpc("biteboss_admin_config_upsert_v8217",{p_rows:normalized});
+    if(error) throw error;
+    if(!data?.ok) throw new Error(data?.error||"CONFIG_SAVE_FAILED");
+    return data;
+  }
+
 
   function adPlacementConfig(){
     const raw = appConfig.ad_campaign_settings;
@@ -2481,10 +2505,7 @@
   }
 
   async function saveAdCreativeConfig(next){
-    const { error }=await adminSb.from("biteboss_app_config").upsert({
-      key:"ad_creatives", value:next, updated_by:session.user.id, updated_at:new Date().toISOString()
-    },{ onConflict:"key" });
-    if(error) throw error;
+    await secureAdminConfigUpsert({ key:"ad_creatives", value:next });
     appConfig.ad_creatives=next;
   }
 
@@ -2518,9 +2539,7 @@
       store_list_image_url:String($("#adCampaignForm")?.dataset.storeListImageUrl || "").trim(),
       store_list_storage_path:String($("#adCampaignForm")?.dataset.storeListStoragePath || "").trim()
     };
-    const row={ key:"ad_campaign_settings", value:settings, updated_by:session.user.id, updated_at:new Date().toISOString() };
-    const { error }=await adminSb.from("biteboss_app_config").upsert(row,{ onConflict:"key" });
-    if(error) throw error;
+    await secureAdminConfigUpsert({ key:"ad_campaign_settings", value:settings });
     appConfig.ad_campaign_settings=settings;
   }
 
@@ -2537,10 +2556,7 @@
         store_list_image_url:creative.store_list_image_url || ""
       }));
     });
-    const { error }=await adminSb.from("biteboss_app_config").upsert({
-      key:"ad_public_campaigns", value:publicRows, updated_by:session.user.id, updated_at:new Date().toISOString()
-    },{ onConflict:"key" });
-    if(error) throw error;
+    await secureAdminConfigUpsert({ key:"ad_public_campaigns", value:publicRows });
     appConfig.ad_public_campaigns=publicRows;
   }
 
@@ -2598,7 +2614,7 @@
     const chart=$("#adAnalyticsChart"); if(!chart) return;
     const days=Math.max(1,Number($("#adAnalyticsDays")?.value || 30));
     chart.innerHTML='<div class="analytics-loading">불러오는 중…</div>';
-    const {data,error}=await adminSb.rpc("biteboss_admin_ad_analytics_v8179",{p_days:days});
+    const {data,error}=await adminSb.rpc("biteboss_admin_ad_analytics_v8217",{p_days:days});
     if(error){
       console.warn("BiteBoss ad analytics:",error);
       chart.innerHTML='<div class="analytics-empty">광고 성과 데이터를 불러오지 못했습니다. 광고 분석 RPC와 데이터베이스 배포 상태를 확인하세요.</div>';
@@ -2609,7 +2625,7 @@
 
   async function loadAdCreativeAnalytics(days){
     adCreativeAnalyticsMap.clear();
-    const {data,error}=await adminSb.rpc("biteboss_admin_ad_creative_analytics_v8211",{p_days:Math.max(1,Number(days||30))});
+    const {data,error}=await adminSb.rpc("biteboss_admin_ad_creative_analytics_v8217",{p_days:Math.max(1,Number(days||30))});
     if(error){
       console.warn("BiteBoss creative analytics:",error);
       renderAdCreatives();
@@ -2620,6 +2636,7 @@
       adCreativeAnalyticsMap.set(key,row);
     });
     renderAdCreatives();
+    renderAdPerformanceCreatives();
   }
 
   function renderAdAnalytics(data){
@@ -2653,6 +2670,8 @@
       funnel.innerHTML=`<div><span>노출</span><strong>${impressions.toLocaleString("ko-KR")}</strong><small>100%</small></div><div><span>클릭</span><strong>${clicks.toLocaleString("ko-KR")}</strong><small>${impressions?(clicks/impressions*100).toFixed(1):"0.0"}%</small></div><div><span>방문</span><strong>${Number(total.visits||0).toLocaleString("ko-KR")}</strong><small>클릭 대비 ${visitRate.toFixed(1)}%</small></div><div><span>점령</span><strong>${Number(total.captures||0).toLocaleString("ko-KR")}</strong><small>방문 대비 ${captureRate.toFixed(1)}%</small></div>`;
     }
     renderAds();
+    renderAdPerformanceCampaigns();
+    renderAdPerformanceCreatives();
     loadAdCreativeAnalytics(Math.max(1,Number($("#adAnalyticsDays")?.value || 30)));
   }
 
@@ -2660,7 +2679,7 @@
     if(!Object.keys(appConfig).length) await loadConfig();
     const box = $("#adCampaignList");
     if(!box) return;
-    const { data, error } = await adminSb.rpc("biteboss_admin_list_campaigns");
+    const { data, error } = await adminSb.rpc("biteboss_admin_list_campaigns_v8217");
     if(error){
       console.warn(error);
       box.innerHTML = `<div class="admin-empty">광고 캠페인을 불러오지 못했습니다.</div>`;
@@ -2670,6 +2689,7 @@
     populateAdTargetStores();
     try{ await syncPublicAdCampaigns(); }catch(error){ console.warn("Ad public config sync:", error); }
     renderAds();
+    renderAdPerformanceCampaigns();
     await loadAdAnalytics();
     if(!$("#adCampaignId")?.value) ensureAdStartDefault();
   }
@@ -2678,16 +2698,12 @@
     const box = $("#adCampaignList");
     if(!box) return;
     const now = Date.now();
-    box.innerHTML = adCampaigns.map(item => {
+    const query=String($("#adCampaignSearch")?.value||"").trim().toLowerCase();
+    const visibleCampaigns=adCampaigns.filter(item=>!query || [item.campaign_name,item.advertiser_name].some(value=>String(value||"").toLowerCase().includes(query)));
+    box.innerHTML = visibleCampaigns.map(item => {
       const start = item.starts_at ? new Date(item.starts_at).getTime() : 0;
       const end = item.ends_at ? new Date(item.ends_at).getTime() : Infinity;
       const live = item.is_active && start <= now && end > now;
-      const measured = adAnalyticsCampaignMap.get(String(item.id)) || {};
-      const impressions = Number(measured.impressions ?? item.impressions ?? 0);
-      const clicks = Number(measured.clicks ?? item.clicks ?? 0);
-      const ctr = impressions > 0 ? (clicks / impressions * 100).toFixed(1) : "0.0";
-      const visits = Number(measured.visits || 0);
-      const captures = Number(measured.captures || 0);
       const creativeCount=campaignCreatives(item).filter(c=>c.is_active!==false && c.image_url).length;
       const setting = campaignSetting(item.id);
       const placementLabel = ({home:"홈", takeover:"점령 대기", store_list:"매장 목록", both:"홈 + 점령 대기", all:"전체 위치"})[setting.placement] || "홈 + 점령 대기";
@@ -2698,7 +2714,6 @@
           <div class="admin-ad-copy">
             <div class="admin-ad-title"><strong>${escapeHtml(item.campaign_name)}</strong><span>${live ? "LIVE" : (item.is_active ? "SCHEDULED" : "OFF")}</span></div>
             <p>${escapeHtml(item.advertiser_name)} · ${creativeCount.toLocaleString("ko-KR")}개 소재 · ${escapeHtml(placementLabel + targetLabel)} · ${escapeHtml(formatAdPeriod(item.starts_at, item.ends_at))}</p>
-            <div class="admin-ad-stats"><span>${impressions.toLocaleString("ko-KR")} 노출</span><span>${clicks.toLocaleString("ko-KR")} 클릭</span><span>CTR ${ctr}%</span><span>${visits.toLocaleString("ko-KR")} 방문</span><span>${captures.toLocaleString("ko-KR")} 점령</span></div>
           </div>
           <div class="admin-data-actions">
             <button class="text-btn" data-manage-ad-creatives="${escapeAttr(item.id)}" type="button">광고 소재</button>
@@ -2706,7 +2721,7 @@
             <button class="text-btn danger-text" data-delete-ad="${escapeAttr(item.id)}" type="button">삭제</button>
           </div>
         </article>`;
-    }).join("") || `<div class="admin-empty">등록된 광고 캠페인이 없습니다.</div>`;
+    }).join("") || `<div class="admin-empty">${query?"검색 결과가 없습니다.":"등록된 광고 캠페인이 없습니다."}</div>`;
 
     $$('[data-manage-ad-creatives]').forEach(btn => btn.onclick = () => openAdCreativePanel(btn.dataset.manageAdCreatives));
     $$('[data-edit-ad]').forEach(btn => btn.onclick = () => editAdCampaign(btn.dataset.editAd));
@@ -2718,7 +2733,7 @@
     const campaign=adCampaigns.find(item=>String(item.id)===selectedAdCampaignId);
     if(!campaign) return;
     $("#adCreativePanel")?.classList.remove("hidden");
-    setText("#adCreativePanelDescription",`${campaign.campaign_name} · 실제 노출 소재와 소재별 성과`);
+    setText("#adCreativePanelDescription",`${campaign.campaign_name} · 실제 노출 광고 소재 관리`);
     resetAdCreativeForm();
     renderAds();
     renderAdCreatives();
@@ -2749,16 +2764,12 @@
     if(!campaign){ closeAdCreativePanel(); return; }
     const rows=campaignCreatives(campaign);
     box.innerHTML=rows.map(creative=>{
-      const metric=creativeMetric(campaign.id,creative.id);
-      const impressions=Number(metric.impressions||0), clicks=Number(metric.clicks||0);
-      const ctr=impressions ? (clicks/impressions*100).toFixed(1) : "0.0";
       const image=creative.image_url || creative.store_list_image_url || "";
       return `<article class="admin-ad-row admin-ad-creative-row">
         ${image?`<img class="admin-ad-thumb" src="${escapeAttr(image)}" alt="" />`:`<div class="admin-ad-thumb"></div>`}
         <div class="admin-ad-copy">
           <div class="admin-ad-title"><strong>${escapeHtml(creative.name || "광고 소재")}</strong><span class="admin-ad-creative-badge ${creative.is_primary?"is-primary":""}">${creative.is_primary?"기본 소재":(creative.is_active===false?"OFF":"ACTIVE")}</span></div>
           <p>${creative.store_list_image_url?"홈 · 점령 대기 · 매장 목록":"홈 · 점령 대기"}${creative.click_url?" · 클릭 연결":""}</p>
-          <div class="admin-ad-stats"><span>${impressions.toLocaleString("ko-KR")} 노출</span><span>${clicks.toLocaleString("ko-KR")} 클릭</span><span>CTR ${ctr}%</span><span>${Number(metric.visits||0).toLocaleString("ko-KR")} 방문</span><span>${Number(metric.captures||0).toLocaleString("ko-KR")} 점령</span></div>
         </div>
         <div class="admin-data-actions">
           ${creative.is_primary?`<button class="text-btn" data-edit-primary-creative="${escapeAttr(campaign.id)}" type="button">기본 소재 수정</button>`:`<button class="text-btn" data-edit-creative="${escapeAttr(creative.id)}" type="button">수정</button><button class="text-btn danger-text" data-delete-creative="${escapeAttr(creative.id)}" type="button">삭제</button>`}
@@ -2768,6 +2779,111 @@
     $$('[data-edit-primary-creative]',box).forEach(btn=>btn.onclick=()=>editAdCampaign(btn.dataset.editPrimaryCreative));
     $$('[data-edit-creative]',box).forEach(btn=>btn.onclick=()=>editAdCreative(btn.dataset.editCreative));
     $$('[data-delete-creative]',box).forEach(btn=>btn.onclick=()=>deleteAdCreative(btn.dataset.deleteCreative));
+  }
+
+
+  function renderAdPerformanceCampaigns(){
+    const box=$("#adPerformanceCampaignList");
+    if(!box) return;
+    const now=Date.now();
+    const query=String($("#adPerformanceSearch")?.value||"").trim().toLowerCase();
+    const visibleCampaigns=adCampaigns.filter(item=>!query || [item.campaign_name,item.advertiser_name].some(value=>String(value||"").toLowerCase().includes(query)));
+    box.innerHTML=visibleCampaigns.map(item=>{
+      const measured=adAnalyticsCampaignMap.get(String(item.id)) || {};
+      const impressions=Number(measured.impressions ?? item.impressions ?? 0);
+      const clicks=Number(measured.clicks ?? item.clicks ?? 0);
+      const ctr=impressions ? (clicks/impressions*100).toFixed(1) : "0.0";
+      const visits=Number(measured.visits||0), captures=Number(measured.captures||0);
+      const start=item.starts_at?new Date(item.starts_at).getTime():0;
+      const end=item.ends_at?new Date(item.ends_at).getTime():Infinity;
+      const live=item.is_active && start<=now && end>now;
+      return `<button class="admin-ad-row admin-ad-performance-row ${String(selectedAdPerformanceCampaignId)===String(item.id)?"is-selected":""}" data-ad-performance-campaign="${escapeAttr(item.id)}" type="button">
+        <img class="admin-ad-thumb" src="${escapeAttr(item.image_url)}" alt="" />
+        <span class="admin-ad-copy">
+          <span class="admin-ad-title"><strong>${escapeHtml(item.campaign_name)}</strong><span>${live?"LIVE":(item.is_active?"SCHEDULED":"OFF")}</span></span>
+          <span class="admin-ad-performance-meta">${escapeHtml(item.advertiser_name || "광고주")} · ${escapeHtml(formatAdPeriod(item.starts_at,item.ends_at))}</span>
+          <span class="admin-ad-stats"><span>${impressions.toLocaleString("ko-KR")} 노출</span><span>${clicks.toLocaleString("ko-KR")} 클릭</span><span>CTR ${ctr}%</span><span>${visits.toLocaleString("ko-KR")} 방문</span><span>${captures.toLocaleString("ko-KR")} 점령</span></span>
+        </span>
+      </button>`;
+    }).join("") || `<div class="admin-empty">${query?"검색 결과가 없습니다.":"등록된 광고 캠페인이 없습니다."}</div>`;
+    $$('[data-ad-performance-campaign]',box).forEach(btn=>btn.onclick=()=>openAdPerformanceCreativePanel(btn.dataset.adPerformanceCampaign));
+  }
+
+
+  function csvCell(value){
+    const text=String(value??"");
+    return /[",\n]/.test(text) ? `"${text.replace(/"/g,'""')}"` : text;
+  }
+
+  function downloadCsv(filename, rows){
+    const csv=`\uFEFF${rows.map(row=>row.map(csvCell).join(",")).join("\n")}`;
+    const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
+    const url=URL.createObjectURL(blob);
+    const link=document.createElement("a");
+    link.href=url; link.download=filename; document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
+
+  function exportAdPerformanceCsv(){
+    const days=Math.max(1,Number($("#adAnalyticsDays")?.value||30));
+    const query=String($("#adPerformanceSearch")?.value||"").trim().toLowerCase();
+    const campaigns=adCampaigns.filter(item=>!query || [item.campaign_name,item.advertiser_name].some(value=>String(value||"").toLowerCase().includes(query)));
+    const rows=[["기간(일)","캠페인","광고주","소재","노출","클릭","CTR(%)","방문","점령"]];
+    campaigns.forEach(campaign=>{
+      const creatives=campaignCreatives(campaign);
+      if(creatives.length){
+        creatives.forEach(creative=>{
+          const metric=creativeMetric(campaign.id,creative.id);
+          const impressions=Number(metric.impressions||0), clicks=Number(metric.clicks||0);
+          rows.push([days,campaign.campaign_name||"",campaign.advertiser_name||"",creative.name||"광고 소재",impressions,clicks,impressions?(clicks/impressions*100).toFixed(1):"0.0",Number(metric.visits||0),Number(metric.captures||0)]);
+        });
+      }else{
+        const metric=adAnalyticsCampaignMap.get(String(campaign.id))||{};
+        const impressions=Number(metric.impressions||0), clicks=Number(metric.clicks||0);
+        rows.push([days,campaign.campaign_name||"",campaign.advertiser_name||"","",impressions,clicks,impressions?(clicks/impressions*100).toFixed(1):"0.0",Number(metric.visits||0),Number(metric.captures||0)]);
+      }
+    });
+    const stamp=new Date().toISOString().slice(0,10);
+    downloadCsv(`biteboss-ad-performance-${days}d-${stamp}.csv`,rows);
+  }
+
+  function openAdPerformanceCreativePanel(campaignId){
+    selectedAdPerformanceCampaignId=String(campaignId||"");
+    const campaign=adCampaigns.find(item=>String(item.id)===selectedAdPerformanceCampaignId);
+    if(!campaign) return;
+    $("#adPerformanceCreativePanel")?.classList.remove("hidden");
+    setText("#adPerformanceCreativeDescription",`${campaign.campaign_name} · 광고 소재별 성과`);
+    renderAdPerformanceCampaigns();
+    renderAdPerformanceCreatives();
+    $("#adPerformanceCreativePanel")?.scrollIntoView({behavior:"smooth",block:"start"});
+  }
+
+  function closeAdPerformanceCreativePanel(){
+    selectedAdPerformanceCampaignId="";
+    $("#adPerformanceCreativePanel")?.classList.add("hidden");
+    renderAdPerformanceCampaigns();
+  }
+
+  function renderAdPerformanceCreatives(){
+    const box=$("#adPerformanceCreativeList");
+    if(!box || !selectedAdPerformanceCampaignId) return;
+    const campaign=adCampaigns.find(item=>String(item.id)===selectedAdPerformanceCampaignId);
+    if(!campaign){ closeAdPerformanceCreativePanel(); return; }
+    const rows=campaignCreatives(campaign);
+    box.innerHTML=rows.map(creative=>{
+      const metric=creativeMetric(campaign.id,creative.id);
+      const impressions=Number(metric.impressions||0), clicks=Number(metric.clicks||0);
+      const ctr=impressions ? (clicks/impressions*100).toFixed(1) : "0.0";
+      const image=creative.image_url || creative.store_list_image_url || "";
+      return `<article class="admin-ad-row admin-ad-creative-row admin-ad-performance-row">
+        ${image?`<img class="admin-ad-thumb" src="${escapeAttr(image)}" alt="" />`:`<div class="admin-ad-thumb"></div>`}
+        <div class="admin-ad-copy">
+          <div class="admin-ad-title"><strong>${escapeHtml(creative.name||"광고 소재")}</strong><span class="admin-ad-creative-badge ${creative.is_primary?"is-primary":""}">${creative.is_primary?"기본 소재":(creative.is_active===false?"OFF":"ACTIVE")}</span></div>
+          <p>${creative.store_list_image_url?"홈 · 점령 대기 · 매장 목록":"홈 · 점령 대기"}${creative.click_url?" · 클릭 연결":""}</p>
+          <div class="admin-ad-stats"><span>${impressions.toLocaleString("ko-KR")} 노출</span><span>${clicks.toLocaleString("ko-KR")} 클릭</span><span>CTR ${ctr}%</span><span>${Number(metric.visits||0).toLocaleString("ko-KR")} 방문</span><span>${Number(metric.captures||0).toLocaleString("ko-KR")} 점령</span></div>
+        </div>
+      </article>`;
+    }).join("") || '<div class="admin-empty">등록된 광고 소재가 없습니다.</div>';
   }
 
   function editAdCreative(id){
@@ -2967,7 +3083,7 @@
         form.dataset.storeListStoragePath=storeListStoragePath;
       }
 
-      const { data, error } = await adminSb.rpc("biteboss_admin_upsert_campaign", {
+      const { data, error } = await adminSb.rpc("biteboss_admin_upsert_campaign_v8217", {
         p_id:id || null,
         p_advertiser_name:String($("#adAdvertiserName")?.value || "").trim(),
         p_campaign_name:String($("#adCampaignName")?.value || "").trim(),
@@ -2983,7 +3099,7 @@
       if(!data?.ok) throw new Error(data?.error || "CAMPAIGN_SAVE_FAILED");
       let savedCampaignId=String(data?.id || data?.campaign_id || id || "");
       if(!savedCampaignId){
-        const listed=await adminSb.rpc("biteboss_admin_list_campaigns");
+        const listed=await adminSb.rpc("biteboss_admin_list_campaigns_v8217");
         if(listed.error) throw listed.error;
         const saved=(Array.isArray(listed.data) ? listed.data : []).find(item => String(item.image_url || "") === String(imageUrl));
         savedCampaignId=String(saved?.id || "");
@@ -3021,7 +3137,7 @@
     if(!item) return;
     if(!confirm(`${item.campaign_name} 캠페인을 삭제할까요?`)) return;
     try{
-      const { data, error } = await adminSb.rpc("biteboss_admin_delete_campaign", { p_campaign_id:item.id });
+      const { data, error } = await adminSb.rpc("biteboss_admin_delete_campaign_v8217", { p_campaign_id:item.id });
       if(error) throw error;
       if(!data?.ok) throw new Error(data?.error || "CAMPAIGN_DELETE_FAILED");
       if(data.storage_path){
@@ -3034,7 +3150,7 @@
       if(creativePaths.length){ const removed=await adminSb.storage.from("biteboss-assets").remove(creativePaths); if(removed.error) console.warn("Creative asset cleanup:",removed.error); }
       const creatives={...adCreativeConfig()}; delete creatives[String(id)]; await saveAdCreativeConfig(creatives);
       const settings={ ...adPlacementConfig() }; delete settings[String(id)];
-      await adminSb.from("biteboss_app_config").upsert({ key:"ad_campaign_settings", value:settings, updated_by:session.user.id, updated_at:new Date().toISOString() },{ onConflict:"key" });
+      await secureAdminConfigUpsert({ key:"ad_campaign_settings", value:settings });
       appConfig.ad_campaign_settings=settings;
       if(String(selectedAdCampaignId)===String(id)) closeAdCreativePanel();
       await loadAds();
