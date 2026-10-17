@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.00";
+  const BITEBOSS_BUILD = "82.01";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1906,7 +1906,8 @@ await handleClaimParam();
     });
 
     const loginNotice = $("#storesLoginNotice");
-    loginNotice?.classList.toggle("hidden", presenceBlockedReason !== "MEMBER_LOGIN_REQUIRED");
+    const guestNeedsLogin = !playerSession?.authenticated;
+    loginNotice?.classList.toggle("hidden", !guestNeedsLogin);
     startStoreListReclaimCountdowns();
   }
 
@@ -7856,21 +7857,14 @@ await handleClaimParam();
       <div class="profile-comment-all">
         ${items.length ? items.map(profileCommentRowMarkup).join("") : `<div class="profile-record-empty">아직 남긴 한마디가 없습니다.</div>`}
       </div>
-      ${total > 10 ? `
-        <nav class="list-pagination profile-comment-pagination" aria-label="내 한마디 페이지">
-          <button type="button" data-profile-comment-page="prev" ${safePage<=1 ? "disabled" : ""}>이전</button>
-          <span>${safePage} / ${pageCount}</span>
-          <button type="button" data-profile-comment-page="next" ${safePage>=pageCount ? "disabled" : ""}>다음</button>
-        </nav>
-      ` : ""}
+      ${total > 10 ? `<nav id="profileCommentAllPagination" class="list-pagination profile-comment-pagination" aria-label="내 한마디 페이지"></nav>` : ""}
     `;
     bindProfileCommentRows(body);
-    body.querySelector('[data-profile-comment-page="prev"]')?.addEventListener("click",()=>{
-      if(safePage>1) openProfileCommentAll(safePage-1);
-    });
-    body.querySelector('[data-profile-comment-page="next"]')?.addEventListener("click",()=>{
-      if(safePage<pageCount) openProfileCommentAll(safePage+1);
-    });
+    if(total > 10){
+      renderPagination("#profileCommentAllPagination", safePage, total, 10, nextPage => {
+        openProfileCommentAll(nextPage);
+      });
+    }
   }
 
   async function openCurrentOrganizationDetail(){
