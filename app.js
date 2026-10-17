@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.90";
+  const BITEBOSS_BUILD = "81.91";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1037,6 +1037,8 @@
         cachePartnerBanners(config.partner_banners);
       }
     }
+    gamePulseLoadedAt = 0;
+    if($("#page-stores")?.classList.contains("active")) paintImmediatePartnerBanner();
   }
 
   function renderHomeSplashImage(options = {}){
@@ -4818,7 +4820,11 @@
     if(!box) return;
     const banner=currentPartnerBanner();
     const markup=partnerBannerMarkup(banner);
-    if(!markup) return;
+    if(!markup){
+      box.innerHTML="";
+      box.classList.add("hidden");
+      return;
+    }
     box.innerHTML=markup;
     box.classList.remove("hidden");
     bindGamePulseStoreLinks(box);

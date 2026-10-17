@@ -15,7 +15,7 @@
           detectSessionInUrl:false,
           storageKey:"biteboss-store-auth"
         },
-        global:{ headers:{ "x-client-info":"biteboss-store-admin-web/81.90" } }
+        global:{ headers:{ "x-client-info":"biteboss-store-admin-web/81.91" } }
       })
     : null;
 
@@ -293,7 +293,9 @@
 
     if(snapshotResult.error) throw snapshotResult.error;
     snapshot = snapshotResult.data || {};
-    currentStorePlan = planResult.error ? {plan:"partner",label:"PARTNER",features:{}} : (planResult.data || {plan:"partner",label:"PARTNER",features:{}});
+    currentStorePlan = planResult.error
+      ? {plan:"partner",label:"PARTNER",features:{}}
+      : (planResult.data?.plan || {plan:"partner",label:"PARTNER",features:{}});
     renderOverview();
     renderStoreForm();
     renderBoss();

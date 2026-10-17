@@ -15,7 +15,7 @@
           detectSessionInUrl:false,
           storageKey:"biteboss-admin-auth"
         },
-        global:{ headers:{ "x-client-info":"biteboss-admin-web/81.90" } }
+        global:{ headers:{ "x-client-info":"biteboss-admin-web/81.91" } }
       })
     : null;
 
@@ -1619,6 +1619,7 @@
 
   async function openStoreEditor(storeId){
     if(!storeId) return;
+    await loadConfig();
     editingStoreId = storeId;
     editingStoreBundle = null;
     const editor = $("#adminStoreEditor");
@@ -1766,6 +1767,7 @@
 
   async function reloadStoreEditor(){
     if(!editingStoreId) return;
+    await loadConfig();
     const [{ data, error }, videoResult, seoResult, planResult] = await Promise.all([
       adminSb.rpc("biteboss_admin_store_detail", { p_store_id:editingStoreId }),
       adminSb.rpc("biteboss_admin_store_video", { p_store_id:editingStoreId }),
@@ -1784,7 +1786,7 @@
     const partnered=String(store.partnership_status || "")==="partnered";
     section.classList.toggle("hidden",!partnered);
     if(!partnered) return;
-    const plan=String(planData?.plan || storePlanMap.get(String(store.id))?.plan || "partner");
+    const plan=String(storePlanMap.get(String(store.id))?.plan || planData?.plan || "partner");
     const select=$("#adminStorePlanSelect");
     if(select) select.value=plan==="pro" ? "pro" : "partner";
     const expires=$("#adminStorePlanExpires");
