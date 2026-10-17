@@ -314,3 +314,31 @@ test('82.18 routes legacy admin RPCs through a full-admin server proxy', () => {
   assert.match(sql, /p\.proname like 'biteboss_admin_%'/);
   assert.match(sql, /has_function_privilege\('authenticated'/);
 });
+
+test('82.19 tracks privacy-minimized access presence and renders role/plan access analytics', () => {
+  const sql = read('sql/biteboss-82.19-access-analytics.sql');
+  const adminHtml = read('admin.html');
+  assert.match(app, /biteboss_access_ping_v8219/);
+  assert.match(app, /function accessTelemetryOwnerContext\(\)/);
+  assert.match(app, /tier:\"plus\"/);
+  assert.match(app, /tier:\"pro\"/);
+  assert.match(sql, /create table if not exists public\.biteboss_access_sessions/);
+  assert.match(sql, /biteboss_admin_access_analytics_v8219/);
+  assert.match(sql, /revoke all on table public\.biteboss_access_sessions from public, anon, authenticated/);
+  assert.match(sql, /stores no GPS, IP address, email, PIN/);
+  assert.match(adminHtml, /id="accessOnlineNow"/);
+  assert.match(adminHtml, /id="accessTierBreakdown"/);
+  assert.match(adminHtml, /id="accessRecentList"/);
+  assert.match(admin, /biteboss_admin_access_analytics_v8219/);
+  assert.match(admin, /PARTNER/);
+  assert.match(admin, /PLUS/);
+  assert.match(admin, /PRO/);
+});
+
+test('82.19 admin layout uses unified hierarchy and explicit moderation/ad action controls', () => {
+  const adminCss = read('admin.css');
+  assert.match(adminCss, /admin-page-head h2\{[^}]*font-size:30px/);
+  assert.match(adminCss, /admin-comment-actions \.text-btn\{[^}]*min-height:30px/);
+  assert.match(adminCss, /admin-ad-thumb\.admin-ad-placeholder/);
+  assert.match(admin, /이름 없는 캠페인/);
+});

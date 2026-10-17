@@ -15,7 +15,7 @@
           detectSessionInUrl:false,
           storageKey:"biteboss-admin-auth"
         },
-        global:{ headers:{ "x-client-info":"biteboss-admin-web/82.18" } }
+        global:{ headers:{ "x-client-info":"biteboss-admin-web/82.19" } }
       })
     : null;
 
@@ -311,6 +311,7 @@
     $$('[data-analytics-range]').forEach(btn => btn.addEventListener("click", () => selectAnalyticsRange(btn.dataset.analyticsRange)));
     $("#analyticsCompareMode")?.addEventListener("change", event => { analyticsCompareMode = String(event.currentTarget.value || "previous"); loadAnalytics(); });
     $("#analyticsApplyCustom")?.addEventListener("click", () => { analyticsRange = "custom"; syncAnalyticsPresetUi(); loadAnalytics(); });
+    $("#refreshAccessAnalytics")?.addEventListener("click", () => loadAccessAnalytics(resolveAnalyticsPeriod()));
 
     $$('[data-close-store-editor]').forEach(node => node.addEventListener('click', closeStoreEditor));
     $("#adminStoreEditForm")?.addEventListener("submit", saveAdminStoreInfo);
@@ -535,6 +536,7 @@
       if($("#analyticsTo") && !$("#analyticsTo").value) $("#analyticsTo").value=formatInputDate(period.to);
     }
     chart.innerHTML='<div class="analytics-loading">불러오는 중…</div>';
+    void loadAccessAnalytics(period);
 
     const {data,error}=await adminRpc("biteboss_admin_analytics_v7582",{
       p_from:period.from.toISOString(), p_to:period.to.toISOString(),
@@ -563,6 +565,89 @@
     setText("#analyticsRepeatRateDelta", pointDeltaText(current.repeat_rate,compare.repeat_rate));
     renderAnalyticsTrend(Array.isArray(data.trend)?data.trend:[]);
     renderPartnerCompare(data.partner_compare || {});
+  }
+
+
+  async function loadAccessAnalytics(period = resolveAnalyticsPeriod()){
+    const tierBox=$("#accessTierBreakdown");
+    const surfaceBox=$("#accessSurfaceBreakdown");
+    const recentBox=$("#accessRecentList");
+    if(!tierBox || !surfaceBox || !recentBox) return;
+    tierBox.innerHTML='<div class="analytics-loading">불러오는 중…</div>';
+    surfaceBox.innerHTML='<div class="analytics-loading">불러오는 중…</div>';
+    recentBox.innerHTML='<div class="analytics-loading">불러오는 중…</div>';
+    setText("#accessPeriodLabel",period.label || "선택 기간");
+
+    const {data,error}=await adminRpc("biteboss_admin_access_analytics_v8219",{
+      p_from:period.from.toISOString(),
+      p_to:period.to.toISOString()
+    });
+    if(error){
+      console.warn("BiteBoss access analytics:",error);
+      const empty='<div class="analytics-empty">접속 데이터를 불러오지 못했습니다. 82.19 접속 분석 SQL 배포 상태를 확인하세요.</div>';
+      tierBox.innerHTML=empty; surfaceBox.innerHTML=empty; recentBox.innerHTML=empty;
+      return;
+    }
+    renderAccessAnalytics(data || {});
+  }
+
+  function renderAccessAnalytics(data){
+    const now=data.now || {}, period=data.period || {};
+    setText("#accessOnlineNow",Number(now.online_users||0).toLocaleString("ko-KR"));
+    setText("#accessPeriodActive",Number(period.active_users||0).toLocaleString("ko-KR"));
+    setText("#accessMembers",Number(period.member_users||0).toLocaleString("ko-KR"));
+    setText("#accessGuests",Number(period.guest_users||0).toLocaleString("ko-KR"));
+    setText("#accessStoreOwners",Number(period.store_owner_users||0).toLocaleString("ko-KR"));
+    renderAccessBreakdown("#accessTierBreakdown",Array.isArray(data.tiers)?data.tiers:[],"tier");
+    renderAccessBreakdown("#accessSurfaceBreakdown",Array.isArray(data.surfaces)?data.surfaces:[],"surface");
+    renderRecentAccess(Array.isArray(data.recent)?data.recent:[]);
+  }
+
+  function accessTierLabel(value){
+    return ({guest:"게스트",member:"일반 회원",store_owner:"매장주",partner:"PARTNER",plus:"PLUS",pro:"PRO"})[String(value||"")] || String(value||"기타").toUpperCase();
+  }
+
+  function accessSurfaceLabel(value){
+    return ({web:"Web",pwa:"PWA",ios:"iOS",android:"Android"})[String(value||"")] || String(value||"기타").toUpperCase();
+  }
+
+  function renderAccessBreakdown(selector,rows,type){
+    const box=$(selector); if(!box) return;
+    const normalized=rows.map(row=>({
+      key:String(type==="tier"?row.tier:row.surface || "other"),
+      online:Number(row.online_users||0),
+      active:Number(row.active_users||0)
+    }));
+    if(type==="tier"){
+      ["guest","member","store_owner","partner","plus","pro"].forEach(key=>{
+        if(!normalized.some(row=>row.key===key)) normalized.push({key,online:0,active:0});
+      });
+      const order={guest:0,member:1,store_owner:2,partner:3,plus:4,pro:5};
+      normalized.sort((a,b)=>(order[a.key]??99)-(order[b.key]??99));
+    }else{
+      normalized.sort((a,b)=>b.active-a.active || b.online-a.online);
+    }
+    box.innerHTML=normalized.map(row=>`<div class="admin-access-breakdown-row">
+      <span>${escapeHtml(type==="tier"?accessTierLabel(row.key):accessSurfaceLabel(row.key))}</span>
+      <div><strong>${row.online.toLocaleString("ko-KR")}</strong><small>현재</small></div>
+      <div><strong>${row.active.toLocaleString("ko-KR")}</strong><small>기간</small></div>
+    </div>`).join("") || '<div class="analytics-empty">접속 기록이 없습니다.</div>';
+  }
+
+  function renderRecentAccess(rows){
+    const box=$("#accessRecentList"); if(!box) return;
+    box.innerHTML=rows.slice(0,30).map(row=>{
+      const tier=accessTierLabel(row.access_tier || (row.account_kind==="guest"?"guest":"member"));
+      const surface=accessSurfaceLabel(row.surface);
+      const nickname=String(row.nickname || (row.account_kind==="guest"?"게스트":"회원"));
+      const page=String(row.current_path || "home").replace(/^page-/,"");
+      const online=Boolean(row.is_online);
+      return `<article class="admin-access-recent-row">
+        <div class="admin-access-user"><span class="admin-presence-dot ${online?"is-online":""}" aria-hidden="true"></span><div><strong>${escapeHtml(nickname)}</strong><small>${escapeHtml(tier)}${row.is_store_owner?" · 매장주":""}</small></div></div>
+        <div class="admin-access-context"><span>${escapeHtml(surface)}</span><span>${escapeHtml(page)}</span></div>
+        <time datetime="${escapeAttr(row.last_seen_at||"")}">${escapeHtml(formatDate(row.last_seen_at))}</time>
+      </article>`;
+    }).join("") || '<div class="analytics-empty">최근 접속 기록이 없습니다.</div>';
   }
 
   function deltaText(value, base){
@@ -2736,9 +2821,9 @@
       const targetLabel = setting.target_type === "region" && setting.target_region ? ` · ${setting.target_region}` : " · 전체";
       return `
         <article class="admin-ad-row ${String(selectedAdCampaignId)===String(item.id)?"is-selected":""}">
-          <img class="admin-ad-thumb" src="${escapeAttr(item.image_url)}" alt="" />
+          ${item.image_url?`<img class="admin-ad-thumb" src="${escapeAttr(item.image_url)}" alt="" />`:`<div class="admin-ad-thumb admin-ad-placeholder">AD</div>`}
           <div class="admin-ad-copy">
-            <div class="admin-ad-title"><strong>${escapeHtml(item.campaign_name)}</strong><span>${live ? "LIVE" : (item.is_active ? "SCHEDULED" : "OFF")}</span></div>
+            <div class="admin-ad-title"><strong>${escapeHtml(item.campaign_name || "이름 없는 캠페인")}</strong><span>${live ? "LIVE" : (item.is_active ? "SCHEDULED" : "OFF")}</span></div>
             <p>${escapeHtml(item.advertiser_name)} · ${creativeCount.toLocaleString("ko-KR")}개 소재 · ${escapeHtml(placementLabel + targetLabel)} · ${escapeHtml(formatAdPeriod(item.starts_at, item.ends_at))}</p>
           </div>
           <div class="admin-data-actions">
@@ -2792,7 +2877,7 @@
     box.innerHTML=rows.map(creative=>{
       const image=creative.image_url || creative.store_list_image_url || "";
       return `<article class="admin-ad-row admin-ad-creative-row">
-        ${image?`<img class="admin-ad-thumb" src="${escapeAttr(image)}" alt="" />`:`<div class="admin-ad-thumb"></div>`}
+        ${image?`<img class="admin-ad-thumb" src="${escapeAttr(image)}" alt="" />`:`<div class="admin-ad-thumb admin-ad-placeholder">AD</div>`}
         <div class="admin-ad-copy">
           <div class="admin-ad-title"><strong>${escapeHtml(creative.name || "광고 소재")}</strong><span class="admin-ad-creative-badge ${creative.is_primary?"is-primary":""}">${creative.is_primary?"기본 소재":(creative.is_active===false?"OFF":"ACTIVE")}</span></div>
           <p>${creative.store_list_image_url?"홈 · 점령 대기 · 매장 목록":"홈 · 점령 대기"}${creative.click_url?" · 클릭 연결":""}</p>
@@ -2824,9 +2909,9 @@
       const end=item.ends_at?new Date(item.ends_at).getTime():Infinity;
       const live=item.is_active && start<=now && end>now;
       return `<button class="admin-ad-row admin-ad-performance-row ${String(selectedAdPerformanceCampaignId)===String(item.id)?"is-selected":""}" data-ad-performance-campaign="${escapeAttr(item.id)}" type="button">
-        <img class="admin-ad-thumb" src="${escapeAttr(item.image_url)}" alt="" />
+        ${item.image_url?`<img class="admin-ad-thumb" src="${escapeAttr(item.image_url)}" alt="" />`:`<span class="admin-ad-thumb admin-ad-placeholder">AD</span>`}
         <span class="admin-ad-copy">
-          <span class="admin-ad-title"><strong>${escapeHtml(item.campaign_name)}</strong><span>${live?"LIVE":(item.is_active?"SCHEDULED":"OFF")}</span></span>
+          <span class="admin-ad-title"><strong>${escapeHtml(item.campaign_name || "이름 없는 캠페인")}</strong><span>${live?"LIVE":(item.is_active?"SCHEDULED":"OFF")}</span></span>
           <span class="admin-ad-performance-meta">${escapeHtml(item.advertiser_name || "광고주")} · ${escapeHtml(formatAdPeriod(item.starts_at,item.ends_at))}</span>
           <span class="admin-ad-stats"><span>${impressions.toLocaleString("ko-KR")} 노출</span><span>${clicks.toLocaleString("ko-KR")} 클릭</span><span>CTR ${ctr}%</span><span>${visits.toLocaleString("ko-KR")} 방문</span><span>${captures.toLocaleString("ko-KR")} 점령</span></span>
         </span>
@@ -2902,7 +2987,7 @@
       const ctr=impressions ? (clicks/impressions*100).toFixed(1) : "0.0";
       const image=creative.image_url || creative.store_list_image_url || "";
       return `<article class="admin-ad-row admin-ad-creative-row admin-ad-performance-row">
-        ${image?`<img class="admin-ad-thumb" src="${escapeAttr(image)}" alt="" />`:`<div class="admin-ad-thumb"></div>`}
+        ${image?`<img class="admin-ad-thumb" src="${escapeAttr(image)}" alt="" />`:`<div class="admin-ad-thumb admin-ad-placeholder">AD</div>`}
         <div class="admin-ad-copy">
           <div class="admin-ad-title"><strong>${escapeHtml(creative.name||"광고 소재")}</strong><span class="admin-ad-creative-badge ${creative.is_primary?"is-primary":""}">${creative.is_primary?"기본 소재":(creative.is_active===false?"OFF":"ACTIVE")}</span></div>
           <p>${creative.store_list_image_url?"홈 · 점령 대기 · 매장 목록":"홈 · 점령 대기"}${creative.click_url?" · 클릭 연결":""}</p>

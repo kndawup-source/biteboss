@@ -61,3 +61,10 @@ Feature: BiteBoss release-critical flows
     Then a new takeover countdown does not start
     And the challenge page shows the remaining wait time
     And the member can still visit their own occupied store
+
+  Scenario: Admin reviews live access by account and store plan
+    Given BiteBoss clients report privacy-minimized access presence
+    When a full admin opens the service status dashboard
+    Then current and period active users are shown separately
+    And member, guest, store owner, PARTNER, PLUS, and PRO access can be compared
+    And recent access does not expose GPS coordinates, PINs, or IP addresses

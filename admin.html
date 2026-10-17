@@ -7,9 +7,9 @@
 <meta content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" name="viewport"/>
 <meta content="yes" name="mobile-web-app-capable"/>
 <title>BiteBoss Admin</title>
-<link href="./styles.css?v=82.18" rel="stylesheet"/>
-<link href="./admin.css?v=82.18" rel="stylesheet"/>
-<script src="./app-config.js?v=82.18"></script>
+<link href="./styles.css?v=82.19" rel="stylesheet"/>
+<link href="./admin.css?v=82.19" rel="stylesheet"/>
+<script src="./app-config.js?v=82.19"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="admin-app">
@@ -121,6 +121,34 @@
 </article>
 </section>
 </section>
+<section class="admin-section-card admin-dashboard-section admin-access-section" aria-labelledby="accessOverviewTitle">
+<div class="admin-section-title admin-section-title-row">
+<div><h3 id="accessOverviewTitle">접속 현황</h3><p>현재 접속과 선택한 기간의 활성 사용자를 회원·매장주·등급별로 확인합니다.</p></div>
+<span class="admin-data-note">앱 세션 기준 · 현재 접속 5분</span>
+</div>
+<div class="admin-access-kpis" aria-label="접속 핵심 지표">
+<article><span>현재 접속</span><strong id="accessOnlineNow">0</strong><small>최근 5분</small></article>
+<article><span>기간 활성</span><strong id="accessPeriodActive">0</strong><small id="accessPeriodLabel">최근 7일</small></article>
+<article><span>회원</span><strong id="accessMembers">0</strong><small>기간 내 고유 사용자</small></article>
+<article><span>게스트</span><strong id="accessGuests">0</strong><small>기간 내 고유 사용자</small></article>
+<article><span>매장주</span><strong id="accessStoreOwners">0</strong><small>관리 권한 감지 세션</small></article>
+</div>
+<div class="admin-access-grid">
+<article class="admin-access-panel">
+<div class="section-head"><h3>등급별 접속</h3><span>현재 / 기간 활성</span></div>
+<div class="admin-access-breakdown" id="accessTierBreakdown"><div class="analytics-loading">불러오는 중…</div></div>
+</article>
+<article class="admin-access-panel">
+<div class="section-head"><h3>접속 환경</h3><span>기기·플랫폼</span></div>
+<div class="admin-access-breakdown" id="accessSurfaceBreakdown"><div class="analytics-loading">불러오는 중…</div></div>
+</article>
+</div>
+<div class="admin-access-recent-head">
+<div><h3>최근 접속</h3><p>개인정보를 최소화해 닉네임·등급·화면·마지막 활동만 표시합니다.</p></div>
+<button class="secondary-btn admin-small-btn" id="refreshAccessAnalytics" type="button">새로고침</button>
+</div>
+<div class="admin-access-recent" id="accessRecentList"><div class="analytics-loading">불러오는 중…</div></div>
+</section>
 <section class="ops-recent admin-dashboard-section admin-section-card">
 <div class="section-head"><h3>최근 활동</h3><span>서비스 이벤트</span></div>
 <div class="admin-activity-list" id="adminLogs"></div>
@@ -214,7 +242,7 @@
 <label>GPS 허용 반경(m)<input class="input" min="1" name="gps_radius_m" required="" type="number"/></label>
 <label>최대 GPS 오차(m)<input class="input" min="1" name="max_location_accuracy_m" required="" type="number"/></label>
 <label>GPS 체류시간(초)<input class="input" min="30" name="gps_dwell_seconds" required="" type="number"/></label>
-<label>GPS 확인간격(초)<input class="input" min="5" name="gps_presence_ping_seconds" required="" type="number"/ inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="숫자 6자리" autocomplete="current-password"></label>
+<label>GPS 확인간격(초)<input class="input" min="5" name="gps_presence_ping_seconds" required="" type="number" inputmode="numeric" pattern="[0-9]*"/></label>
 <label>하루 매장별 점령 제한<input class="input" min="1" name="daily_store_limit" required="" type="number"/></label>
 <label>주변 매장 반경(m)<input class="input" min="100" name="nearby_radius_m" required="" type="number"/></label>
 <label>주변 매장 표시 수<input class="input" max="100" min="1" name="nearby_limit" required="" type="number"/></label>
@@ -617,6 +645,6 @@
 </div>
 </section>
 </div>
-<script src="./admin.js?v=82.18"></script>
+<script src="./admin.js?v=82.19"></script>
 </body>
 </html>

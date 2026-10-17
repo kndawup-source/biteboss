@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const ASSET_VERSION = document.querySelector('meta[name="biteboss-build"]')?.content || "82.18";
+  const ASSET_VERSION = document.querySelector('meta[name="biteboss-build"]')?.content || "82.19";
 
   const isNative = (() => {
     try{

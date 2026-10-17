@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.18";
+  const BITEBOSS_BUILD = "82.19";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -284,6 +284,9 @@
   let storeSearchTimer = null;
   let storeSearchSeq = 0;
   let presenceTimer = null;
+  let accessTelemetryTimer = null;
+  let accessTelemetryBusy = false;
+  let accessTelemetryUnavailable = false;
   let delayedTakeoverCloseTimer = null;
   let takeoverCancelResetTimer = null;
   const autoImportAttempts = new Map();
@@ -360,6 +363,93 @@
 
   const partnerBannerPhotoHydration = new Map();
 
+  function accessTelemetrySessionKey(){
+    const storageKey="biteboss-access-session-v8219";
+    try{
+      let value=sessionStorage.getItem(storageKey);
+      if(!value){
+        value=globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        sessionStorage.setItem(storageKey,value);
+      }
+      return String(value).slice(0,80);
+    }catch{
+      return `volatile-${String(authUser?.id||"guest").slice(0,36)}`;
+    }
+  }
+
+  function accessTelemetrySurface(){
+    try{
+      const platform=String(window.Capacitor?.getPlatform?.() || "web").toLowerCase();
+      if(platform==="ios" || platform==="android") return platform;
+    }catch{}
+    const standalone=window.matchMedia?.("(display-mode: standalone)")?.matches===true || window.navigator.standalone===true;
+    return standalone ? "pwa" : "web";
+  }
+
+  function accessTelemetryOwnerContext(){
+    const managementRoles=new Set(["owner","manager","staff","admin","store_admin","store_owner","partner"]);
+    const ownerStoreIds=[];
+    storeRoleMap.forEach((row,storeId)=>{
+      const role=String(row?.store_role || row?.admin_role || row?.my_store_role || row?.management_role || "").toLowerCase();
+      const canManage=Boolean(
+        row?.is_store_owner || row?.is_store_admin || row?.is_manager || row?.can_manage || row?.can_manage_store || row?.is_my_store || managementRoles.has(role)
+      );
+      if(canManage) ownerStoreIds.push(String(storeId));
+    });
+    if(!ownerStoreIds.length) return {isStoreOwner:false,tier:playerSession?.authenticated?"member":"guest"};
+
+    const rawPlans=Array.isArray(config.store_plans) ? config.store_plans : [];
+    const planByStore=new Map(rawPlans.map(item=>[String(item?.store_id||""),String(item?.plan||"").toLowerCase()]));
+    const ownerStores=ownerStoreIds.map(id=>stores.find(store=>String(store?.id||"")===id)).filter(Boolean);
+    const plans=ownerStoreIds.map(id=>planByStore.get(id)).filter(Boolean);
+    if(plans.includes("pro")) return {isStoreOwner:true,tier:"pro"};
+    if(plans.includes("plus")) return {isStoreOwner:true,tier:"plus"};
+    if(plans.includes("partner") || ownerStores.some(store=>String(store?.partnership_status||"")==="partnered")) return {isStoreOwner:true,tier:"partner"};
+    return {isStoreOwner:true,tier:"store_owner"};
+  }
+
+  function accessTelemetryPath(){
+    const active=document.querySelector(".page.active");
+    if(active?.id) return String(active.id).replace(/^page-/,"").slice(0,80);
+    return String(location.pathname || "/").slice(0,80);
+  }
+
+  async function pingAccessTelemetry(){
+    if(accessTelemetryBusy || accessTelemetryUnavailable || document.hidden || !window.sb || !authUser?.id) return;
+    accessTelemetryBusy=true;
+    try{
+      const owner=accessTelemetryOwnerContext();
+      const nickname=String(profile?.nickname || playerSession?.nickname || authUser?.user_metadata?.nickname || (playerSession?.authenticated?"회원":"게스트")).trim().slice(0,40);
+      const {error}=await sb.rpc("biteboss_access_ping_v8219",{
+        p_session_key:accessTelemetrySessionKey(),
+        p_player_user_id:playerSession?.authenticated ? (playerSession?.player_user_id || null) : null,
+        p_nickname:nickname,
+        p_account_kind:playerSession?.authenticated ? "member" : "guest",
+        p_access_tier:owner.tier,
+        p_is_store_owner:owner.isStoreOwner,
+        p_surface:accessTelemetrySurface(),
+        p_current_path:accessTelemetryPath()
+      });
+      if(error){
+        const message=String(error?.message || error || "");
+        if(/function .*biteboss_access_ping_v8219|PGRST202|42883/i.test(message)) accessTelemetryUnavailable=true;
+        console.warn("BiteBoss access telemetry:",error);
+      }
+    }catch(error){
+      console.warn("BiteBoss access telemetry:",error);
+    }finally{
+      accessTelemetryBusy=false;
+    }
+  }
+
+  function startAccessTelemetry(){
+    void pingAccessTelemetry();
+    if(accessTelemetryTimer!==null) return;
+    accessTelemetryTimer=window.setInterval(()=>void pingAccessTelemetry(),60*1000);
+    document.addEventListener("visibilitychange",()=>{ if(!document.hidden) void pingAccessTelemetry(); });
+    window.addEventListener("focus",()=>void pingAccessTelemetry(),{passive:true});
+  }
+
   async function init(){
     syncRuntimeShell();
     syncViewportMetrics();
@@ -433,6 +523,7 @@
       if($("#page-stores")?.classList.contains("active")) void loadGamePulse(true);
     }
     await loadStores();
+    startAccessTelemetry();
     if(lastPosition?.coords){
       nearbyLastRefreshPosition = lastPosition;
       nearbyLastRefreshAt = Date.now();
@@ -1642,6 +1733,7 @@ await handleClaimParam();
         stores.sort(compareNearbyStores);
         renderBaseStoreList({ patch:true });
         void loadGamePulse(false);
+        void pingAccessTelemetry();
       })
       .catch(error => console.warn("BiteBoss store roles:", error));
 
@@ -1667,6 +1759,7 @@ await handleClaimParam();
         const afterIds = nextStores.map(store => String(store.id)).join("|");
         stores = nextStores;
         await loadStoreRoles(stores);
+        void pingAccessTelemetry();
         stores.sort(compareNearbyStores);
 
         if(beforeIds === afterIds){
@@ -6665,6 +6758,7 @@ await handleClaimParam();
 
       lastPosition = await loginPositionPromise;
       await loadStores();
+      void pingAccessTelemetry();
       if(lastPosition?.coords){
         nearbyLastRefreshPosition = lastPosition;
         nearbyLastRefreshAt = Date.now();
@@ -6748,6 +6842,7 @@ await handleClaimParam();
       await Promise.all([loadHome(), loadMyOrganization()]);
       lastPosition = await registerPositionPromise;
       await loadStores();
+      void pingAccessTelemetry();
       if(lastPosition?.coords){
         nearbyLastRefreshPosition = lastPosition;
         nearbyLastRefreshAt = Date.now();
@@ -9584,6 +9679,7 @@ await handleClaimParam();
     updateProfileUi();
     renderOrganizationUi();
     await loadStores();
+    void pingAccessTelemetry();
   }
 
   async function getPositionSafe(showErrors = false, options = {}){
