@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.93";
+  const BITEBOSS_BUILD = "81.94";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -3170,6 +3170,16 @@ await handleClaimParam();
     return `<div class="store-comment-youtube"><iframe src="https://www.youtube-nocookie.com/embed/${escapeAttr(id)}" title="YouTube 영상" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>`;
   }
 
+  function commentVisibleBody(body){
+    const text=String(body || "");
+    if(!commentYoutubeId(text)) return text;
+    return text
+      .replace(/https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?[^\s]*v=|shorts\/|embed\/)|youtu\.be\/)[^\s]+/ig,"")
+      .replace(/[ \t]+\n/g,"\n")
+      .replace(/\n{3,}/g,"\n\n")
+      .trim();
+  }
+
   function storeCommentMarkup(comment){
     const nickname = String(comment.nickname || "사용자");
     const time = formatCommentTime(comment.created_at);
@@ -3191,7 +3201,7 @@ await handleClaimParam();
               ${comment.is_mine ? `<button type="button" data-comment-edit>수정</button><button type="button" data-comment-delete>삭제</button>` : `<button type="button" data-comment-report>신고</button>`}
             </div>
           </div>
-          <p>${escapeHtml(comment.body || "")}</p>
+          ${commentVisibleBody(comment.body || "") ? `<p>${escapeHtml(commentVisibleBody(comment.body || ""))}</p>` : ""}
           ${commentYoutubeEmbed(comment.body || "")}
         </div>
       </article>`;
