@@ -401,6 +401,11 @@
     updateProfileUi();
     void refreshNotificationState({ registerIfGranted:true });
 
+    const initialStoreRoute=storeRouteFromPath(location.pathname);
+    if(initialStoreRoute){
+      await openStoreDetail(initialStoreRoute.id,{historyMode:"replace",fromRoute:true});
+    }
+
     const initialPositionPromise = getPositionSafe(false, {
       timeout:RUNTIME.initialLocationTimeoutMs,
       maximumAge:RUNTIME.initialLocationMaxAgeMs
@@ -568,6 +573,13 @@
     document.addEventListener("touchmove", blockHomeViewportScroll, { passive:false });
     document.addEventListener("wheel", blockHomeViewportScroll, { passive:false });
     window.addEventListener("popstate", () => {
+      const storeRoute=storeRouteFromPath(location.pathname);
+      if(storeRoute){
+        openStoreDetail(storeRoute.id,{historyMode:"replace",fromRoute:true});
+        return;
+      }
+      if(activeStoreDetailId) closeModal({restoreUrl:false});
+      resetPublicSeoMeta();
       openTab(primaryTabFromPath(location.pathname), { historyMode:"replace" });
     });
 
@@ -695,6 +707,64 @@
     rank:"/rank",
     profile:"/profile"
   });
+
+  function partnerStoreSlug(value){
+    const normalized=String(value || "").trim().normalize("NFKC").toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu,"-")
+      .replace(/^-+|-+$/g,"")
+      .slice(0,80);
+    return normalized || "store";
+  }
+
+  function partnerStorePath(store){
+    const id=String(store?.id || "").trim();
+    if(!id) return "";
+    return `/store/${encodeURIComponent(id)}/${encodeURIComponent(partnerStoreSlug(store?.name || "store"))}`;
+  }
+
+  function storeRouteFromPath(pathname=location.pathname){
+    const match=String(pathname || "").match(/^\/store\/([^/]+)(?:\/([^/?#]+))?\/?$/);
+    if(!match) return null;
+    try{
+      return { id:decodeURIComponent(match[1]), slug:match[2] ? decodeURIComponent(match[2]) : "" };
+    }catch{
+      return null;
+    }
+  }
+
+  function syncPartnerStoreUrl(store, historyMode="push"){
+    if(String(store?.partnership_status || "")!=="partnered") return;
+    const path=partnerStorePath(store);
+    if(!path) return;
+    const current=`${location.pathname}${location.search || ""}`;
+    const next=`${path}${location.search || ""}`;
+    if(current===next) return;
+    const method=historyMode==="replace" ? "replaceState" : "pushState";
+    history[method]({...(history.state || {}),bitebossStoreId:String(store.id)}, "", next);
+  }
+
+  function resetPublicSeoMeta(){
+    document.title="BiteBoss";
+    const description=document.querySelector('meta[name="description"]');
+    if(description) description.content="BiteBoss는 주변 매장을 발견하고 방문·도전·점령 기록과 크루 순위를 즐기는 위치 기반 게임입니다.";
+    document.querySelector('link[rel="canonical"]')?.setAttribute("href",`${location.origin}${location.pathname}`);
+  }
+
+  function paintPartnerStoreSeoMeta(data){
+    const store=data?.store || {};
+    if(String(store.partnership_status || "")!=="partnered") return;
+    const place=[store.city,store.district].filter(Boolean).join(" ");
+    const description=[place,store.category,store.notice].filter(Boolean).join(" · ").slice(0,155) || `${store.name || "매장"}의 BiteBoss 매장 정보입니다.`;
+    document.title=`${store.name || "매장"} | BiteBoss`;
+    const meta=document.querySelector('meta[name="description"]');
+    if(meta) meta.content=description;
+    document.querySelector('meta[property="og:title"]')?.setAttribute("content",`${store.name || "매장"} | BiteBoss`);
+    document.querySelector('meta[property="og:description"]')?.setAttribute("content",description);
+    const cover=(Array.isArray(data?.photos) ? data.photos : []).find(photo=>Boolean(photo?.is_cover))
+      || (Array.isArray(data?.photos) ? data.photos[0] : null);
+    if(cover?.image_url) document.querySelector('meta[property="og:image"]')?.setAttribute("content",String(cover.image_url));
+    document.querySelector('link[rel="canonical"]')?.setAttribute("href",`${location.origin}${partnerStorePath(store)}`);
+  }
 
   function primaryTabFromPath(pathname = location.pathname){
     const path = String(pathname || "/").replace(/\/+$/, "") || "/";
@@ -2028,6 +2098,10 @@
     const protectionSummary = protectedNow ? `보호 ${formatRemaining(protectionUntil)} 남음` : "";
     const details = [categoryLabel(store.category), place, distance, protectionSummary].filter(Boolean).join(" · ");
     const isPartner = String(store.partnership_status || "unclaimed") === "partnered";
+    if(isPartner){
+      syncPartnerStoreUrl(store, options.historyMode || (options.fromRoute ? "replace" : "push"));
+      paintPartnerStoreSeoMeta(data);
+    }
     const presence = presenceState.get(String(store.id));
     const requiredSeconds = Math.max(30, Number(presence?.required_seconds || config.gps_dwell_seconds || 120));
     const remainingSeconds = Math.max(0, Number(presence?.remaining_seconds ?? requiredSeconds));
@@ -2198,6 +2272,7 @@
       const statusPromise=sb.rpc("biteboss_my_store_status",{p_store_id:storeId});
       const orgPromise=sb.rpc("biteboss_store_organization_status",{p_store_id:storeId});
       const offerPromise=sb.rpc("biteboss_store_offer_access",{p_store_id:storeId});
+      const videoPromise=sb.rpc("biteboss_store_video",{p_store_id:storeId});
       const secondaryPromise=Promise.all([
         playerSession?.authenticated && options?.showStoreManagerCard!==false
           ? sb.rpc("biteboss_partner_request_status",{p_store_id:storeId})
@@ -2206,8 +2281,8 @@
         sb.rpc("biteboss_store_game_board_v631",{p_store_id:storeId}),
         sb.rpc("biteboss_store_history_v71",{p_store_id:storeId,p_limit:12})
       ]);
-      const [detailResult,statusResult,orgResult,offerResult]=await Promise.all([
-        detailPromise,statusPromise,orgPromise,offerPromise
+      const [detailResult,statusResult,orgResult,offerResult,videoResult]=await Promise.all([
+        detailPromise,statusPromise,orgPromise,offerPromise,videoPromise
       ]);
       if(detailResult.error) throw detailResult.error;
       if(!detailResult.data?.store) throw new Error("STORE_NOT_FOUND");
@@ -2220,6 +2295,7 @@
       data.game=statusResult.error ? null : (statusResult.data || null);
       data.organization=orgResult.error ? null : (orgResult.data || null);
       data.offerAccess=offerResult.error ? null : (offerResult.data || null);
+      data.video=videoResult?.error ? null : (videoResult.data || null);
       data.partnerRequest=null; data.publicGrowth=null; data.arena=null; data.history=[];
       const cachedReclaim=getCachedStoreReclaimState(storeId);
       data.reclaim=cachedReclaim?.data || deriveOptimisticStoreReclaimState([],String(data.game?.my_role||"visitor")==="boss");
@@ -2449,6 +2525,41 @@
     return { ...hours, schedule, closedLabel, closedToday, status };
   }
 
+  function youtubeVideoMeta(value){
+    const raw=String(value || "").trim();
+    if(!raw) return null;
+    try{
+      const url=new URL(raw);
+      const host=url.hostname.replace(/^www\./,"").toLowerCase();
+      let id="";
+      let vertical=false;
+      if(host==="youtu.be") id=url.pathname.split("/").filter(Boolean)[0] || "";
+      else if(host==="youtube.com" || host==="m.youtube.com" || host==="music.youtube.com"){
+        const parts=url.pathname.split("/").filter(Boolean);
+        if(parts[0]==="shorts"){ id=parts[1] || ""; vertical=true; }
+        else if(parts[0]==="embed") id=parts[1] || "";
+        else id=url.searchParams.get("v") || "";
+      }
+      if(!/^[A-Za-z0-9_-]{6,20}$/.test(id)) return null;
+      return {id,vertical,thumbnail:`https://i.ytimg.com/vi/${id}/hqdefault.jpg`,embed:`https://www.youtube-nocookie.com/embed/${id}?autoplay=1&playsinline=1&rel=0`};
+    }catch{return null;}
+  }
+
+  function storeVideoMarkup(videoUrl,storeName){
+    const video=youtubeVideoMeta(videoUrl);
+    if(!video) return "";
+    return `<section class="store-detail-video-section ${video.vertical ? "is-vertical" : "is-landscape"}" aria-label="${escapeAttr(storeName || "매장")} 영상"><button class="store-video-player" type="button" data-youtube-play="${escapeAttr(video.id)}" data-youtube-embed="${escapeAttr(video.embed)}" aria-label="영상 재생"><img src="${escapeAttr(video.thumbnail)}" alt="" loading="lazy" decoding="async"/><span class="store-video-play" aria-hidden="true"></span></button></section>`;
+  }
+
+  function bindStoreVideoPlayers(root){
+    $$('[data-youtube-play]',root).forEach(button=>button.addEventListener("click",()=>{
+      const embed=String(button.dataset.youtubeEmbed || ""); if(!embed) return;
+      const iframe=document.createElement("iframe"); iframe.src=embed; iframe.title="YouTube video player";
+      iframe.allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"; iframe.allowFullscreen=true; iframe.referrerPolicy="strict-origin-when-cross-origin";
+      button.replaceWith(iframe);
+    },{once:true}));
+  }
+
   function renderStoreDetail(data, options = {}){
     const store = data.store || {};
     const game = data.game || {};
@@ -2461,6 +2572,7 @@
     const growth = game.growth || {};
     const defenseActivity = game.defense_activity || {};
     const photos = Array.isArray(data.photos) ? data.photos : [];
+    const videoUrl = String(data.video?.video_url || "").trim();
     const menu = Array.isArray(data.menu) ? data.menu : [];
     const offers = Array.isArray(offerAccess.offers)
       ? offerAccess.offers
@@ -2540,6 +2652,7 @@
             </figure>`).join("")}
         </div>
       </section>` : "";
+    const videoHtml = isPartner ? storeVideoMarkup(videoUrl, store.name) : "";
 
     const managerManagedStore = hasStoreManagerAccount(store, partnerRequest) || isPartner;
     const prioritizedMenu = [...menu].sort((a,b) => Number(Boolean(b?.is_signature)) - Number(Boolean(a?.is_signature)));
@@ -2830,6 +2943,7 @@
         </section>
 
         ${gallery}
+        ${videoHtml}
 
         ${ownerStatusHtml}
 
@@ -2915,6 +3029,7 @@
       </div>
     `;
 
+    bindStoreVideoPlayers(body);
     void renderStoreDetailMap(store);
     bindStoreComments(store.id);
 
@@ -9335,11 +9450,16 @@
     // focused/active visual state on the top-right X after the modal transition.
   }
 
-  function closeModal(){
+  function closeModal(options = {}){
     stopScanner();
     destroyStoreDetailMap();
     storeReclaimTimer = clearIntervalRef(storeReclaimTimer);
     activeStoreDetailId = "";
+
+    if(options.restoreUrl !== false && storeRouteFromPath(location.pathname)){
+      history.pushState({...(history.state || {}),bitebossTab:"stores"}, "", "/stores");
+      resetPublicSeoMeta();
+    }
 
     const modal = $("#modal");
     takeoverChoiceOpen=false;

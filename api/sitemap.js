@@ -1,3 +1,15 @@
-const U="https://imumpyumchvctrpmfngr.supabase.co"; const K=process.env.SUPABASE_ANON_KEY||"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJIUzI1NiIsInJlZiI6ImltdW1weXVtY2h2Y3RycG1mbmdyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxODQ1MjksImV4cCI6MjA5OTc2MDUyOX0.oXpNENBuoaN9cTgQfiesRpQucsCS2XSDTr62M58ue7Y";
-const x=s=>String(s??"").replace(/[<>&'"]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;","'":"&apos;",'"':"&quot;"}[c]));
-module.exports=async(req,res)=>{const r=await fetch(`${U}/rest/v1/biteboss_stores?status=eq.active&select=id,name,updated_at&order=updated_at.desc&limit=10000`,{headers:{apikey:K,Authorization:`Bearer ${K}`}});const rows=r.ok?await r.json():[];const o=`https://${req.headers.host}`;const urls=[`<url><loc>${x(o)}/</loc></url>`,`<url><loc>${x(o)}/stores</loc></url>`,...rows.map(s=>`<url><loc>${x(o)}/store/${x(s.id)}/${x(String(s.name||"store").replace(/\s+/g,"-"))}</loc>${s.updated_at?`<lastmod>${x(String(s.updated_at).slice(0,10))}</lastmod>`:""}</url>`)];res.setHeader("Content-Type","application/xml; charset=utf-8");res.setHeader("Cache-Control","public, s-maxage=3600");res.end(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.join("")}</urlset>`)};
+const SUPABASE_URL=process.env.SUPABASE_URL || "https://imumpyumchvctrpmfngr.supabase.co";
+const KEY=process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
+const esc=v=>String(v??"").replace(/[<>&'"]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;","'":"&apos;",'"':"&quot;"}[c]));
+const slug=v=>String(v||"").trim().normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu,"-").replace(/^-+|-+$/g,"").slice(0,80)||"store";
+export default async function handler(req,res){
+  if(!KEY) return res.status(500).send("Missing configuration");
+  const url=`${SUPABASE_URL}/rest/v1/biteboss_stores?select=id,name,updated_at&status=eq.active&partnership_status=eq.partnered&order=updated_at.desc`;
+  const r=await fetch(url,{headers:{apikey:KEY,Authorization:`Bearer ${KEY}`}});
+  if(!r.ok) return res.status(500).send("Sitemap unavailable");
+  const rows=await r.json();
+  const items=rows.map(x=>`<url><loc>${esc(`https://biteboss.kr/store/${encodeURIComponent(x.id)}/${encodeURIComponent(slug(x.name))}`)}</loc>${x.updated_at?`<lastmod>${esc(new Date(x.updated_at).toISOString())}</lastmod>`:""}</url>`).join("");
+  res.setHeader("Content-Type","application/xml; charset=utf-8");
+  res.setHeader("Cache-Control","public, s-maxage=3600, stale-while-revalidate=86400");
+  res.status(200).send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${items}</urlset>`);
+}

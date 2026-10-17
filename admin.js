@@ -235,6 +235,8 @@
     $$('[data-close-store-editor]').forEach(node => node.addEventListener('click', closeStoreEditor));
     $("#adminStoreEditForm")?.addEventListener("submit", saveAdminStoreInfo);
     $("#adminPhotoForm")?.addEventListener("submit", addAdminStorePhoto);
+    $("#adminVideoForm")?.addEventListener("submit", saveAdminStoreVideo);
+    $("#adminVideoDelete")?.addEventListener("click", deleteAdminStoreVideo);
     bindAdminDateTimeControl("#adStartsAt", "#adStartsDate", "#adStartsTime");
     bindAdminDateTimeControl("#adEndsAt", "#adEndsDate", "#adEndsTime");
     $("#adminMenuForm")?.addEventListener("submit", saveAdminMenu);
@@ -1577,10 +1579,13 @@
     resetAdminOfferForm();
 
     try{
-      const { data, error } = await adminSb.rpc("biteboss_admin_store_detail", { p_store_id:storeId });
+      const [{ data, error }, videoResult] = await Promise.all([
+        adminSb.rpc("biteboss_admin_store_detail", { p_store_id:storeId }),
+        adminSb.rpc("biteboss_admin_store_video", { p_store_id:storeId })
+      ]);
       if(error) throw error;
       if(!data?.ok) throw new Error(data?.error || "STORE_LOAD_FAILED");
-      editingStoreBundle = data;
+      editingStoreBundle = { ...data, video:videoResult.error ? null : (videoResult.data || null) };
       renderAdminStoreEditor();
     }catch(error){
       console.error(error);
@@ -1665,6 +1670,7 @@
     }
 
     renderAdminPhotos(bundle.photos || []);
+    renderAdminVideo(bundle.video || null);
     renderAdminMenu(bundle.menu || []);
     renderAdminOffers(bundle.offers || []);
     renderAdminPartnerPromotion(store);
@@ -1674,10 +1680,13 @@
 
   async function reloadStoreEditor(){
     if(!editingStoreId) return;
-    const { data, error } = await adminSb.rpc("biteboss_admin_store_detail", { p_store_id:editingStoreId });
+    const [{ data, error }, videoResult] = await Promise.all([
+      adminSb.rpc("biteboss_admin_store_detail", { p_store_id:editingStoreId }),
+      adminSb.rpc("biteboss_admin_store_video", { p_store_id:editingStoreId })
+    ]);
     if(error) throw error;
     if(!data?.ok) throw new Error(data?.error || "STORE_LOAD_FAILED");
-    editingStoreBundle = data;
+    editingStoreBundle = { ...data, video:videoResult.error ? null : (videoResult.data || null) };
     renderAdminStoreEditor();
   }
 
@@ -1831,6 +1840,26 @@
     }finally{
       if(submit) submit.disabled = false;
     }
+  }
+
+  function renderAdminVideo(video){
+    const input=$("#adminVideoUrl");
+    if(input) input.value=String(video?.video_url || "");
+  }
+
+  async function saveAdminStoreVideo(event){
+    event.preventDefault(); if(!editingStoreId) return;
+    const url=String($("#adminVideoUrl")?.value || "").trim(); const status=$("#adminVideoStatus"); setStatusText(status,"저장 중…");
+    const {data,error}=await adminSb.rpc("biteboss_admin_set_store_video",{p_store_id:editingStoreId,p_video_url:url});
+    if(error || !data?.ok) return setStatusText(status,`저장 실패 · ${error?.message || data?.error || "다시 시도하세요."}`);
+    setStatusText(status,"영상이 저장되었습니다."); await reloadStoreEditor();
+  }
+
+  async function deleteAdminStoreVideo(){
+    if(!editingStoreId) return; const status=$("#adminVideoStatus"); setStatusText(status,"삭제 중…");
+    const {data,error}=await adminSb.rpc("biteboss_admin_set_store_video",{p_store_id:editingStoreId,p_video_url:""});
+    if(error || !data?.ok) return setStatusText(status,`삭제 실패 · ${error?.message || data?.error || "다시 시도하세요."}`);
+    if($("#adminVideoUrl")) $("#adminVideoUrl").value=""; setStatusText(status,"영상이 삭제되었습니다."); await reloadStoreEditor();
   }
 
   function renderAdminPhotos(rows){

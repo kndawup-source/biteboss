@@ -6,12 +6,11 @@
   <meta name="theme-color" content="#000000" />
   <meta name="description" content="BiteBoss는 주변 매장을 발견하고 방문·도전·점령 기록과 크루 순위를 즐기는 위치 기반 게임입니다." />
   <meta name="robots" content="index,follow" />
+  <link rel="canonical" href="https://biteboss.kr/" />
   <meta property="og:title" content="BiteBoss" />
   <meta property="og:description" content="주변 매장을 발견하고 도전해 보스를 차지하세요." />
   <meta property="og:type" content="website" />
-  <link rel="canonical" href="https://biteboss.app/" />
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"BiteBoss","applicationCategory":"GameApplication","operatingSystem":"Web, iOS","description":"주변 실제 매장을 발견하고 방문·도전·점령하는 위치 기반 게임."}</script>
-  <meta name="biteboss-build" content="81.80" />
+  <meta name="biteboss-build" content="76.6" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -23,8 +22,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet" />
-  <link rel="manifest" href="./manifest.webmanifest?v=81.80" />
-  <link rel="stylesheet" href="./styles.css?v=81.80" />
+  <link rel="manifest" href="/manifest.webmanifest?v=76.6" />
+  <link rel="stylesheet" href="/styles.css?v=76.6" />
 </head>
 <body class="user-app home-active">
 <div id="app" class="app-shell">
@@ -56,7 +55,7 @@
         <span id="homeProfileFallback"></span>
         <b id="homeXp">Lv 1 · 0 XP</b>
         <a id="homeAdBanner" class="hidden" href="#" target="_blank" rel="sponsored noopener noreferrer">
-          <span class="home-ad-label">AD</span><span class="ad-store-profile" aria-hidden="true"><img id="homeAdProfileImage" class="hidden" src="" alt="" /><span id="homeAdProfileFallback" class="ad-store-profile-fallback">B</span></span><img id="homeAdImage" src="" alt="" />
+          <span class="home-ad-label">AD</span><img id="homeAdImage" src="" alt="" />
         </a>
         <div id="homeNearbyBosses"></div>
         <b id="homeMeterTitle">No active Boss</b><strong id="homeMeterValue">-</strong><span id="homeMeterBar"></span>
@@ -116,12 +115,7 @@
         <button class="chip" data-rank="organizations" type="button">크루</button>
         <button class="chip" data-rank="local_crew" type="button">주변 크루</button>
         <button class="chip" data-rank="territory" type="button">현재 점령</button>
-        
-      </div>
-      <div id="rankPeriodTabs" class="rank-tabs rank-period-tabs" role="group" aria-label="순위 기간">
-        <button class="chip active" data-rank-period="week" type="button" aria-pressed="true">이번 주</button>
-        <button class="chip" data-rank-period="month" type="button" aria-pressed="false">이번 달</button>
-        <button class="chip" data-rank-period="all" type="button" aria-pressed="false">전체</button>
+        <button class="chip" data-rank="season" type="button">시즌</button>
       </div>
 
       <section id="territoryMapSection" class="territory-map-section hidden" aria-label="현재 점령 지도">
@@ -206,9 +200,9 @@
         <nav id="profileCommentPagination" class="list-pagination player-profile-comment-pagination hidden" aria-label="한마디 페이지"></nav>
       </section>
       <section class="profile-settings" aria-label="설정 및 지원">
-        <button id="addStoreBtn" class="profile-setting-row" type="button"><span>매장 등록 요청</span><span aria-hidden="true">›</span></button>
-        <a id="privacyLink" class="profile-setting-row" href="./privacy-policy.html?return=profile"><span>개인정보 처리방침</span><span aria-hidden="true">›</span></a>
-        <a id="supportLink" class="profile-setting-row" href="./support.html?return=profile"><span>고객지원</span><span aria-hidden="true">›</span></a>
+        <button id="addStoreBtn" class="profile-setting-row hidden" type="button"><span>매장 추가</span><span aria-hidden="true">›</span></button>
+        <a id="privacyLink" class="profile-setting-row" href="/privacy-policy.html"><span>개인정보 처리방침</span><span aria-hidden="true">›</span></a>
+        <a id="supportLink" class="profile-setting-row" href="/support.html"><span>고객지원</span><span aria-hidden="true">›</span></a>
         <button id="deleteAccountBtn" class="profile-setting-row profile-delete hidden" type="button"><span>계정 삭제</span><span aria-hidden="true">›</span></button>
         <button id="logoutBtn" class="profile-setting-row profile-logout hidden" type="button"><span>로그아웃</span><span aria-hidden="true">›</span></button>
       </section>
@@ -235,16 +229,9 @@
     </div>
     <div class="takeover-count-wrap">
       <div class="takeover-count-meta" aria-hidden="true"><span>TIME REMAINING</span><span>SEC</span></div>
-      <div id="takeoverCount" class="takeover-count" aria-label="00:20">
-        <span class="takeover-minutes">00</span><span class="takeover-colon" aria-hidden="true">:</span><span class="takeover-seconds">20</span>
-      </div>
+      <div id="takeoverCount" class="takeover-count">00:20</div>
+      <div class="takeover-count-rule" aria-hidden="true"></div>
     </div>
-    <aside id="takeoverAdSlot" class="takeover-ad-slot hidden" aria-label="광고">
-      <div class="takeover-ad-meta"><span class="takeover-ad-brand"><span class="ad-store-profile" aria-hidden="true"><img id="takeoverAdProfileImage" class="hidden" src="" alt="" /><span id="takeoverAdProfileFallback" class="ad-store-profile-fallback">B</span></span><span>SPONSORED</span></span><span id="takeoverAdAdvertiser"></span></div>
-      <a id="takeoverAdLink" class="takeover-ad-link" target="_blank" rel="noopener noreferrer">
-        <img id="takeoverAdImage" class="takeover-ad-image" alt="" decoding="async" />
-      </a>
-    </aside>
     <div class="takeover-bottom">
       <div class="takeover-bottom-grid">
         <p id="takeoverStatus" class="takeover-status">매장 안에서 위치를 유지하세요.</p>
@@ -267,6 +254,6 @@
   </div>
 </div>
 
-<script src="./bootstrap.js?v=81.80"></script>
+<script src="/bootstrap.js?v=76.6"></script>
 </body>
 </html>

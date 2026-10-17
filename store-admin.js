@@ -225,6 +225,7 @@
   }
   function bindForms(){
     $("#storeInfoForm")?.addEventListener("submit", saveStoreInfo);
+    $("#storeVideoForm")?.addEventListener("submit", saveStoreVideo);
     $("#menuForm")?.addEventListener("submit", addMenu);
     $("#offerForm")?.addEventListener("submit", addOffer);
     $("#benefitPassForm")?.addEventListener("submit", redeemBenefitPass);
@@ -239,6 +240,7 @@
       location.reload();
     });
     $("#clearBossBtn")?.addEventListener("click", releaseBoss);
+    $("#storeVideoDelete")?.addEventListener("click", deleteStoreVideo);
     $("#copyQrBtn")?.addEventListener("click", copyQr);
     $("#rotateQrBtn")?.addEventListener("click", rotateQr);
 
@@ -265,7 +267,7 @@
 
     const [snapshotResult] = await Promise.all([
       storeSb.rpc("biteboss_store_snapshot", { p_store_id:currentStore.id }),
-      loadPhotos(), loadMenu(), loadOffers(), loadQr(), loadActivity()
+      loadPhotos(), loadStoreVideo(), loadMenu(), loadOffers(), loadQr(), loadActivity()
     ]);
 
     if(snapshotResult.error) throw snapshotResult.error;
@@ -373,6 +375,22 @@
     });
     if(error) return alert(error.message);
     await refreshStore();
+  }
+
+  async function loadStoreVideo(){
+    if(!currentStore) return; const {data,error}=await storeSb.rpc("biteboss_store_video",{p_store_id:currentStore.id});
+    if(error) return console.warn("BiteBoss store video:",error); const input=$("#storeVideoForm")?.elements?.video_url; if(input) input.value=String(data?.video_url || "");
+  }
+
+  async function saveStoreVideo(event){
+    event.preventDefault(); if(!currentStore) return; const form=new FormData(event.currentTarget); const url=String(form.get("video_url") || "").trim(); setText("#storeVideoStatus","저장 중…");
+    const {data,error}=await storeSb.rpc("biteboss_store_set_video",{p_store_id:currentStore.id,p_video_url:url});
+    if(error || !data?.ok) return setText("#storeVideoStatus",`저장 실패 · ${error?.message || data?.error || "다시 시도하세요."}`); setText("#storeVideoStatus","영상이 저장되었습니다."); await loadStoreVideo();
+  }
+
+  async function deleteStoreVideo(){
+    if(!currentStore) return; setText("#storeVideoStatus","삭제 중…"); const {data,error}=await storeSb.rpc("biteboss_store_set_video",{p_store_id:currentStore.id,p_video_url:""});
+    if(error || !data?.ok) return setText("#storeVideoStatus",`삭제 실패 · ${error?.message || data?.error || "다시 시도하세요."}`); const input=$("#storeVideoForm")?.elements?.video_url; if(input) input.value=""; setText("#storeVideoStatus","영상이 삭제되었습니다.");
   }
 
   async function loadPhotos(){

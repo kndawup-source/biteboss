@@ -515,6 +515,14 @@
 <div class="admin-media-list" id="adminPhotoList"></div>
 </section>
 <section class="admin-edit-section">
+<div class="section-head"><h3>영상</h3><span>YouTube</span></div>
+<form class="form-grid admin-form compact-admin-form" id="adminVideoForm">
+<label class="wide">YouTube 주소<input class="input" id="adminVideoUrl" inputmode="url" placeholder="https://www.youtube.com/watch?v=..." type="url"/></label>
+<div class="admin-form-actions wide"><button class="secondary-btn" type="submit">영상 저장</button><button class="text-btn danger-text" id="adminVideoDelete" type="button">영상 삭제</button></div>
+<p aria-live="polite" class="asset-status wide" id="adminVideoStatus"></p>
+</form>
+</section>
+<section class="admin-edit-section">
 <div class="section-head"><h3>메뉴</h3></div>
 <form class="form-grid admin-form compact-admin-form" id="adminMenuForm">
 <input id="adminMenuId" type="hidden"/>
