@@ -2458,8 +2458,8 @@
       }
       const { data, error } = await adminRpc("biteboss_admin_add_photo", {
         p_store_id:editingStoreId,
-        p_image_url:imageUrl,
-        p_storage_path:storagePath || null,
+        p_image_url:canonicalImageUrl,
+        p_storage_path:canonicalStoragePath || null,
         p_caption:"",
         p_is_cover:isCover
       });
@@ -2683,9 +2683,11 @@
   function primaryCreativeForCampaign(item){
     if(!item?.id) return null;
     const setting=campaignSetting(item.id);
+    const usesStoreListFallback=setting.primary_image_kind === "store_list";
     return {
       id:`primary:${item.id}`, campaign_id:String(item.id), name:"기본 소재", is_primary:true,
-      image_url:String(item.image_url || ""), storage_path:String(item.storage_path || ""),
+      image_url:usesStoreListFallback ? "" : String(item.image_url || ""),
+      storage_path:usesStoreListFallback ? "" : String(item.storage_path || ""),
       store_list_image_url:setting.store_list_image_url, store_list_storage_path:setting.store_list_storage_path,
       click_url:String(item.click_url || ""), is_active:true, sort_order:0
     };
@@ -2709,7 +2711,8 @@
       target_region:String(value.target_region || "").trim(),
       target_store_id:String(value.target_store_id || "").trim(),
       store_list_image_url:String(value.store_list_image_url || "").trim(),
-      store_list_storage_path:String(value.store_list_storage_path || "").trim()
+      store_list_storage_path:String(value.store_list_storage_path || "").trim(),
+      primary_image_kind:String(value.primary_image_kind || "") === "store_list" ? "store_list" : "home"
     };
   }
 
@@ -2729,7 +2732,8 @@
       target_region:String($("#adTargetRegion")?.value || "").trim(),
       target_store_id:String($("#adTargetStore")?.value || "").trim(),
       store_list_image_url:String($("#adCampaignForm")?.dataset.storeListImageUrl || "").trim(),
-      store_list_storage_path:String($("#adCampaignForm")?.dataset.storeListStoragePath || "").trim()
+      store_list_storage_path:String($("#adCampaignForm")?.dataset.storeListStoragePath || "").trim(),
+      primary_image_kind:String($("#adCampaignForm")?.dataset.primaryImageKind || "home") === "store_list" ? "store_list" : "home"
     };
     await secureAdminConfigUpsert({ key:"ad_campaign_settings", value:settings });
     appConfig.ad_campaign_settings=settings;
@@ -2738,7 +2742,7 @@
   async function syncPublicAdCampaigns(){
     const publicRows=adCampaigns.flatMap(item=>{
       const setting=campaignSetting(item.id);
-      return campaignCreatives(item).filter(creative=>creative.is_active !== false && creative.image_url).map(creative=>({
+      return campaignCreatives(item).filter(creative=>creative.is_active !== false && (creative.image_url || creative.store_list_image_url)).map(creative=>({
         id:item.id, campaign_id:item.id, creative_id:creative.id, creative_name:creative.name || "광고 소재",
         advertiser_name:item.advertiser_name || "", campaign_name:item.campaign_name || "",
         image_url:creative.image_url || "", click_url:creative.click_url || "", starts_at:item.starts_at || null,
@@ -3125,12 +3129,15 @@
         const up=await adminSb.storage.from("biteboss-assets").upload(path,blob,{contentType:"image/jpeg",cacheControl:"86400",upsert:false}); if(up.error) throw up.error;
         uploaded.push(path); imageUrl=adminSb.storage.from("biteboss-assets").getPublicUrl(path).data.publicUrl; storagePath=path;
       }
-      if(!imageUrl) throw new Error("광고 소재 이미지를 선택하세요.");
       if(storeListFile){
-        const blob=await imageFileToJpegBlob(storeListFile,1800,1200,.88); const path=`ads/${campaign.id}/creative-list-${id}-${Date.now()}.jpg`;
+        const blob=await imageFileToJpegBlob(storeListFile,1800,360,.88); const path=`ads/${campaign.id}/creative-list-${id}-${Date.now()}.jpg`;
         const up=await adminSb.storage.from("biteboss-assets").upload(path,blob,{contentType:"image/jpeg",cacheControl:"86400",upsert:false}); if(up.error) throw up.error;
         uploaded.push(path); storeListImageUrl=adminSb.storage.from("biteboss-assets").getPublicUrl(path).data.publicUrl; storeListStoragePath=path;
       }
+      const placement=campaignSetting(campaign.id).placement;
+      if(placement === "store_list" && !storeListImageUrl) throw new Error("매장 목록 이미지를 선택하세요.");
+      if(["home","takeover","both"].includes(placement) && !imageUrl) throw new Error("홈 · 점령 대기 이미지를 선택하세요.");
+      if(placement === "all" && (!imageUrl || !storeListImageUrl)) throw new Error("전체 위치 노출에는 홈 · 점령 대기 이미지와 매장 목록 이미지가 모두 필요합니다.");
       const all={...adCreativeConfig()}; const rows=storedCampaignCreatives(campaign.id); const old=rows.find(x=>String(x.id)===id);
       const next={id,campaign_id:String(campaign.id),name:String($("#adCreativeName")?.value||"").trim(),image_url:imageUrl,storage_path:storagePath,store_list_image_url:storeListImageUrl,store_list_storage_path:storeListStoragePath,click_url:String($("#adCreativeClickUrl")?.value||"").trim(),is_active:String($("#adCreativeIsActive")?.value||"true")==="true",sort_order:Number($("#adCreativeSortOrder")?.value||0)};
       all[String(campaign.id)]=[...rows.filter(x=>String(x.id)!==id),next];
@@ -3182,6 +3189,7 @@
     if(adForm){
       adForm.dataset.storeListImageUrl=setting.store_list_image_url || "";
       adForm.dataset.storeListStoragePath=setting.store_list_storage_path || "";
+      adForm.dataset.primaryImageKind=setting.primary_image_kind || "home";
     }
     syncAdTargetRegionField();
     $("#adCampaignCancel")?.classList.remove("hidden");
@@ -3203,6 +3211,7 @@
     if(form){
       delete form.dataset.storeListImageUrl;
       delete form.dataset.storeListStoragePath;
+      delete form.dataset.primaryImageKind;
     }
     syncAdTargetRegionField();
     $("#adCampaignCancel")?.classList.add("hidden");
@@ -3226,18 +3235,16 @@
     const storeListFile = $("#adStoreListImageFile")?.files?.[0] || null;
     const startsRaw = String($("#adStartsAt")?.value || "").trim();
     const endsRaw = String($("#adEndsAt")?.value || "").trim();
-    let imageUrl = previous?.image_url || "";
-    let storagePath = previous?.storage_path || "";
-    let newStoragePath = "";
+    const placement=String($("#adPlacement")?.value || "both");
     const previousSetting=id ? campaignSetting(id) : {};
+    const previousUsesStoreListFallback=previousSetting.primary_image_kind === "store_list";
+    let imageUrl = previousUsesStoreListFallback ? "" : String(previous?.image_url || "");
+    let storagePath = previousUsesStoreListFallback ? "" : String(previous?.storage_path || "");
+    let newStoragePath = "";
     let storeListImageUrl=String(previousSetting.store_list_image_url || form?.dataset.storeListImageUrl || "");
     let storeListStoragePath=String(previousSetting.store_list_storage_path || form?.dataset.storeListStoragePath || "");
     let newStoreListStoragePath="";
 
-    if(!file && !imageUrl){
-      setStatusText(status, "배너 이미지를 선택하세요.");
-      return;
-    }
     if(!startsRaw){
       setStatusText(status, "시작일시를 입력하세요.");
       return;
@@ -3270,9 +3277,18 @@
         storeListImageUrl=adminSb.storage.from("biteboss-assets").getPublicUrl(newStoreListStoragePath).data.publicUrl;
         storeListStoragePath=newStoreListStoragePath;
       }
+
+      if(placement === "store_list" && !storeListImageUrl) throw new Error("매장 목록 이미지를 선택하세요.");
+      if(["home","takeover","both"].includes(placement) && !imageUrl) throw new Error("홈 · 점령 대기 이미지를 선택하세요.");
+      if(placement === "all" && (!imageUrl || !storeListImageUrl)) throw new Error("전체 위치 노출에는 홈 · 점령 대기 이미지와 매장 목록 이미지가 모두 필요합니다.");
+
+      const usesStoreListFallback=!imageUrl && Boolean(storeListImageUrl);
+      const canonicalImageUrl=imageUrl || storeListImageUrl;
+      const canonicalStoragePath=storagePath || storeListStoragePath;
       if(form){
         form.dataset.storeListImageUrl=storeListImageUrl;
         form.dataset.storeListStoragePath=storeListStoragePath;
+        form.dataset.primaryImageKind=usesStoreListFallback ? "store_list" : "home";
       }
 
       const { data, error } = await adminRpc("biteboss_admin_upsert_campaign_v8217", {
@@ -3293,13 +3309,13 @@
       if(!savedCampaignId){
         const listed=await adminRpc("biteboss_admin_list_campaigns_v8217");
         if(listed.error) throw listed.error;
-        const saved=(Array.isArray(listed.data) ? listed.data : []).find(item => String(item.image_url || "") === String(imageUrl));
+        const saved=(Array.isArray(listed.data) ? listed.data : []).find(item => String(item.image_url || "") === String(canonicalImageUrl));
         savedCampaignId=String(saved?.id || "");
       }
       if(!savedCampaignId) throw new Error("CAMPAIGN_ID_NOT_RETURNED");
       await saveAdCampaignSetting(savedCampaignId);
 
-      if(newStoragePath && previous?.storage_path && previous.storage_path !== newStoragePath){
+      if(newStoragePath && previous?.storage_path && previous.storage_path !== newStoragePath && previous.storage_path !== storeListStoragePath){
         const removed = await adminSb.storage.from("biteboss-assets").remove([previous.storage_path]);
         if(removed.error) console.warn("Old ad asset cleanup:", removed.error);
       }
