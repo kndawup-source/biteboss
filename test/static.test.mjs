@@ -530,7 +530,7 @@ test('82.43 ad performance drills down from overall to campaign to creative', ()
 });
 
 
-test('82.44 app notice supports an optional safe external link', () => {
+test('82.45 app notice supports an optional tappable external link', () => {
   const adminHtml = read('admin.html');
   const adminJs = read('admin.js');
   const appJs = read('app.js');
@@ -539,6 +539,9 @@ test('82.44 app notice supports an optional safe external link', () => {
   assert.match(adminJs, /first_capture_guide_link_url/);
   assert.match(adminJs, /http:\"?,\"https:/);
   assert.match(appJs, /first_capture_guide_link_url/);
+  assert.match(appJs, /data-guide-link/);
+  assert.match(appJs, /window\.location\.assign\(url\)/);
+  assert.doesNotMatch(appJs, /is-guide is-linked[^`]*target=\"_blank\"/);
   assert.match(appJs, /is-guide is-linked/);
   assert.match(appJs, /noopener noreferrer/);
   assert.match(styles, /is-guide\.is-linked/);

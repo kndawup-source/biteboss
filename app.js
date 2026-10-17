@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.44";
+  const BITEBOSS_BUILD = "82.45";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -5413,7 +5413,7 @@ await handleClaimParam();
     }
     const content=`${icon ? `<span class="guide-bulb" aria-hidden="true">${escapeHtml(icon)}</span>` : ""}<strong>${escapeHtml(title)}</strong>${body ? `<small>${escapeHtml(body)}</small>` : ""}`;
     return linkUrl
-      ? `<a class="game-pulse-item is-guide is-linked" href="${escapeAttr(linkUrl)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeAttr(`${title} 링크 열기`)}">${content}</a>`
+      ? `<a class="game-pulse-item is-guide is-linked" href="${escapeAttr(linkUrl)}" data-guide-link="${escapeAttr(linkUrl)}" aria-label="${escapeAttr(`${title} 링크 열기`)}">${content}</a>`
       : `<div class="game-pulse-item is-guide" role="note">${content}</div>`;
   }
 
@@ -5425,6 +5425,17 @@ await handleClaimParam();
 
 
   function bindGamePulseStoreLinks(box){
+    $$('[data-guide-link]',box).forEach(link => link.addEventListener('click',event=>{
+      const url=String(link.dataset.guideLink || link.getAttribute('href') || '').trim();
+      if(!/^https?:\/\//i.test(url)){
+        event.preventDefault();
+        return;
+      }
+      // iOS/Capacitor WebView can ignore target=_blank links. Navigate explicitly
+      // in the current webview so the notice always responds to a tap.
+      event.preventDefault();
+      window.location.assign(url);
+    }));
     $$("[data-pulse-store]",box).forEach(btn => btn.addEventListener("click",()=>{
       const rawStoreId=String(btn.dataset.pulseStore||"").trim();
       const storeName=String(btn.dataset.pulseName||"").trim();
