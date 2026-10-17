@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.27";
+  const BITEBOSS_BUILD = "82.28";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -318,6 +318,7 @@
   let benefitPassTimer = null;
   let benefitPassReturnFocus = null;
   let activeBenefitOfferId = "";
+  let activeDefaultBenefitStoreName = "";
   let gamePulseLoadedAt = 0;
   let activeBanner = null;
   const presenceState = new Map();
@@ -772,9 +773,15 @@ await handleClaimParam();
     });
     $("#benefitPassClose")?.addEventListener("click", closeBenefitPassScreen);
     $("#benefitPassRetry")?.addEventListener("click", () => {
-      const offerId=activeBenefitOfferId;
+      const retryKey=activeBenefitOfferId;
+      const defaultStoreName=activeDefaultBenefitStoreName;
       closeBenefitPassScreen({restoreFocus:false});
-      if(offerId) void createBenefitPass(offerId);
+      if(retryKey.startsWith("boss-pass:")){
+        const storeId=retryKey.slice("boss-pass:".length);
+        if(storeId) void createDefaultBossPass(storeId, defaultStoreName);
+      }else if(retryKey){
+        void createBenefitPass(retryKey);
+      }
     });
     document.addEventListener("keydown", event => {
       if(event.key === "Escape" && !$("#benefitPassScreen")?.classList.contains("hidden")){
@@ -3119,13 +3126,16 @@ await handleClaimParam();
                 ? {label:"도전 준비",cls:"history"}
                 : {label:"첫 점령 가능",cls:"open"};
 
+    const defaultBossPassEligible = !isPartner && (isBoss || isCrew);
+
     const detailBadges=[
       occupancyBadge,
       relationshipBadge,
       opportunityBadge,
       isPartner ? {label:"제휴",cls:"partner"} : null,
       isProStore ? {label:"PRO",cls:"pro"} : null,
-      offers.length ? {label:"혜택",cls:"benefit"} : null
+      offers.length ? {label:"혜택",cls:"benefit"} : null,
+      defaultBossPassEligible ? {label:"BOSS PASS",cls:"benefit"} : null
     ].filter(Boolean);
 
     const offersHtml = isPartner ? `
@@ -3163,6 +3173,19 @@ await handleClaimParam();
               </article>
             `;
           }).join("") : `<div class="store-detail-empty">현재 사용 가능한 혜택이 없습니다.</div>`}
+        </div>
+      </section>` : defaultBossPassEligible ? `
+      <section class="store-detail-section partner-benefits boss-pass-benefit">
+        <div class="partner-benefits-head"><h4>BOSS PASS</h4></div>
+        <div class="store-detail-offers">
+          <article class="partner-benefit is-eligible">
+            <div>
+              <div class="benefit-role-badges"><span class="store-status-tag">${isBoss ? "보스" : "크루"}</span></div>
+              <strong>점령 인증 패스</strong>
+              <p>현재 점령 자격을 실시간으로 인증합니다. 할인·서비스 제공 여부는 매장 정책에 따릅니다.</p>
+            </div>
+            <button class="text-btn benefit-use-btn" type="button" data-default-benefit-store="${escapeAttr(store.id || "")}" data-default-benefit-name="${escapeAttr(store.name || "매장")}">패스 보기</button>
+          </article>
         </div>
       </section>` : "";
 
@@ -4170,6 +4193,7 @@ await handleClaimParam();
   function closeBenefitPassScreen(options = {}){
     benefitPassTimer = clearIntervalRef(benefitPassTimer);
     activeBenefitOfferId = "";
+    activeDefaultBenefitStoreName = "";
     const screen=$("#benefitPassScreen");
     screen?.classList.add("hidden");
     screen?.classList.remove("is-expired");
@@ -4203,6 +4227,10 @@ await handleClaimParam();
     const token=String(data?.token || "").trim();
     setText("#benefitPassCode", token ? `PASS ${token}` : "");
 
+    const isDefaultBossPass=String(data?.pass_kind || "") === "boss_pass";
+    const liveInstruction=isDefaultBossPass
+      ? "현재 점령 자격을 직원에게 보여주세요. 할인·서비스 제공 여부는 매장 정책에 따릅니다."
+      : "직원에게 이 실시간 화면을 보여주세요.";
     const expiresAt=new Date(data?.expires_at || "").getTime();
     const retry=$("#benefitPassRetry");
     const tick=()=>{
@@ -4222,7 +4250,7 @@ await handleClaimParam();
         setText("#benefitPassInstruction", "혜택 화면이 만료되었습니다.");
         benefitPassTimer = clearIntervalRef(benefitPassTimer);
       }else{
-        setText("#benefitPassInstruction", "직원에게 이 실시간 화면을 보여주세요.");
+        setText("#benefitPassInstruction", liveInstruction);
       }
     };
 
@@ -4231,6 +4259,34 @@ await handleClaimParam();
     tick();
     benefitPassTimer=window.setInterval(tick,1000);
     $("#benefitPassClose")?.focus?.({preventScroll:true});
+  }
+
+  async function createDefaultBossPass(storeId, storeName){
+    const id=String(storeId || "").trim();
+    if(!id) return;
+    try{
+      const {data,error}=await sb.rpc("biteboss_my_store_status",{p_store_id:id});
+      if(error) throw error;
+      const role=String(data?.my_role || "visitor");
+      if(role!=="boss" && role!=="crew"){
+        toast("현재 BOSS 또는 BOSS 크루만 패스를 사용할 수 있습니다.");
+        return;
+      }
+      activeDefaultBenefitStoreName=String(storeName || data?.store_name || "매장");
+      openBenefitPassScreen({
+        ok:true,
+        pass_kind:"boss_pass",
+        player_role:role,
+        player_nickname:String(profile?.nickname || ""),
+        store_name:activeDefaultBenefitStoreName,
+        offer_title:"BOSS PASS",
+        offer_description:"현재 점령 자격을 실시간으로 인증합니다. 할인·서비스 제공 여부는 매장 정책에 따릅니다.",
+        expires_at:new Date(Date.now()+60_000).toISOString()
+      },`boss-pass:${id}`);
+    }catch(error){
+      console.warn("BiteBoss default boss pass:",error);
+      toast("BOSS PASS를 열지 못했습니다.");
+    }
   }
 
   async function createBenefitPass(offerId){
