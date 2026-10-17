@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.98";
+  const BITEBOSS_BUILD = "81.99";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -274,6 +274,7 @@
   let visitRows = [];
   let profileActivityAllPage = 1;
   const PROFILE_ACTIVITY_ALL_PAGE_SIZE = 10;
+  let profileCommentTotal = 0;
   let summary = null;
   let homeLoadPromise = null;
   let storeSearchTimer = null;
@@ -610,6 +611,7 @@ await handleClaimParam();
       });
     });
     $("#profileActivityAllBtn")?.addEventListener("click", openProfileActivityAll);
+    $("#profileCommentAllBtn")?.addEventListener("click", () => openProfileCommentAll(1));
     $("#storesLoginBtn")?.addEventListener("click", openMemberLogin);
     $("#addStoreBtn")?.addEventListener("click", openMemberStoreForm);
     const organizationAction = (selector, handler) => {
@@ -830,7 +832,7 @@ await handleClaimParam();
       loadHistory();
       loadMyOrganization();
       loadGameActivity();
-      loadMyCommentHistory(1);
+      loadMyCommentHistory();
     }
   }
 
@@ -7782,73 +7784,130 @@ await handleClaimParam();
 
   }
 
-  async function loadMyCommentHistory(page = 1){
-    const section = $("#profileCommentSection");
-    const list = $("#profileCommentList");
-    const pagination = $("#profileCommentPagination");
-    const totalEl = $("#profileCommentCount");
+  function profileCommentRowMarkup(row){
+    const visibleBody=commentVisibleBody(row.body || "");
+    return `
+      <button class="profile-comment-line" type="button" data-profile-comment-store="${escapeAttr(row.store_id || "")}">
+        <span class="profile-comment-copy">
+          <strong>${escapeHtml(row.store_name || "매장")}</strong>
+          ${visibleBody ? `<small>${escapeHtml(visibleBody)}</small>` : `<small>영상 한마디</small>`}
+        </span>
+        <time>${escapeHtml(formatCommentTime(row.created_at))}${row.edited_at ? " · 수정됨" : ""}</time>
+      </button>
+    `;
+  }
+
+  function bindProfileCommentRows(root){
+    root?.querySelectorAll("[data-profile-comment-store]").forEach(button => {
+      button.addEventListener("click", () => {
+        const storeId=String(button.dataset.profileCommentStore || "").trim();
+        if(storeId) openStoreDetail(storeId,{source:"my_profile_comment",showStoreManagerCard:false});
+      });
+    });
+  }
+
+  async function loadMyCommentHistory(){
+    const section=$("#profileCommentSection");
+    const list=$("#profileCommentList");
+    const allBtn=$("#profileCommentAllBtn");
     if(!section || !list) return;
 
     if(!playerSession?.authenticated){
       section.classList.add("hidden");
-      list.innerHTML = "";
-      if(totalEl) totalEl.textContent = "0건";
-      pagination?.classList.add("hidden");
+      list.innerHTML="";
+      allBtn?.classList.add("hidden");
+      profileCommentTotal=0;
       return;
     }
 
-    const userId = String(
+    const userId=String(
       playerSession?.player_user_id ||
       profile?.user_id ||
       authUser?.id ||
       ""
     ).trim();
-
     if(!userId){
       section.classList.add("hidden");
       return;
     }
 
     section.classList.remove("hidden");
-    list.innerHTML = `<div class="app-state">한마디 기록을 불러오는 중…</div>`;
+    list.innerHTML=`<div class="app-state">한마디 기록을 불러오는 중…</div>`;
 
-    const { data, error } = await sb.rpc("biteboss_player_comment_history_v7585", {
+    const {data,error}=await sb.rpc("biteboss_player_comment_history_v7585",{
       p_user_id:userId,
-      p_page:Math.max(1, Number(page || 1)),
+      p_page:1,
       p_page_size:5
     });
 
     if(error){
-      console.warn("BiteBoss my comment history:", error);
-      setRetryState(list, "한마디 기록을 불러오지 못했습니다.", () => loadMyCommentHistory(page));
+      console.warn("BiteBoss my comment history:",error);
+      setRetryState(list,"한마디 기록을 불러오지 못했습니다.",loadMyCommentHistory);
       return;
     }
 
-    const payload = data && typeof data === "object" ? data : {};
-    const items = Array.isArray(payload.items) ? payload.items : [];
-    const total = Math.max(0, Number(payload.total || 0));
-    const safePage = Math.max(1, Number(payload.page || page || 1));
+    const payload=data && typeof data==="object" ? data : {};
+    const items=Array.isArray(payload.items) ? payload.items : [];
+    profileCommentTotal=Math.max(0,Number(payload.total || 0));
+    allBtn?.classList.toggle("hidden",profileCommentTotal <= 5);
 
-    if(totalEl) totalEl.textContent = `${total.toLocaleString("ko-KR")}건`;
+    list.innerHTML=items.length
+      ? items.map(profileCommentRowMarkup).join("")
+      : `<div class="profile-record-empty">아직 남긴 한마디가 없습니다.</div>`;
+    bindProfileCommentRows(list);
+  }
 
-    list.innerHTML = items.length ? items.map(row => `
-      <button class="player-profile-comment-row" type="button" data-profile-comment-store="${escapeAttr(row.store_id || "")}">
-        <div class="player-profile-comment-meta">
-          <strong>${escapeHtml(row.store_name || "매장")}</strong>
-          <time>${escapeHtml(formatCommentTime(row.created_at))}${row.edited_at ? " · 수정됨" : ""}</time>
-        </div>
-        <p>${escapeHtml(row.body || "")}</p>
-      </button>
-    `).join("") : `<div class="app-state player-profile-empty">아직 남긴 한마디가 없습니다.</div>`;
+  async function openProfileCommentAll(page = 1){
+    const userId=String(
+      playerSession?.player_user_id ||
+      profile?.user_id ||
+      authUser?.id ||
+      ""
+    ).trim();
+    if(!userId) return;
 
-    list.querySelectorAll("[data-profile-comment-store]").forEach(button => {
-      button.addEventListener("click", () => {
-        const storeId = button.dataset.profileCommentStore;
-        if(storeId) openStoreDetail(storeId, { source:"my_profile_comment", showStoreManagerCard:false });
-      });
+    openModal("내 한마디",`<div class="profile-record-empty">한마디 기록을 불러오는 중입니다.</div>`,{type:"detail-sheet"});
+    const body=$("#modalBody");
+    if(!body) return;
+
+    const safeRequestPage=Math.max(1,Number(page || 1));
+    const {data,error}=await sb.rpc("biteboss_player_comment_history_v7585",{
+      p_user_id:userId,
+      p_page:safeRequestPage,
+      p_page_size:10
     });
 
-    renderPagination(pagination, safePage, total, 5, next => loadMyCommentHistory(next));
+    if(error){
+      console.warn("BiteBoss my comment history all:",error);
+      setRetryState(body,"한마디 기록을 불러오지 못했습니다.",()=>openProfileCommentAll(safeRequestPage));
+      return;
+    }
+
+    const payload=data && typeof data==="object" ? data : {};
+    const items=Array.isArray(payload.items) ? payload.items : [];
+    const total=Math.max(0,Number(payload.total || 0));
+    const safePage=Math.max(1,Number(payload.page || safeRequestPage));
+    const pageCount=Math.max(1,Math.ceil(total/10));
+
+    body.innerHTML=`
+      <div class="profile-comment-all">
+        ${items.length ? items.map(profileCommentRowMarkup).join("") : `<div class="profile-record-empty">아직 남긴 한마디가 없습니다.</div>`}
+      </div>
+      ${total > 10 ? `
+        <nav class="list-pagination profile-comment-pagination" aria-label="내 한마디 페이지">
+          <button type="button" data-profile-comment-page="prev" ${safePage<=1 ? "disabled" : ""}>이전</button>
+          <span>${safePage} / ${pageCount}</span>
+          <button type="button" data-profile-comment-page="next" ${safePage>=pageCount ? "disabled" : ""}>다음</button>
+        </nav>
+      ` : ""}
+    `;
+    bindProfileCommentRows(body);
+    body.querySelector('[data-profile-comment-page="prev"]')?.addEventListener("click",()=>{
+      if(safePage>1) openProfileCommentAll(safePage-1);
+    });
+    body.querySelector('[data-profile-comment-page="next"]')?.addEventListener("click",()=>{
+      if(safePage<pageCount) openProfileCommentAll(safePage+1);
+    });
   }
 
   async function openCurrentOrganizationDetail(){

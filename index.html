@@ -23,7 +23,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet" />
   <link rel="manifest" href="/manifest.webmanifest?v=76.6" />
-  <link rel="stylesheet" href="/styles.css?v=81.97" />
+  <link rel="stylesheet" href="/styles.css?v=81.99" />
 </head>
 <body class="user-app home-active">
 <div id="app" class="app-shell">
@@ -194,10 +194,12 @@
         </div>
         <div id="profileRecentActivity" class="profile-recent-activity-list"></div>
       </section>
-      <section id="profileCommentSection" class="section profile-record-section hidden">
-        <div class="section-head visit-head"><h3>내 한마디</h3><small id="profileCommentCount">0건</small></div>
-        <div id="profileCommentList" class="player-profile-comment-list"></div>
-        <nav id="profileCommentPagination" class="list-pagination player-profile-comment-pagination hidden" aria-label="한마디 페이지"></nav>
+      <section id="profileCommentSection" class="section profile-record-section profile-comment-section hidden">
+        <div class="section-head visit-head">
+          <h3>내 한마디</h3>
+          <button id="profileCommentAllBtn" class="profile-section-more hidden" type="button">전체보기</button>
+        </div>
+        <div id="profileCommentList" class="profile-comment-list"></div>
       </section>
       <section class="profile-settings" aria-label="설정 및 지원">
         <button id="addStoreBtn" class="profile-setting-row hidden" type="button"><span>매장 추가</span><span aria-hidden="true">›</span></button>
