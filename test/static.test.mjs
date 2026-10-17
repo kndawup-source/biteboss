@@ -398,3 +398,16 @@ test('release source contains no stale historical version-tag comments', () => {
   const releaseText = `${app}\n${css}\n${read('admin.css')}\n${read('store-admin.css')}\n${read('app-config.js')}`;
   assert.doesNotMatch(releaseText, /(?:release\s+66\.3|\/\*\s*81\.|\/\*\s*82\.18)/i);
 });
+
+
+test('82.25 current territory ranking opens the occupied store list and avoids duplicate map loads', () => {
+  assert.match(app, /data-territory-rank/);
+  assert.match(app, /function openTerritoryRankStores\(trigger\)/);
+  assert.match(app, /fetchTerritoryRows\(\)/);
+  assert.match(app, /data-territory-store=/);
+  assert.match(app, /await openStoreDetail\(storeId\)/);
+  assert.match(css, /\.territory-rank-card\[data-territory-rank\]\{[^}]*cursor:pointer/);
+  const rankTabBlock = blockBetween(app, 'const openTerritoryStoresFromRank', '$$("[data-rank-period]")');
+  assert.match(rankTabBlock, /openTerritoryRankStores\(trigger\)/);
+  assert.doesNotMatch(rankTabBlock, /if\(currentRank === "territory"\) await loadTerritoryMap\(\)/);
+});

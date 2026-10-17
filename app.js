@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.24";
+  const BITEBOSS_BUILD = "82.25";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -328,6 +328,7 @@
   let territoryMapLayer = null;
   let territoryUserLayer = null;
   let territoryMapRows = [];
+  let territoryRowsPromise = null;
   let pendingCrewInviteToken = "";
   let lastForegroundRefreshAt = 0;
   let foregroundRefreshPromise = null;
@@ -826,6 +827,16 @@ await handleClaimParam();
     $("#myRankSummary")?.addEventListener("click", openCrewProfileFromRank);
     $("#myRankSummary")?.addEventListener("keydown", openCrewProfileFromRank);
 
+    const openTerritoryStoresFromRank = event => {
+      const trigger = event.target.closest("[data-territory-rank]");
+      if(!trigger) return;
+      if(event.type === "keydown" && event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      openTerritoryRankStores(trigger);
+    };
+    $("#rankList")?.addEventListener("click", openTerritoryStoresFromRank);
+    $("#rankList")?.addEventListener("keydown", openTerritoryStoresFromRank);
+
     $("#organizationPanelOpen")?.addEventListener("click", event => {
       if(event.target.closest("button,a,input,select,textarea,label")) return;
       if(event.target.closest("[data-player-profile],[data-transfer-leader],[data-kick-member]")) return;
@@ -847,7 +858,6 @@ await handleClaimParam();
         syncTerritoryMapVisibility();
         syncRankPeriodVisibility();
         await loadRank();
-        if(currentRank === "territory") await loadTerritoryMap();
       });
     });
     $$("[data-rank-period]").forEach(btn => {
@@ -1000,7 +1010,6 @@ await handleClaimParam();
       else restoreRankMeter();
       syncTerritoryMapVisibility();
       loadRank();
-      if(currentRank === "territory") loadTerritoryMap();
     }
     if(tab === "alerts") loadAlerts();
     if(tab === "profile"){
@@ -5753,6 +5762,94 @@ await handleClaimParam();
     section.classList.toggle("hidden", currentRank !== "territory");
   }
 
+  async function fetchTerritoryRows({ force=false } = {}){
+    if(!force && territoryMapRows.length) return territoryMapRows;
+    if(territoryRowsPromise) return territoryRowsPromise;
+
+    territoryRowsPromise = (async () => {
+      const { data, error } = await sb.rpc("biteboss_territory_map");
+      if(error) throw error;
+      territoryMapRows = Array.isArray(data) ? data : [];
+      return territoryMapRows;
+    })();
+
+    try{
+      return await territoryRowsPromise;
+    }finally{
+      territoryRowsPromise = null;
+    }
+  }
+
+  function territoryRankMatchesStore(row = {}, target = {}){
+    const same = (a,b) => String(a || "").trim() === String(b || "").trim();
+    if(target.city && !same(row.city, target.city)) return false;
+    if(target.district && !same(row.district, target.district)) return false;
+
+    const targetOrganizationId = String(target.organizationId || "").trim();
+    const rowOrganizationId = String(row.organization_id || row.crew_id || "").trim();
+    if(targetOrganizationId) return rowOrganizationId === targetOrganizationId;
+
+    const targetOrganizationName = String(target.organizationName || "").trim();
+    return !targetOrganizationName || same(row.organization_name, targetOrganizationName);
+  }
+
+  async function openTerritoryRankStores(trigger){
+    if(!trigger) return;
+
+    const target = {
+      city:String(trigger.dataset.territoryCity || "").trim(),
+      district:String(trigger.dataset.territoryDistrict || "").trim(),
+      organizationId:String(trigger.dataset.territoryOrganizationId || "").trim(),
+      organizationName:String(trigger.dataset.territoryOrganizationName || "").trim()
+    };
+    const area = [target.city,target.district].filter(Boolean).join(" ") || "현재 점령 지역";
+    const organizationName = target.organizationName || "크루";
+
+    openModal(area, `
+      <div class="rank-territory-detail">
+        <div class="rank-territory-detail-head">
+          <span>${escapeHtml(organizationName)}</span>
+          <strong>현재 점령 매장</strong>
+        </div>
+        <div class="rank-territory-store-list"><div class="app-state">점령 매장을 불러오는 중…</div></div>
+      </div>
+    `);
+
+    let rows = [];
+    try{
+      rows = (await fetchTerritoryRows()).filter(row => territoryRankMatchesStore(row, target));
+    }catch(error){
+      console.warn("BiteBoss territory rank stores:", error);
+      const list = $(".rank-territory-store-list", $("#modalBody"));
+      if(list) list.innerHTML = `<div class="app-state is-error">점령 매장을 불러오지 못했습니다.</div>`;
+      return;
+    }
+
+    const list = $(".rank-territory-store-list", $("#modalBody"));
+    if(!list) return;
+    list.innerHTML = rows.length ? rows.map(row => {
+      const protectedNow = Boolean(row.protected_until && new Date(row.protected_until).getTime() > Date.now());
+      const status = protectedNow ? `보호 ${formatRemaining(row.protected_until)} 남음` : "도전 가능";
+      return `
+        <button class="rank-territory-store" type="button" data-territory-store="${escapeAttr(row.store_id || "")}">
+          <span class="rank-territory-store-copy">
+            <strong>${escapeHtml(row.store_name || "매장")}</strong>
+            <small>${escapeHtml(row.boss_name || "보스")} · 방어력 ${Number(row.boss_defense || 0)} · ${escapeHtml(status)}</small>
+          </span>
+          <span class="rank-territory-store-arrow" aria-hidden="true">→</span>
+        </button>`;
+    }).join("") : `<div class="app-state">현재 점령 중인 매장이 없습니다.</div>`;
+
+    $$('[data-territory-store]', list).forEach(button => {
+      button.addEventListener("click", async () => {
+        const storeId = String(button.dataset.territoryStore || "").trim();
+        if(!storeId) return;
+        closeModal();
+        await openStoreDetail(storeId);
+      });
+    });
+  }
+
   async function loadTerritoryMap(){
     const section = $("#territoryMapSection");
     const mapEl = $("#territoryMap");
@@ -5767,15 +5864,16 @@ await handleClaimParam();
       return;
     }
 
-    const { data, error } = await sb.rpc("biteboss_territory_map");
-
-    if(error){
+    let rows;
+    try{
+      rows = await fetchTerritoryRows({ force:true });
+    }catch(error){
       console.warn("BiteBoss territory map:", error);
       if(summaryEl) summaryEl.textContent = "점령지 지도를 불러오지 못했습니다";
       return;
     }
 
-    territoryMapRows = Array.isArray(data) ? data : [];
+    territoryMapRows = Array.isArray(rows) ? rows : [];
 
     const currentPosition = await getPositionSafe(false);
     const currentLat = Number(currentPosition?.coords?.latitude);
@@ -6224,15 +6322,25 @@ await handleClaimParam();
       setRankItems(rows.map((row,index)=>{
         const area=[row.city,row.district].filter(Boolean).join(" ");
         return `
-          <article class="rank-card territory-rank-card">
+          <article
+            class="rank-card territory-rank-card"
+            data-territory-rank
+            data-territory-city="${escapeAttr(row.city || "")}"
+            data-territory-district="${escapeAttr(row.district || "")}"
+            data-territory-organization-id="${escapeAttr(row.organization_id || row.crew_id || "")}"
+            data-territory-organization-name="${escapeAttr(row.organization_name || "")}"
+            role="button"
+            tabindex="0"
+            aria-label="${escapeAttr(`${area || "지역 정보 없음"} ${row.organization_name || "크루"} 현재 점령 매장 보기`)}">
             <span class="rank-number">${index+1}</span>
             <div>
               <strong>${escapeHtml(area || "지역 정보 없음")}</strong>
               <div class="meta">${escapeHtml(row.organization_name || "크루")}</div>
             </div>
-            <div class="rank-result">
+            <div class="rank-result territory-rank-result">
               <b>${Number(row.store_count || 0)}</b>
               <span>매장</span>
+              <i aria-hidden="true">→</i>
             </div>
           </article>`;
       }), "아직 현재 점령 순위가 없습니다.");
