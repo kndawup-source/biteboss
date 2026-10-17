@@ -15,7 +15,7 @@
           detectSessionInUrl:false,
           storageKey:"biteboss-admin-auth"
         },
-        global:{ headers:{ "x-client-info":"biteboss-admin-web/81.85" } }
+        global:{ headers:{ "x-client-info":"biteboss-admin-web/81.86" } }
       })
     : null;
 
@@ -891,9 +891,18 @@
     if(!targets.length) return;
 
     const results=await Promise.all(targets.map(async store=>{
-      const {data,error}=await adminSb.rpc("biteboss_admin_store_plan",{p_store_id:store.id});
-      if(error || !data?.ok) return [String(store.id),{plan:"partner"}];
-      return [String(store.id),data.plan || {plan:"partner"}];
+      const {data,error}=await adminSb
+        .from("biteboss_store_plans")
+        .select("plan,started_at,expires_at")
+        .eq("store_id",store.id)
+        .maybeSingle();
+      if(error) return [String(store.id),{plan:"partner"}];
+      const expired=data?.plan==="pro" && data?.expires_at && new Date(data.expires_at).getTime()<=Date.now();
+      return [String(store.id),{
+        plan:expired ? "partner" : String(data?.plan || "partner"),
+        started_at:data?.started_at || null,
+        expires_at:data?.expires_at || null
+      }];
     }));
     let changed=false;
     results.forEach(([id,plan])=>{
@@ -1624,11 +1633,11 @@
         adminSb.rpc("biteboss_admin_store_detail", { p_store_id:storeId }),
         adminSb.rpc("biteboss_admin_store_video", { p_store_id:storeId }),
         adminSb.rpc("biteboss_store_seo_settings", { p_store_id:storeId }),
-        adminSb.rpc("biteboss_admin_store_plan", { p_store_id:storeId })
+        adminSb.from("biteboss_store_plans").select("plan,started_at,expires_at").eq("store_id",storeId).maybeSingle()
       ]);
       if(error) throw error;
       if(!data?.ok) throw new Error(data?.error || "STORE_LOAD_FAILED");
-      editingStoreBundle = { ...data, video:videoResult.error ? null : (videoResult.data || null), seo:seoResult?.error ? null : (seoResult?.data || null), plan:planResult?.error ? null : (planResult?.data?.plan || null) };
+      editingStoreBundle = { ...data, video:videoResult.error ? null : (videoResult.data || null), seo:seoResult?.error ? null : (seoResult?.data || null), plan:planResult?.error ? null : (planResult?.data || {plan:"partner"}) };
       renderAdminStoreEditor();
     }catch(error){
       console.error(error);
@@ -1759,11 +1768,11 @@
       adminSb.rpc("biteboss_admin_store_detail", { p_store_id:editingStoreId }),
       adminSb.rpc("biteboss_admin_store_video", { p_store_id:editingStoreId }),
       adminSb.rpc("biteboss_store_seo_settings", { p_store_id:editingStoreId }),
-      adminSb.rpc("biteboss_admin_store_plan", { p_store_id:editingStoreId })
+      adminSb.from("biteboss_store_plans").select("plan,started_at,expires_at").eq("store_id",editingStoreId).maybeSingle()
     ]);
     if(error) throw error;
     if(!data?.ok) throw new Error(data?.error || "STORE_LOAD_FAILED");
-    editingStoreBundle = { ...data, video:videoResult.error ? null : (videoResult.data || null), seo:seoResult?.error ? null : (seoResult?.data || null), plan:planResult?.error ? null : (planResult?.data?.plan || null) };
+    editingStoreBundle = { ...data, video:videoResult.error ? null : (videoResult.data || null), seo:seoResult?.error ? null : (seoResult?.data || null), plan:planResult?.error ? null : (planResult?.data || {plan:"partner"}) };
     renderAdminStoreEditor();
   }
 
@@ -1800,8 +1809,18 @@
     if(button) button.disabled=true;
     setStatusText(status,"저장 중…");
     try{
-      const {data,error}=await adminSb.rpc("biteboss_admin_set_store_plan",{p_store_id:editingStoreId,p_plan:plan,p_expires_at:expires});
-      if(error || !data?.ok) throw error || new Error(data?.error || "PLAN_SAVE_FAILED");
+      const existing=storePlanMap.get(String(editingStoreId)) || editingStoreBundle?.plan || {};
+      const now=new Date().toISOString();
+      const {data,error}=await adminSb.from("biteboss_store_plans").upsert([{
+        store_id:editingStoreId,
+        plan,
+        started_at:String(existing.plan || "partner")===plan && existing.started_at ? existing.started_at : now,
+        expires_at:plan==="pro" ? expires : null,
+        updated_at:now,
+        updated_by:session.user.id
+      }],{onConflict:"store_id"}).select("plan,started_at,expires_at").single();
+      if(error) throw error;
+      storePlanMap.set(String(editingStoreId),data || {plan});
 
       // Downgrading immediately removes paid banner exposure.
       if(plan!=="pro"){
