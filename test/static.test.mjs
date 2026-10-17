@@ -469,7 +469,7 @@ test('82.31 current territory ranking and territory store modal have no decorati
 
 
 
-test('82.33 store-list-only ads save without requiring a home banner image', () => {
+test('82.34 store-list-only ads save without requiring a home banner image', () => {
   const adminHtml = read('admin.html');
   assert.match(adminHtml, /id="adStoreListImageFile"[\s\S]*?1200×240/);
   assert.match(admin, /placement === "store_list" && !storeListImageUrl/);
@@ -480,7 +480,7 @@ test('82.33 store-list-only ads save without requiring a home banner image', () 
   assert.doesNotMatch(admin, /setStatusText\(status, "배너 이미지를 선택하세요\."\)/);
 });
 
-test('82.33 current territory store modal paginates 10 stores per page', () => {
+test('82.34 current territory store modal paginates 10 stores per page', () => {
   assert.match(app, /const TERRITORY_STORE_PAGE_SIZE = 10/);
   assert.match(app, /rank-territory-pagination hidden/);
   assert.match(app, /pageSlice\(rows, territoryStorePage, TERRITORY_STORE_PAGE_SIZE\)/);
