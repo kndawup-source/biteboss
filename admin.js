@@ -30,8 +30,8 @@
     "biteboss_admin_list_campaigns_v8217",
     "biteboss_admin_upsert_campaign_v8217",
     "biteboss_admin_delete_campaign_v8217",
-    "biteboss_admin_upsert_campaign_v8237",
-    "biteboss_admin_delete_campaign_v8237",
+    "biteboss_admin_upsert_campaign_v8238",
+    "biteboss_admin_delete_campaign_v8238",
     "biteboss_admin_ad_analytics_v8217",
     "biteboss_admin_ad_creative_analytics_v8217"
   ]);
@@ -3311,7 +3311,7 @@
         form.dataset.primaryImageKind=usesStoreListFallback ? "store_list" : "home";
       }
 
-      const { data, error } = await adminRpc("biteboss_admin_upsert_campaign_v8237", {
+      const { data, error } = await adminRpc("biteboss_admin_upsert_campaign_v8238", {
         p_id:campaignId,
         p_advertiser_name:String($("#adAdvertiserName")?.value || "").trim(),
         p_campaign_name:String($("#adCampaignName")?.value || "").trim(),
@@ -3376,7 +3376,7 @@
     const uniquePaths=[...new Set(paths)];
 
     try{
-      const { data, error } = await adminRpc("biteboss_admin_delete_campaign_v8237", { p_campaign_id:item.id });
+      const { data, error } = await adminRpc("biteboss_admin_delete_campaign_v8238", { p_campaign_id:item.id });
       if(error) throw error;
       if(!data?.ok) throw new Error(data?.error || "CAMPAIGN_DELETE_FAILED");
 
