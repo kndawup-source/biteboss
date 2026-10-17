@@ -9,7 +9,7 @@
   <script src="./app-config.js?v=76.3"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./supabase.js?v=76.3"></script>
-  <link rel="stylesheet" href="./store-admin.css?v=81.79?v=76.3" />
+  <link rel="stylesheet" href="./store-admin.css?v=76.3" />
 </head>
 <body class="store-admin-app">
 <div id="storeAuthGate" class="auth-gate">
@@ -82,10 +82,6 @@
         <div class="store-impact-grid"><div><span>방문</span><strong id="impactVisits">0</strong><small id="impactVisitsDelta">-</small></div><div><span>고유 방문자</span><strong id="impactUnique">0</strong><small id="impactUniqueDelta">-</small></div><div><span>신규 방문자</span><strong id="impactNew">0</strong><small id="impactNewDelta">-</small></div><div><span>재방문자</span><strong id="impactRepeat">0</strong><small id="impactRepeatDelta">-</small></div><div><span>혜택 사용</span><strong id="impactBenefits">0</strong><small id="impactBenefitsDelta">-</small></div></div>
       </section>
 
-      <section class="store-impact store-ad-impact">
-        <div class="store-section-head"><div><h3>광고 성과</h3><p>내 매장 광고가 관심과 실제 방문으로 이어진 결과입니다.</p></div><select id="storeAdDays" class="input impact-period"><option value="7">7일</option><option value="30" selected>30일</option><option value="90">90일</option></select></div>
-        <div id="storeAdPerformance" class="store-ad-performance"><div class="store-empty">광고 성과를 불러오는 중…</div></div>
-      </section>
       <section class="today-actions">
         <button class="primary-btn" data-open-store-page="offers" type="button">혜택 코드 확인</button>
         <button class="secondary-btn" data-open-store-page="qr" type="button">QR 열기</button>
@@ -114,7 +110,105 @@
           <label>도시<input name="city" class="input" /></label>
           <label>지역<input name="district" class="input" /></label>
           <label class="wide">주소<input name="address" class="input" /></label>
-          <label>영업시간<input name="hours" class="input" placeholder="11:00 - 22:00" /></label>
+          <input name="hours" type="hidden" />
+<label>영업 시작<select name="hours_open" class="input"><option value="">선택</option><option value="00:00">00:00</option>
+<option value="00:30">00:30</option>
+<option value="01:00">01:00</option>
+<option value="01:30">01:30</option>
+<option value="02:00">02:00</option>
+<option value="02:30">02:30</option>
+<option value="03:00">03:00</option>
+<option value="03:30">03:30</option>
+<option value="04:00">04:00</option>
+<option value="04:30">04:30</option>
+<option value="05:00">05:00</option>
+<option value="05:30">05:30</option>
+<option value="06:00">06:00</option>
+<option value="06:30">06:30</option>
+<option value="07:00">07:00</option>
+<option value="07:30">07:30</option>
+<option value="08:00">08:00</option>
+<option value="08:30">08:30</option>
+<option value="09:00">09:00</option>
+<option value="09:30">09:30</option>
+<option value="10:00">10:00</option>
+<option value="10:30">10:30</option>
+<option value="11:00">11:00</option>
+<option value="11:30">11:30</option>
+<option value="12:00">12:00</option>
+<option value="12:30">12:30</option>
+<option value="13:00">13:00</option>
+<option value="13:30">13:30</option>
+<option value="14:00">14:00</option>
+<option value="14:30">14:30</option>
+<option value="15:00">15:00</option>
+<option value="15:30">15:30</option>
+<option value="16:00">16:00</option>
+<option value="16:30">16:30</option>
+<option value="17:00">17:00</option>
+<option value="17:30">17:30</option>
+<option value="18:00">18:00</option>
+<option value="18:30">18:30</option>
+<option value="19:00">19:00</option>
+<option value="19:30">19:30</option>
+<option value="20:00">20:00</option>
+<option value="20:30">20:30</option>
+<option value="21:00">21:00</option>
+<option value="21:30">21:30</option>
+<option value="22:00">22:00</option>
+<option value="22:30">22:30</option>
+<option value="23:00">23:00</option>
+<option value="23:30">23:30</option></select></label>
+<label>영업 종료<select name="hours_close" class="input"><option value="">선택</option><option value="00:00">00:00</option>
+<option value="00:30">00:30</option>
+<option value="01:00">01:00</option>
+<option value="01:30">01:30</option>
+<option value="02:00">02:00</option>
+<option value="02:30">02:30</option>
+<option value="03:00">03:00</option>
+<option value="03:30">03:30</option>
+<option value="04:00">04:00</option>
+<option value="04:30">04:30</option>
+<option value="05:00">05:00</option>
+<option value="05:30">05:30</option>
+<option value="06:00">06:00</option>
+<option value="06:30">06:30</option>
+<option value="07:00">07:00</option>
+<option value="07:30">07:30</option>
+<option value="08:00">08:00</option>
+<option value="08:30">08:30</option>
+<option value="09:00">09:00</option>
+<option value="09:30">09:30</option>
+<option value="10:00">10:00</option>
+<option value="10:30">10:30</option>
+<option value="11:00">11:00</option>
+<option value="11:30">11:30</option>
+<option value="12:00">12:00</option>
+<option value="12:30">12:30</option>
+<option value="13:00">13:00</option>
+<option value="13:30">13:30</option>
+<option value="14:00">14:00</option>
+<option value="14:30">14:30</option>
+<option value="15:00">15:00</option>
+<option value="15:30">15:30</option>
+<option value="16:00">16:00</option>
+<option value="16:30">16:30</option>
+<option value="17:00">17:00</option>
+<option value="17:30">17:30</option>
+<option value="18:00">18:00</option>
+<option value="18:30">18:30</option>
+<option value="19:00">19:00</option>
+<option value="19:30">19:30</option>
+<option value="20:00">20:00</option>
+<option value="20:30">20:30</option>
+<option value="21:00">21:00</option>
+<option value="21:30">21:30</option>
+<option value="22:00">22:00</option>
+<option value="22:30">22:30</option>
+<option value="23:00">23:00</option>
+<option value="23:30">23:30</option></select></label>
+<label class="wide store-hours-all-day"><input type="checkbox" name="open_24h" value="1"/><span>24시간 영업</span></label>
+<div class="wide store-closed-days-field"><span>정기 휴무</span><div class="store-day-toggles" role="group" aria-label="정기 휴무 요일"><label class="store-day-toggle"><input type="checkbox" name="closed_days" value="mon"/><span>월</span></label><label class="store-day-toggle"><input type="checkbox" name="closed_days" value="tue"/><span>화</span></label><label class="store-day-toggle"><input type="checkbox" name="closed_days" value="wed"/><span>수</span></label><label class="store-day-toggle"><input type="checkbox" name="closed_days" value="thu"/><span>목</span></label><label class="store-day-toggle"><input type="checkbox" name="closed_days" value="fri"/><span>금</span></label><label class="store-day-toggle"><input type="checkbox" name="closed_days" value="sat"/><span>토</span></label><label class="store-day-toggle"><input type="checkbox" name="closed_days" value="sun"/><span>일</span></label></div></div>
           <label>전화번호<input name="phone" class="input" /></label>
           <label class="wide">공지<textarea name="notice" class="input store-textarea"></textarea></label>
           <button class="primary-btn wide" type="submit">저장</button>
@@ -202,6 +296,6 @@
     </section>
   </main>
 </div>
-<script src="./store-admin.js?v=81.79?v=76.3"></script>
+<script src="./store-admin.js?v=76.3"></script>
 </body>
 </html>

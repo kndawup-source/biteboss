@@ -23,7 +23,6 @@
   let storeAccount = null;
   let accessibleStores = [];
   let currentStore = null;
-    void loadStoreAdPerformance();
   let currentRole = null;
   let snapshot = {};
   let activeQr = null;
@@ -75,7 +74,6 @@
       const status = $("#storeActivationStatus");
       const submit = event.currentTarget.querySelector('button[type="submit"]');
 
-      if(submit?.disabled) return;
       if(!code) return setText("#storeActivationStatus", "활성화 코드를 입력하세요.");
       if(!/^[a-z0-9][a-z0-9._-]{2,31}$/.test(username)) return setText("#storeActivationStatus", "ID는 영문 소문자/숫자/._- 조합 3~32자입니다.");
       if(!/^\d{6}$/.test(pin)) return setText("#storeActivationStatus", "PIN은 숫자 6자리입니다.");
@@ -115,15 +113,12 @@
       const username = String(form.get("store_id") || "").trim().toLowerCase();
       const pin = String(form.get("pin") || "").trim();
       const status = $("#storeLoginStatus");
-      const submit = event.currentTarget.querySelector('button[type="submit"]');
 
-      if(submit?.disabled) return;
       if(!username || !/^\d{6}$/.test(pin)){
         if(status) status.textContent = "ID와 6자리 PIN을 확인하세요.";
         return;
       }
 
-      if(submit) submit.disabled = true;
       if(status) status.textContent = "로그인 중…";
 
       try{
@@ -150,8 +145,6 @@
       }catch(error){
         console.error("BiteBoss store login failed:", error);
         if(status) status.textContent = `로그인 실패 · ${error?.message || "알 수 없는 오류"}`;
-      }finally{
-        if(submit) submit.disabled = false;
       }
     });
   }
@@ -301,12 +294,67 @@
     }
   }
 
+  const STORE_DAY_KEYS = ["mon","tue","wed","thu","fri","sat","sun"];
+
+  function parseStoreHours(value){
+    const raw = String(value || "").trim();
+    const [timePart = "", ...metaParts] = raw.split("|").map(part => part.trim());
+    const match = timePart.match(/^(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})$/);
+    const meta = Object.fromEntries(metaParts.map(part => {
+      const index = part.indexOf("=");
+      return index > 0 ? [part.slice(0,index).trim(), part.slice(index+1).trim()] : ["", ""];
+    }).filter(([key]) => key));
+    return {
+      open:match ? match[1] : "",
+      close:match ? match[2] : "",
+      open24:meta.open24 === "1",
+      closedDays:String(meta.closed || "").split(",").filter(day => STORE_DAY_KEYS.includes(day))
+    };
+  }
+
+  function composeStoreHours(form){
+    const open24 = String(form.get("open_24h") || "") === "1";
+    const open = String(form.get("hours_open") || "").trim();
+    const close = String(form.get("hours_close") || "").trim();
+    const closedDays = form.getAll("closed_days").map(String).filter(day => STORE_DAY_KEYS.includes(day));
+    const timePart = open24 ? "00:00 - 00:00" : (open && close ? `${open} - ${close}` : "");
+    if(!timePart && !closedDays.length) return "";
+    return [timePart, `open24=${open24 ? "1" : "0"}`, `closed=${closedDays.join(",")}`].filter(Boolean).join("|");
+  }
+
+  function applyStoreHoursForm(form, value){
+    const hours = parseStoreHours(value);
+    if(form.elements.hours_open) form.elements.hours_open.value = hours.open;
+    if(form.elements.hours_close) form.elements.hours_close.value = hours.close;
+    if(form.elements.hours) form.elements.hours.value = value || "";
+    const open24 = form.elements.open_24h;
+    if(open24) open24.checked = hours.open24;
+    form.querySelectorAll('input[name="closed_days"]').forEach(input => {
+      input.checked = hours.closedDays.includes(input.value);
+    });
+    const disabled = hours.open24;
+    if(form.elements.hours_open) form.elements.hours_open.disabled = disabled;
+    if(form.elements.hours_close) form.elements.hours_close.disabled = disabled;
+  }
+
+  function bindStoreHoursControls(form){
+    const open24 = form?.elements?.open_24h;
+    if(!open24 || open24.dataset.bound === "1") return;
+    open24.dataset.bound = "1";
+    open24.addEventListener("change", () => {
+      if(form.elements.hours_open) form.elements.hours_open.disabled = open24.checked;
+      if(form.elements.hours_close) form.elements.hours_close.disabled = open24.checked;
+    });
+  }
+
   function renderStoreForm(){
     const form = $("#storeInfoForm");
     if(!form) return;
-    ["name","category","city","district","address","hours","phone","notice"].forEach(key => {
+    ["name","category","city","district","address","phone","notice"].forEach(key => {
       if(form.elements[key]) form.elements[key].value = currentStore[key] || "";
     });
+    applyStoreHoursForm(form, currentStore.hours);
+    bindStoreHoursControls(form);
   }
 
   async function saveStoreInfo(event){
@@ -319,7 +367,7 @@
       p_city:String(form.get("city") || "").trim(),
       p_district:String(form.get("district") || "").trim(),
       p_address:String(form.get("address") || "").trim(),
-      p_hours:String(form.get("hours") || "").trim(),
+      p_hours:composeStoreHours(form),
       p_phone:String(form.get("phone") || "").trim(),
       p_notice:String(form.get("notice") || "").trim()
     });
@@ -712,15 +760,4 @@
     showAuthGate();
     setText("#storeLoginStatus", error?.message === "NO_STORE_ACCESS" ? "관리 가능한 BiteBoss 매장이 없습니다." : "초기화에 실패했습니다.");
   }
-  async function loadStoreAdPerformance(){
-    const box=$("#storeAdPerformance"); if(!box || !currentStore?.id) return;
-    const days=Math.max(1,Number($("#storeAdDays")?.value || 30));
-    const {data,error}=await storeSb.rpc("biteboss_store_ad_analytics_v8179",{p_store_id:currentStore.id,p_days:days});
-    if(error){ console.warn("Store ad analytics:",error); box.innerHTML='<div class="store-empty">광고 성과를 불러오지 못했습니다.</div>'; return; }
-    const total=data?.total || {}, trend=Array.isArray(data?.trend)?data.trend:[];
-    const impressions=Number(total.impressions||0), clicks=Number(total.clicks||0);
-    const max=Math.max(1,...trend.map(row=>Number(row.impressions||0)));
-    box.innerHTML=`<article><span>노출</span><strong>${impressions.toLocaleString("ko-KR")}</strong><small>광고 표시</small></article><article><span>클릭</span><strong>${clicks.toLocaleString("ko-KR")}</strong><small>관심 반응</small></article><article><span>CTR</span><strong>${impressions?(clicks/impressions*100).toFixed(1):"0.0"}%</strong><small>노출 대비</small></article><article><span>방문</span><strong>${Number(total.visits||0).toLocaleString("ko-KR")}</strong><small>광고 이후</small></article><article><span>점령</span><strong>${Number(total.captures||0).toLocaleString("ko-KR")}</strong><small>광고 이후</small></article>${trend.length?`<div class="store-ad-mini-bars" aria-label="일별 광고 노출 추이">${trend.map(row=>`<i title="${escapeAttr(row.label||"")} · ${Number(row.impressions||0)}회" style="height:${Math.max(Number(row.impressions||0)?4:1,Math.round(Number(row.impressions||0)/max*100))}%"></i>`).join("")}</div>`:""}`;
-  }
-
 })();

@@ -1596,6 +1596,59 @@
     document.body.classList.remove("admin-editor-open");
   }
 
+  const STORE_DAY_KEYS = ["mon","tue","wed","thu","fri","sat","sun"];
+
+  function parseStoreHours(value){
+    const raw = String(value || "").trim();
+    const [timePart = "", ...metaParts] = raw.split("|").map(part => part.trim());
+    const match = timePart.match(/^(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})$/);
+    const meta = Object.fromEntries(metaParts.map(part => {
+      const index = part.indexOf("=");
+      return index > 0 ? [part.slice(0,index).trim(), part.slice(index+1).trim()] : ["", ""];
+    }).filter(([key]) => key));
+    return {
+      open:match ? match[1] : "",
+      close:match ? match[2] : "",
+      open24:meta.open24 === "1",
+      closedDays:String(meta.closed || "").split(",").filter(day => STORE_DAY_KEYS.includes(day))
+    };
+  }
+
+  function composeStoreHours(form){
+    const open24 = String(form.get("open_24h") || "") === "1";
+    const open = String(form.get("hours_open") || "").trim();
+    const close = String(form.get("hours_close") || "").trim();
+    const closedDays = form.getAll("closed_days").map(String).filter(day => STORE_DAY_KEYS.includes(day));
+    const timePart = open24 ? "00:00 - 00:00" : (open && close ? `${open} - ${close}` : "");
+    if(!timePart && !closedDays.length) return "";
+    return [timePart, `open24=${open24 ? "1" : "0"}`, `closed=${closedDays.join(",")}`].filter(Boolean).join("|");
+  }
+
+  function applyStoreHoursForm(form, value){
+    const hours = parseStoreHours(value);
+    if(form.elements.hours_open) form.elements.hours_open.value = hours.open;
+    if(form.elements.hours_close) form.elements.hours_close.value = hours.close;
+    if(form.elements.hours) form.elements.hours.value = value || "";
+    const open24 = form.elements.open_24h;
+    if(open24) open24.checked = hours.open24;
+    form.querySelectorAll('input[name="closed_days"]').forEach(input => {
+      input.checked = hours.closedDays.includes(input.value);
+    });
+    const disabled = hours.open24;
+    if(form.elements.hours_open) form.elements.hours_open.disabled = disabled;
+    if(form.elements.hours_close) form.elements.hours_close.disabled = disabled;
+  }
+
+  function bindStoreHoursControls(form){
+    const open24 = form?.elements?.open_24h;
+    if(!open24 || open24.dataset.bound === "1") return;
+    open24.dataset.bound = "1";
+    open24.addEventListener("change", () => {
+      if(form.elements.hours_open) form.elements.hours_open.disabled = open24.checked;
+      if(form.elements.hours_close) form.elements.hours_close.disabled = open24.checked;
+    });
+  }
+
   function renderAdminStoreEditor(){
     const bundle = editingStoreBundle || {};
     const store = bundle.store || {};
@@ -1604,9 +1657,11 @@
 
     const form = $("#adminStoreEditForm");
     if(form){
-      ["name","brand_name","category","status","city","district","address","latitude","longitude","hours","phone","notice"].forEach(key => {
+      ["name","brand_name","category","status","city","district","address","latitude","longitude","phone","notice"].forEach(key => {
         if(form.elements[key]) form.elements[key].value = store[key] ?? "";
       });
+      applyStoreHoursForm(form, store.hours);
+      bindStoreHoursControls(form);
     }
 
     renderAdminPhotos(bundle.photos || []);
@@ -1743,7 +1798,7 @@
         p_address:String(form.get("address") || "").trim(),
         p_latitude:lat,
         p_longitude:lng,
-        p_hours:String(form.get("hours") || "").trim(),
+        p_hours:composeStoreHours(form),
         p_phone:String(form.get("phone") || "").trim(),
         p_notice:String(form.get("notice") || "").trim(),
         p_status:String(form.get("status") || "active")
@@ -1834,21 +1889,6 @@
       });
       if(error) throw error;
       if(!data?.ok) throw new Error(data?.error || "PHOTO_ADD_FAILED");
-
-      if(isCover){
-        const existingBanner=bannerConfigForStore({ id:editingStoreId });
-        if(existingBanner){
-          const banners=normalizedPartnerBanners().filter(item=>item.id!==String(editingStoreId));
-          banners.push({ ...existingBanner, photo_url:imageUrl });
-          const syncResult=await adminSb.from("biteboss_app_config").upsert([{
-            key:"partner_banners", value:banners,
-            updated_by:session.user.id, updated_at:new Date().toISOString()
-          }], { onConflict:"key" });
-          if(syncResult.error) throw syncResult.error;
-          appConfig.partner_banners=banners;
-        }
-      }
-
       form?.reset();
       setStatusText(status, "사진이 등록되었습니다.");
       await Promise.all([reloadStoreEditor(), loadStores()]);

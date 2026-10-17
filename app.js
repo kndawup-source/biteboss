@@ -2403,6 +2403,52 @@
     if(String(activeStoreDetailId || "") === key) applyOwnerReclaimState(data);
   }
 
+  const STORE_DAY_LABELS = Object.freeze({sun:"일",mon:"월",tue:"화",wed:"수",thu:"목",fri:"금",sat:"토"});
+  const STORE_DAY_ORDER = Object.freeze(["sun","mon","tue","wed","thu","fri","sat"]);
+
+  function parsePublicStoreHours(value){
+    const raw=String(value || "").trim();
+    const [timePart="",...metaParts]=raw.split("|").map(part=>part.trim());
+    const match=timePart.match(/^(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})$/);
+    const meta={};
+    metaParts.forEach(part=>{
+      const index=part.indexOf("=");
+      if(index>0) meta[part.slice(0,index).trim()]=part.slice(index+1).trim();
+    });
+    return {
+      open:match ? match[1] : "",
+      close:match ? match[2] : "",
+      open24:meta.open24==="1",
+      closedDays:String(meta.closed || "").split(",").filter(day=>STORE_DAY_ORDER.includes(day))
+    };
+  }
+
+  function storeBusinessInfo(value, now = new Date()){
+    const hours=parsePublicStoreHours(value);
+    const dayKey=STORE_DAY_ORDER[now.getDay()];
+    const closedToday=hours.closedDays.includes(dayKey);
+    const closedLabel=hours.closedDays.map(day=>STORE_DAY_LABELS[day]).join("·");
+    const schedule=hours.open24 ? "24시간 영업" : (hours.open && hours.close ? `${hours.open}–${hours.close}` : "");
+    let status="";
+    if(closedToday){
+      status="오늘 휴무";
+    }else if(hours.open24){
+      status="24시간 영업";
+    }else if(hours.open && hours.close){
+      const current=now.getHours()*60+now.getMinutes();
+      const [oh,om]=hours.open.split(":").map(Number);
+      const [ch,cm]=hours.close.split(":").map(Number);
+      const start=oh*60+om;
+      const end=ch*60+cm;
+      if(end<=start){
+        status=current>=start || current<end ? `영업 중 · ${hours.close} 종료` : `영업 전 · ${hours.open} 시작`;
+      }else{
+        status=current<start ? `영업 전 · ${hours.open} 시작` : current<end ? `영업 중 · ${hours.close} 종료` : "영업 종료";
+      }
+    }
+    return { ...hours, schedule, closedLabel, closedToday, status };
+  }
+
   function renderStoreDetail(data, options = {}){
     const store = data.store || {};
     const game = data.game || {};
@@ -2510,7 +2556,6 @@
       <section class="store-managed-menu" aria-label="대표 메뉴">
         <div class="store-managed-section-head">
           <span>메뉴</span>
-          <small>매장 관리자 등록</small>
         </div>
         <div class="store-detail-menu featured-menu-list">
           ${featuredMenu.map(item => `
@@ -2627,6 +2672,17 @@
             `;
           }).join("") : `<div class="store-detail-empty">현재 사용 가능한 혜택이 없습니다.</div>`}
         </div>
+      </section>` : "";
+
+    const businessInfo = storeBusinessInfo(store.hours);
+    const storeInfoHtml = (store.hours || store.phone || (!managerManagedStore && store.notice)) ? `
+      <section class="store-detail-section store-detail-info">
+        <h4>매장 정보</h4>
+        ${businessInfo.status ? `<div><span>오늘</span><strong>${escapeHtml(businessInfo.status)}</strong></div>` : ""}
+        ${businessInfo.schedule ? `<div><span>영업시간</span><strong>${escapeHtml(businessInfo.schedule)}</strong></div>` : ""}
+        ${businessInfo.closedLabel ? `<div><span>정기휴무</span><strong>${escapeHtml(businessInfo.closedLabel)}요일</strong></div>` : ""}
+        ${store.phone ? `<div><span>전화</span><strong>${escapeHtml(store.phone)}</strong></div>` : ""}
+        ${!managerManagedStore && store.notice ? `<div><span>안내</span><strong>${escapeHtml(store.notice)}</strong></div>` : ""}
       </section>` : "";
 
     const arenaCurrentBoss = String(arena.current_boss_nickname || bossName || "아직 없음");
@@ -2781,6 +2837,7 @@
         ${featuredMenuHtml}
 
         ${offersHtml}
+        ${storeInfoHtml}
 
         <details class="store-more">
           <summary class="store-more-toggle">
@@ -2821,14 +2878,6 @@
               </div>
               ${impactShares ? `<p class="detail-note">최근 30일 공유 ${impactShares}회</p>` : ""}
             </section>
-
-            ${(store.hours || store.phone || (!managerManagedStore && store.notice)) ? `
-              <section class="store-detail-section store-detail-info">
-                <h4>매장 정보</h4>
-                ${store.hours ? `<div><span>영업시간</span><strong>${escapeHtml(store.hours)}</strong></div>` : ""}
-                ${store.phone ? `<div><span>전화</span><strong>${escapeHtml(store.phone)}</strong></div>` : ""}
-                ${!managerManagedStore && store.notice ? `<div><span>안내</span><strong>${escapeHtml(store.notice)}</strong></div>` : ""}
-              </section>` : ""}
 
             ${menuHtml}
           </div>
