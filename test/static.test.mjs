@@ -356,3 +356,19 @@ test('82.20 dashboard performance and partner request controls use direct button
   assert.match(adminCss, /analytics-compare-tabs button\.active\{background:#111;color:#fff\}/);
   assert.match(adminCss, /partner-request-filters button\.active\{background:#111;color:#fff\}/);
 });
+
+
+test('82.21 home hook copy paints before network config resolves', () => {
+  const initBlock = blockBetween(app, 'async function init()', 'function readPartnerBannerPhotoCache');
+  assert.match(app, /HOME_COPY_CACHE_KEY = "biteboss:home-copy-v1"/);
+  assert.match(app, /function restoreCachedHomeCopy\(\)/);
+  assert.match(app, /function cacheHomeCopy\(\)/);
+  const restoreIndex = initBlock.indexOf('restoreCachedHomeCopy();');
+  const renderIndex = initBlock.indexOf('renderHomeCopy();');
+  const sessionIndex = initBlock.indexOf('await ensureUserSession();');
+  const configIndex = initBlock.indexOf('await loadConfig();');
+  assert.ok(restoreIndex >= 0 && renderIndex > restoreIndex, 'cached home copy renders immediately');
+  assert.ok(sessionIndex > renderIndex && configIndex > sessionIndex, 'home copy renders before auth/config network waits');
+  const configBlock = blockBetween(app, 'async function loadConfig()', 'function renderHomeCopy');
+  assert.match(configBlock, /cacheHomeCopy\(\)/);
+});

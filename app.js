@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.20";
+  const BITEBOSS_BUILD = "82.21";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -127,6 +127,7 @@
   }
   let homeSplashRequestId = 0;
   const HOME_SPLASH_CACHE_KEY = "biteboss:home-splash-url";
+  const HOME_COPY_CACHE_KEY = "biteboss:home-copy-v1";
   const PARTNER_BANNERS_CACHE_KEY = "biteboss:partner-banners";
 
   const config = {
@@ -459,6 +460,11 @@
     setupNativeUrlListener();
     setupPushListeners();
     updateNetworkState();
+
+    // Home copy must be available on the first frame. Use the last confirmed
+    // admin-configured value immediately, then reconcile with Supabase below.
+    restoreCachedHomeCopy();
+    renderHomeCopy();
 
     // Paint the last successful hero immediately while auth/config load in the background.
     renderHomeSplashImage({ preferCached:true, allowEmpty:false });
@@ -1087,6 +1093,7 @@ await handleClaimParam();
     Object.keys(config).forEach(key => {
       if(Object.prototype.hasOwnProperty.call(rows, key)) config[key] = rows[key];
     });
+    cacheHomeCopy();
     if(Array.isArray(rows.partner_banners)){
       config.partner_banners = rows.partner_banners;
       cachePartnerBanners(config.partner_banners);
@@ -1194,6 +1201,34 @@ await handleClaimParam();
     if(["true","1","yes","on"].includes(normalized)) return true;
     if(["false","0","no","off",""].includes(normalized)) return false;
     return fallback;
+  }
+
+  function readCachedHomeCopy(){
+    try{
+      const parsed = JSON.parse(localStorage.getItem(HOME_COPY_CACHE_KEY) || "null");
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
+    }catch{
+      return null;
+    }
+  }
+
+  function restoreCachedHomeCopy(){
+    const cached = readCachedHomeCopy();
+    if(!cached) return;
+    for(const key of ["home_hook_enabled","home_hook_text","home_primary_cta","home_secondary_cta"]){
+      if(Object.prototype.hasOwnProperty.call(cached, key)) config[key] = cached[key];
+    }
+  }
+
+  function cacheHomeCopy(){
+    try{
+      localStorage.setItem(HOME_COPY_CACHE_KEY, JSON.stringify({
+        home_hook_enabled:config.home_hook_enabled,
+        home_hook_text:String(config.home_hook_text || ""),
+        home_primary_cta:String(config.home_primary_cta || ""),
+        home_secondary_cta:String(config.home_secondary_cta || "")
+      }));
+    }catch{}
   }
 
   function renderHomeCopy(){
