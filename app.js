@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.02";
+  const BITEBOSS_BUILD = "82.04";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -4874,14 +4874,15 @@ await handleClaimParam();
   }
 
   function shouldShowFirstCaptureGuide(pulseData){
-    // Guests always need the first-capture guide. For members, use the
-    // canonical lifetime claim count when available; the pulse flag remains
-    // a compatibility fallback while summary data is still loading.
+    // Signed-out users always see the first-capture guide.
     if(!playerSession?.authenticated) return true;
 
+    // Signed-in users see it only until their first lifetime capture.
     const claimCount=Number(summary?.claim_count);
     if(Number.isFinite(claimCount)) return claimCount < 1;
 
+    // While the member summary is still loading, keep the server newcomer
+    // signal as the compatibility fallback.
     return pulseData?.new_player_protected === true;
   }
 
