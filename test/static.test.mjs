@@ -443,6 +443,8 @@ test('82.28 benefit passes support partner offers and non-partner boss verificat
   assert.match(app, /async function createDefaultBossPass\(storeId, storeName\)/);
   assert.match(app, /sb\.rpc\("biteboss_my_store_status",\{p_store_id:id\}\)/);
   assert.match(app, /data-default-benefit-store/);
+  assert.match(app, /\$\$\("\[data-default-benefit-store\]", body\)\.forEach/);
+  assert.match(app, /createDefaultBossPass\(\s*button\.dataset\.defaultBenefitStore,\s*button\.dataset\.defaultBenefitName\s*\)/s);
   assert.match(app, /할인·서비스 제공 여부는 매장 정책에 따릅니다/);
   assert.match(app, /defaultBossPassEligible = !isPartner && \(isBoss \|\| isCrew\)/);
 });
