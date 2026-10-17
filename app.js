@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.30";
+  const BITEBOSS_BUILD = "82.31";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -5964,7 +5964,6 @@ await handleClaimParam();
             <strong>${escapeHtml(row.store_name || "매장")}</strong>
             <small>${escapeHtml(row.boss_name || "보스")} · 방어력 ${Number(row.boss_defense || 0)} · ${escapeHtml(status)}</small>
           </span>
-          <span class="rank-territory-store-arrow" aria-hidden="true">→</span>
         </button>`;
     }).join("") : `<div class="app-state">현재 점령 중인 매장이 없습니다.</div>`;
 
@@ -6468,7 +6467,6 @@ await handleClaimParam();
             <div class="rank-result territory-rank-result">
               <b>${Number(row.store_count || 0)}</b>
               <span>매장</span>
-              <i aria-hidden="true">→</i>
             </div>
           </article>`;
       }), "아직 현재 점령 순위가 없습니다.");
