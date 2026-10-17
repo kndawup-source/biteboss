@@ -646,3 +646,19 @@ body.admin-app{min-height:100dvh;background:#f1f1f3;color:#111}
   .admin-app .store-video-thumb-row{grid-template-columns:62px minmax(0,1fr) auto}
   .admin-app .store-video-thumb-row .store-video-thumb{width:62px}
 }
+
+/* 81.82 store avatar alignment */
+.admin-app .admin-store-thumb{
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+  text-align:center;
+  line-height:1;
+  font-size:0;
+}
+.admin-app .admin-store-thumb img,
+.admin-app img.admin-store-thumb{
+  object-position:center center;
+}
