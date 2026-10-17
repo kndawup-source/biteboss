@@ -511,3 +511,20 @@ test('82.41 ad campaign delete clears canonical campaigns, settings, creatives a
   assert.match(admin, /Best-effort legacy cleanup only/);
   assert.match(admin, /creativeCount=campaignCreatives\(item\)\.filter\(c=>c\.is_active!==false && \(c\.image_url \|\| c\.store_list_image_url\)\)\.length/);
 });
+
+test('82.43 ad performance drills down from overall to campaign to creative', () => {
+  const adminHtml = read('admin.html');
+  const sql = read('sql/biteboss-82.43-ad-performance-drilldown.sql');
+  assert.match(adminHtml, /id="adPerformanceScopeTitle"/);
+  assert.match(adminHtml, /id="adPerformanceScopeDescription"/);
+  assert.match(adminHtml, /id="adPerformanceReset"/);
+  assert.match(admin, /biteboss_admin_ad_performance_detail_v8243/);
+  assert.match(admin, /selectedAdPerformanceCreativeId/);
+  assert.match(admin, /data-ad-performance-creative/);
+  assert.match(admin, /function resetAdPerformanceScope\(\)/);
+  assert.match(admin, /renderAdPerformanceData\(data \|\| \{\},\{scope:creativeId\?"creative":"campaign"\}\)/);
+  assert.match(sql, /create or replace function public\.biteboss_admin_ad_performance_detail_v8243/);
+  assert.match(sql, /and \(v_campaign_id is null or e\.campaign_id = v_campaign_id\)/);
+  assert.match(sql, /and \(v_creative_id is null or e\.creative_id = v_creative_id\)/);
+  assert.match(sql, /generate_series/);
+});

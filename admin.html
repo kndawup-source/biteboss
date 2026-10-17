@@ -8,7 +8,7 @@
 <meta content="yes" name="mobile-web-app-capable"/>
 <title>BiteBoss Admin</title>
 <link href="./styles.css?v=82.20" rel="stylesheet"/>
-<link href="./admin.css?v=82.41" rel="stylesheet"/>
+<link href="./admin.css?v=82.43" rel="stylesheet"/>
 <script src="./app-config.js?v=82.20"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -378,10 +378,10 @@
 <div class="admin-page-head"><div><span class="eyebrow">현황</span><h2>광고 성과</h2><p>전체 광고 성과에서 캠페인, 광고 소재 순으로 내려가며 확인합니다.</p></div></div><div class="admin-page-body">
 <section class="admin-section-card admin-ad-performance">
 <div class="admin-section-title admin-section-title-row">
-<div><h3>전체 성과</h3><p>선택한 기간에 집계된 모든 캠페인의 광고 성과입니다.</p></div>
-<select aria-label="광고 성과 기간" class="input admin-ad-period" id="adAnalyticsDays">
+<div><h3 id="adPerformanceScopeTitle">전체 성과</h3><p id="adPerformanceScopeDescription">선택한 기간에 집계된 모든 캠페인의 광고 성과입니다.</p></div>
+<div class="admin-ad-performance-controls"><button class="text-btn hidden" id="adPerformanceReset" type="button">전체 광고</button><select aria-label="광고 성과 기간" class="input admin-ad-period" id="adAnalyticsDays">
 <option value="7">7일</option><option selected="" value="30">30일</option><option value="90">90일</option>
-</select>
+</select></div>
 </div>
 <div class="admin-ad-kpis">
 <article><span>노출</span><strong id="adKpiImpressions">0</strong><small>광고가 표시된 횟수</small></article>
@@ -684,6 +684,6 @@
 </div>
 </section>
 </div>
-<script src="./admin.js?v=82.41"></script>
+<script src="./admin.js?v=82.43"></script>
 </body>
 </html>

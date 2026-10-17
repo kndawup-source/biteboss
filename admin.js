@@ -34,7 +34,8 @@
     "biteboss_admin_upsert_campaign_v8239",
     "biteboss_admin_delete_campaign_v8239",
     "biteboss_admin_ad_analytics_v8217",
-    "biteboss_admin_ad_creative_analytics_v8217"
+    "biteboss_admin_ad_creative_analytics_v8217",
+    "biteboss_admin_ad_performance_detail_v8243"
   ]);
 
   async function adminRpc(name, args){
@@ -63,6 +64,9 @@
   let adCampaigns = [];
   let selectedAdCampaignId = "";
   let selectedAdPerformanceCampaignId = "";
+  let selectedAdPerformanceCreativeId = "";
+  let adAnalyticsOverallData = null;
+  let adPerformanceDetailRequest = 0;
   const adCreativeAnalyticsMap = new Map();
   let partnerRequests = [];
   let storeRequests = [];
@@ -302,6 +306,7 @@
     $("#adPerformanceSearch")?.addEventListener("input", renderAdPerformanceCampaigns);
     $("#adPerformanceExportCsv")?.addEventListener("click", exportAdPerformanceCsv);
     $("#adPerformanceCreativeClose")?.addEventListener("click", closeAdPerformanceCreativePanel);
+    $("#adPerformanceReset")?.addEventListener("click", resetAdPerformanceScope);
     $("#adTargetType")?.addEventListener("change", syncAdTargetRegionField);
     $$('[data-partner-filter]').forEach(button => button.addEventListener("click", () => {
       partnerRequestStatus = String(button.dataset.partnerFilter || "pending");
@@ -2867,7 +2872,15 @@
       chart.innerHTML='<div class="analytics-empty">광고 성과 데이터를 불러오지 못했습니다. 광고 분석 RPC와 데이터베이스 배포 상태를 확인하세요.</div>';
       return;
     }
-    renderAdAnalytics(data || {});
+    adAnalyticsOverallData=data || {};
+    adAnalyticsCampaignMap.clear();
+    (Array.isArray(adAnalyticsOverallData.campaigns)?adAnalyticsOverallData.campaigns:[]).forEach(row=>adAnalyticsCampaignMap.set(String(row.campaign_id),row));
+    await loadAdCreativeAnalytics(days);
+    renderAds();
+    renderAdPerformanceCampaigns();
+    renderAdPerformanceCreatives();
+    if(selectedAdPerformanceCampaignId) await loadAdPerformanceDetail();
+    else renderAdPerformanceData(adAnalyticsOverallData,{scope:"overall"});
   }
 
   async function loadAdCreativeAnalytics(days){
@@ -2886,17 +2899,38 @@
     renderAdPerformanceCreatives();
   }
 
-  function renderAdAnalytics(data){
+  function adPerformanceScopeCopy(scope="overall"){
+    const reset=$("#adPerformanceReset");
+    if(scope==="creative"){
+      const campaign=adCampaigns.find(item=>String(item.id)===String(selectedAdPerformanceCampaignId));
+      const creative=campaignCreatives(campaign||{}).find(item=>String(item.id)===String(selectedAdPerformanceCreativeId));
+      setText("#adPerformanceScopeTitle",creative?.name || "소재 성과");
+      setText("#adPerformanceScopeDescription",`${campaign?.campaign_name || "캠페인"} · 선택한 광고 소재의 성과입니다.`);
+      reset?.classList.remove("hidden");
+      return;
+    }
+    if(scope==="campaign"){
+      const campaign=adCampaigns.find(item=>String(item.id)===String(selectedAdPerformanceCampaignId));
+      setText("#adPerformanceScopeTitle",campaign?.campaign_name || "캠페인 성과");
+      setText("#adPerformanceScopeDescription",`${campaign?.advertiser_name || "광고주"} · 선택한 캠페인의 전체 소재 성과입니다.`);
+      reset?.classList.remove("hidden");
+      return;
+    }
+    setText("#adPerformanceScopeTitle","전체 성과");
+    setText("#adPerformanceScopeDescription","선택한 기간에 집계된 모든 캠페인의 광고 성과입니다.");
+    reset?.classList.add("hidden");
+  }
+
+  function renderAdPerformanceData(data={},options={}){
     const total=data.total || {};
     const impressions=Number(total.impressions||0), clicks=Number(total.clicks||0);
+    const visits=Number(total.visits||0), captures=Number(total.captures||0);
     setText("#adKpiImpressions",impressions.toLocaleString("ko-KR"));
     setText("#adKpiClicks",clicks.toLocaleString("ko-KR"));
     setText("#adKpiCtr",`${impressions ? (clicks/impressions*100).toFixed(1) : "0.0"}%`);
-    setText("#adKpiVisits",Number(total.visits||0).toLocaleString("ko-KR"));
-    setText("#adKpiCaptures",Number(total.captures||0).toLocaleString("ko-KR"));
-
-    adAnalyticsCampaignMap.clear();
-    (Array.isArray(data.campaigns)?data.campaigns:[]).forEach(row=>adAnalyticsCampaignMap.set(String(row.campaign_id),row));
+    setText("#adKpiVisits",visits.toLocaleString("ko-KR"));
+    setText("#adKpiCaptures",captures.toLocaleString("ko-KR"));
+    adPerformanceScopeCopy(options.scope || "overall");
 
     const rows=Array.isArray(data.trend)?data.trend:[];
     const chart=$("#adAnalyticsChart");
@@ -2912,14 +2946,46 @@
     }
     const funnel=$("#adAnalyticsFunnel");
     if(funnel){
-      const visitRate=clicks?Number(total.visits||0)/clicks*100:0;
-      const captureRate=Number(total.visits||0)?Number(total.captures||0)/Number(total.visits||0)*100:0;
-      funnel.innerHTML=`<div><span>노출</span><strong>${impressions.toLocaleString("ko-KR")}</strong><small>100%</small></div><div><span>클릭</span><strong>${clicks.toLocaleString("ko-KR")}</strong><small>${impressions?(clicks/impressions*100).toFixed(1):"0.0"}%</small></div><div><span>방문</span><strong>${Number(total.visits||0).toLocaleString("ko-KR")}</strong><small>클릭 대비 ${visitRate.toFixed(1)}%</small></div><div><span>점령</span><strong>${Number(total.captures||0).toLocaleString("ko-KR")}</strong><small>방문 대비 ${captureRate.toFixed(1)}%</small></div>`;
+      const visitRate=clicks?visits/clicks*100:0;
+      const captureRate=visits?captures/visits*100:0;
+      funnel.innerHTML=`<div><span>노출</span><strong>${impressions.toLocaleString("ko-KR")}</strong><small>100%</small></div><div><span>클릭</span><strong>${clicks.toLocaleString("ko-KR")}</strong><small>${impressions?(clicks/impressions*100).toFixed(1):"0.0"}%</small></div><div><span>방문</span><strong>${visits.toLocaleString("ko-KR")}</strong><small>클릭 대비 ${visitRate.toFixed(1)}%</small></div><div><span>점령</span><strong>${captures.toLocaleString("ko-KR")}</strong><small>방문 대비 ${captureRate.toFixed(1)}%</small></div>`;
     }
-    renderAds();
+  }
+
+  async function loadAdPerformanceDetail(){
+    const campaignId=String(selectedAdPerformanceCampaignId||"");
+    if(!campaignId){
+      renderAdPerformanceData(adAnalyticsOverallData || {},{scope:"overall"});
+      return;
+    }
+    const creativeId=String(selectedAdPerformanceCreativeId||"");
+    const requestId=++adPerformanceDetailRequest;
+    const chart=$("#adAnalyticsChart");
+    if(chart) chart.innerHTML='<div class="analytics-loading">불러오는 중…</div>';
+    const days=Math.max(1,Number($("#adAnalyticsDays")?.value || 30));
+    const {data,error}=await adminRpc("biteboss_admin_ad_performance_detail_v8243",{
+      p_days:days,
+      p_campaign_id:campaignId,
+      p_creative_id:creativeId || null
+    });
+    if(requestId!==adPerformanceDetailRequest) return;
+    if(error || data?.ok===false){
+      console.warn("BiteBoss ad performance detail:",error || data);
+      const fallback=creativeId ? creativeMetric(campaignId,creativeId) : (adAnalyticsCampaignMap.get(campaignId)||{});
+      renderAdPerformanceData({total:fallback,trend:[]},{scope:creativeId?"creative":"campaign"});
+      return;
+    }
+    renderAdPerformanceData(data || {},{scope:creativeId?"creative":"campaign"});
+  }
+
+  function resetAdPerformanceScope(){
+    selectedAdPerformanceCampaignId="";
+    selectedAdPerformanceCreativeId="";
+    adPerformanceDetailRequest+=1;
+    $("#adPerformanceCreativePanel")?.classList.add("hidden");
     renderAdPerformanceCampaigns();
     renderAdPerformanceCreatives();
-    loadAdCreativeAnalytics(Math.max(1,Number($("#adAnalyticsDays")?.value || 30)));
+    renderAdPerformanceData(adAnalyticsOverallData || {},{scope:"overall"});
   }
 
   async function loadAds(){
@@ -3096,19 +3162,19 @@
 
   function openAdPerformanceCreativePanel(campaignId){
     selectedAdPerformanceCampaignId=String(campaignId||"");
+    selectedAdPerformanceCreativeId="";
     const campaign=adCampaigns.find(item=>String(item.id)===selectedAdPerformanceCampaignId);
     if(!campaign) return;
     $("#adPerformanceCreativePanel")?.classList.remove("hidden");
-    setText("#adPerformanceCreativeDescription",`${campaign.campaign_name} · 광고 소재별 성과`);
+    setText("#adPerformanceCreativeDescription",`${campaign.campaign_name} · 소재를 선택하면 상단 성과가 해당 소재 기준으로 바뀝니다.`);
     renderAdPerformanceCampaigns();
     renderAdPerformanceCreatives();
-    $("#adPerformanceCreativePanel")?.scrollIntoView({behavior:"smooth",block:"start"});
+    void loadAdPerformanceDetail();
+    $("#admin-ad-performance")?.scrollIntoView({behavior:"smooth",block:"start"});
   }
 
   function closeAdPerformanceCreativePanel(){
-    selectedAdPerformanceCampaignId="";
-    $("#adPerformanceCreativePanel")?.classList.add("hidden");
-    renderAdPerformanceCampaigns();
+    resetAdPerformanceScope();
   }
 
   function renderAdPerformanceCreatives(){
@@ -3122,15 +3188,21 @@
       const impressions=Number(metric.impressions||0), clicks=Number(metric.clicks||0);
       const ctr=impressions ? (clicks/impressions*100).toFixed(1) : "0.0";
       const image=creative.image_url || creative.store_list_image_url || "";
-      return `<article class="admin-ad-row admin-ad-creative-row admin-ad-performance-row">
-        ${image?`<img class="admin-ad-thumb" src="${escapeAttr(image)}" alt="" />`:`<div class="admin-ad-thumb admin-ad-placeholder">AD</div>`}
-        <div class="admin-ad-copy">
-          <div class="admin-ad-title"><strong>${escapeHtml(creative.name||"광고 소재")}</strong><span class="admin-ad-creative-badge ${creative.is_primary?"is-primary":""}">${creative.is_primary?"기본 소재":(creative.is_active===false?"OFF":"ACTIVE")}</span></div>
-          <p>${creative.store_list_image_url?"홈 · 점령 대기 · 매장 목록":"홈 · 점령 대기"}${creative.click_url?" · 클릭 연결":""}</p>
-          <div class="admin-ad-stats"><span>${impressions.toLocaleString("ko-KR")} 노출</span><span>${clicks.toLocaleString("ko-KR")} 클릭</span><span>CTR ${ctr}%</span><span>${Number(metric.visits||0).toLocaleString("ko-KR")} 방문</span><span>${Number(metric.captures||0).toLocaleString("ko-KR")} 점령</span></div>
-        </div>
-      </article>`;
+      return `<button class="admin-ad-row admin-ad-creative-row admin-ad-performance-row ${String(selectedAdPerformanceCreativeId)===String(creative.id)?"is-selected":""}" data-ad-performance-creative="${escapeAttr(creative.id)}" type="button">
+        ${image?`<img class="admin-ad-thumb" src="${escapeAttr(image)}" alt="" />`:`<span class="admin-ad-thumb admin-ad-placeholder">AD</span>`}
+        <span class="admin-ad-copy">
+          <span class="admin-ad-title"><strong>${escapeHtml(creative.name||"광고 소재")}</strong><span class="admin-ad-creative-badge ${creative.is_primary?"is-primary":""}">${creative.is_primary?"기본 소재":(creative.is_active===false?"OFF":"ACTIVE")}</span></span>
+          <span class="admin-ad-performance-meta">${creative.store_list_image_url?"홈 · 점령 대기 · 매장 목록":"홈 · 점령 대기"}${creative.click_url?" · 클릭 연결":""}</span>
+          <span class="admin-ad-stats"><span>${impressions.toLocaleString("ko-KR")} 노출</span><span>${clicks.toLocaleString("ko-KR")} 클릭</span><span>CTR ${ctr}%</span><span>${Number(metric.visits||0).toLocaleString("ko-KR")} 방문</span><span>${Number(metric.captures||0).toLocaleString("ko-KR")} 점령</span></span>
+        </span>
+      </button>`;
     }).join("") || '<div class="admin-empty">등록된 광고 소재가 없습니다.</div>';
+    $$('[data-ad-performance-creative]',box).forEach(btn=>btn.onclick=()=>{
+      selectedAdPerformanceCreativeId=String(btn.dataset.adPerformanceCreative||"");
+      renderAdPerformanceCreatives();
+      void loadAdPerformanceDetail();
+      $("#admin-ad-performance")?.scrollIntoView({behavior:"smooth",block:"start"});
+    });
   }
 
   function editAdCreative(id){
