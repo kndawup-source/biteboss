@@ -678,3 +678,18 @@ body.admin-app{min-height:100dvh;background:#f1f1f3;color:#111}
 .admin-app .store-plan-feature-grid span{margin-top:5px;color:#888;font-size:8px;line-height:1.45}
 .admin-app #adminPartnerPromotionSection.is-plan-locked{opacity:.62}
 @media(max-width:560px){.admin-app .store-plan-feature-grid{grid-template-columns:1fr}}
+
+/* Ads: campaign / creative hierarchy */
+.admin-app .admin-ad-creatives-section{border-top:2px solid #111}
+.admin-app .admin-ad-creative-list{margin-bottom:10px}
+.admin-app .admin-ad-creative-row{grid-template-columns:60px minmax(0,1fr) auto}
+.admin-app .admin-ad-creative-editor{margin-top:10px;border-top:1px solid #e7e7e9;padding-top:2px}
+.admin-app .admin-ad-first-creative-label{display:flex;align-items:baseline;gap:10px;padding:10px 0 2px;border-top:1px solid #e7e7e9}
+.admin-app .admin-ad-first-creative-label strong{font-size:10px;font-weight:900;color:#111}
+.admin-app .admin-ad-first-creative-label span{font-size:8px;color:#99999f;line-height:1.4}
+.admin-app .admin-ad-row.is-selected{outline:2px solid #111;outline-offset:-2px}
+.admin-app .admin-ad-creative-badge{display:inline-flex;align-items:center;min-height:18px;padding:0 7px;border-radius:999px;background:#f1f1f3;color:#717178;font-size:7px;font-weight:900}
+.admin-app .admin-ad-creative-badge.is-primary{background:#111;color:#fff}
+@media(max-width:720px){
+  .admin-app .admin-ad-first-creative-label{display:grid;gap:4px}
+}

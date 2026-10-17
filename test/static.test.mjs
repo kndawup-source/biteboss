@@ -224,3 +224,29 @@ test('store manager CTA remains visible for eligible non-owner detail views and 
   assert.match(app, /showStoreManagerCard:!fromProfileBattleLog/);
   assert.match(app, /이 매장 관리하기/);
 });
+
+test('ads separate campaign management from creative management without breaking legacy campaign tracking', () => {
+  assert.match(read('admin.html'), /id="adCreativePanel"/);
+  assert.match(read('admin.html'), /id="adCreativeForm"/);
+  assert.match(read('admin.html'), /캠페인의 운영 조건을 설정합니다/);
+  assert.match(read('admin.html'), /같은 캠페인 안에 여러 소재를 등록하면 같은 우선순위에서 랜덤 노출됩니다/);
+  assert.match(admin, /function campaignCreatives\(/);
+  assert.match(admin, /key:"ad_creatives"/);
+  assert.match(admin, /creative_id:creative\.id/);
+  assert.match(app, /biteboss_track_ad_event_v8179/);
+  assert.match(app, /biteboss_track_ad_creative_event_v8211/);
+  assert.match(app, /creative_id:attribution\.creative_id/);
+});
+
+test('capture victory modal keeps share actions visible while store detail refreshes', () => {
+  assert.match(app, /id="shareVictoryBtn"[^>]*>공유하기<\/button>/);
+  assert.match(app, /classList\.contains\("victory-modal"\)/);
+  assert.match(app, /activeStoreDetailId[\s\S]*?!victoryModalVisible[\s\S]*?openStoreDetail\(nearest\.store\.id, \{ preserveModal:true, showStoreManagerCard:false \}\)/);
+});
+
+test('owned stores never expose reclaim timers during the player-wide capture cooldown', () => {
+  assert.match(app, /if\(captureCooldownActive\(\)\)\{\n\s*status = "";/);
+  assert.match(app, /if\(captureCooldownActive\(\)\)\{\n\s*card\.classList\.add\("hidden"\);\n\s*storeReclaimTimer = clearIntervalRef\(storeReclaimTimer\);/);
+  assert.match(app, /globalCaptureCooldownNow \? "" : \(reclaimAvailableAt \?/);
+  assert.match(app, /const captureCooldownNow = captureCooldownActive\(\);[\s\S]*?node\.removeAttribute\("data-store-reclaim-at"\)/);
+});

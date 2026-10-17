@@ -7,9 +7,9 @@
 <meta content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" name="viewport"/>
 <meta content="yes" name="mobile-web-app-capable"/>
 <title>BiteBoss Admin</title>
-<link href="./styles.css?v=82.10" rel="stylesheet"/>
-<link href="./admin.css?v=82.10" rel="stylesheet"/>
-<script src="./app-config.js?v=82.10"></script>
+<link href="./styles.css?v=82.13" rel="stylesheet"/>
+<link href="./admin.css?v=82.13" rel="stylesheet"/>
+<script src="./app-config.js?v=82.13"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body class="admin-app">
@@ -329,19 +329,38 @@
 <div aria-label="광고 전환 퍼널" class="admin-ad-funnel" id="adAnalyticsFunnel"></div>
 </section>
 <section class="admin-section-card admin-ad-campaigns-section">
-<div class="admin-section-title"><div><h3>캠페인</h3><p>캠페인별 성과를 비교하고 수정합니다.</p></div></div>
+<div class="admin-section-title"><div><h3>캠페인</h3><p>광고 운영 단위입니다. 기간·대상·노출 위치와 캠페인 전체 성과를 관리합니다.</p></div></div>
 <div class="admin-ad-list" id="adCampaignList"></div>
 </section>
+<section class="admin-section-card admin-ad-creatives-section hidden" id="adCreativePanel">
+<div class="admin-section-title admin-section-title-row"><div><h3>광고 소재</h3><p id="adCreativePanelDescription">선택한 캠페인에 실제 노출되는 이미지를 관리하고 소재별 성과를 확인합니다.</p></div><button class="text-btn" id="adCreativePanelClose" type="button">닫기</button></div>
+<div class="admin-ad-list admin-ad-creative-list" id="adCreativeList"></div>
+<details class="admin-ad-creative-editor admin-collapsible" id="adCreativeEditor">
+<summary class="admin-collapse-summary"><div><h3>광고 소재 추가</h3><p>같은 캠페인 안에 여러 소재를 등록하면 같은 우선순위에서 랜덤 노출됩니다.</p></div><span>열기</span></summary>
+<form class="form-grid admin-form admin-ad-form" id="adCreativeForm">
+<input id="adCreativeId" type="hidden"/>
+<label class="wide">소재명<input class="input" id="adCreativeName" maxlength="120" placeholder="예: 메인 비주얼 A" required=""/></label>
+<label class="wide">홈 · 점령 대기 이미지<input accept="image/png,image/jpeg,image/webp" class="input" id="adCreativeImageFile" type="file"/><small class="field-help">권장 1200×400 (3:1). 수정 시 새 이미지를 선택하지 않으면 기존 이미지를 유지합니다.</small></label>
+<label class="wide">매장 목록 이미지<input accept="image/png,image/jpeg,image/webp" class="input" id="adCreativeStoreListImageFile" type="file"/><small class="field-help">매장 목록 전용 이미지입니다. 비워두면 매장 목록에는 이 소재가 노출되지 않습니다.</small></label>
+<label class="wide">클릭 URL<input class="input" id="adCreativeClickUrl" placeholder="https://" type="url"/></label>
+<label>상태<select class="input" id="adCreativeIsActive"><option value="true">활성</option><option value="false">비활성</option></select></label>
+<label>소재 순서<input class="input" id="adCreativeSortOrder" step="1" type="number" value="0"/><small class="field-help">캠페인 우선순위가 같을 때 소재 선택에만 사용합니다.</small></label>
+<div class="admin-form-actions wide"><button class="primary-btn" type="submit">광고 소재 저장</button><button class="text-btn hidden" id="adCreativeCancel" type="button">수정 취소</button></div>
+<p aria-live="polite" class="asset-status wide" id="adCreativeStatus"></p>
+</form>
+</details>
+</section>
 <details class="admin-section-card admin-ad-editor-section admin-collapsible" id="adCampaignEditor">
-<summary class="admin-collapse-summary"><div><h3>캠페인 등록·수정</h3><p>새 캠페인을 만들거나 기존 캠페인을 수정합니다.</p></div><span>열기</span></summary>
+<summary class="admin-collapse-summary"><div><h3>캠페인 등록·수정</h3><p>캠페인의 운영 조건을 설정합니다. 새 캠페인은 첫 광고 소재 1개를 함께 등록합니다.</p></div><span>열기</span></summary>
 <form class="form-grid admin-form admin-ad-form" id="adCampaignForm">
 <input id="adCampaignId" type="hidden"/>
 <label>광고주명<input class="input" id="adAdvertiserName" maxlength="120" required=""/></label>
 <label>캠페인명<input class="input" id="adCampaignName" maxlength="160" required=""/></label>
 <div class="wide admin-store-picker" id="adTargetStorePicker"><label for="adTargetStoreSearch">대상 매장</label><input id="adTargetStore" type="hidden" value=""/><div class="admin-store-picker-selected hidden" id="adTargetStoreSelected"><div><strong id="adTargetStoreSelectedName"></strong><span id="adTargetStoreSelectedMeta"></span></div><button class="text-btn" id="adTargetStoreClear" type="button">변경</button></div><div class="admin-store-picker-search" id="adTargetStoreSearchWrap"><input autocomplete="off" class="input" id="adTargetStoreSearch" placeholder="매장명 · 브랜드 · 지역 검색" type="search"/><div class="admin-store-picker-results hidden" id="adTargetStoreResults"></div></div><small class="field-help">선택하지 않으면 브랜드/일반 광고입니다. 매장을 지정하면 광고 이후 방문·점령 전환을 집계합니다.</small></div>
-<label class="wide">홈 · 점령 대기 배너 이미지<input accept="image/png,image/jpeg,image/webp" class="input" id="adImageFile" type="file"/><small class="field-help">기존 광고 영역용 · 권장 1200×400 (3:1)</small></label>
-<label class="wide">매장 목록 배너 이미지<input accept="image/png,image/jpeg,image/webp" class="input" id="adStoreListImageFile" type="file"/><small class="field-help">매장 목록 전용 · 공지 배너 크기에 맞춰 별도로 등록합니다. 등록하지 않으면 매장 목록에는 노출되지 않습니다.</small></label>
-<label class="wide">클릭 URL<input class="input" id="adClickUrl" placeholder="https://" type="url"/></label>
+<div class="wide admin-ad-first-creative-label"><strong>첫 광고 소재</strong><span>캠페인을 만들 때 기본 소재 1개를 함께 등록합니다. 이후 광고 소재 영역에서 추가 소재를 관리합니다.</span></div>
+<label class="wide">홈 · 점령 대기 이미지<input accept="image/png,image/jpeg,image/webp" class="input" id="adImageFile" type="file"/><small class="field-help">첫 광고 소재 · 권장 1200×400 (3:1)</small></label>
+<label class="wide">매장 목록 이미지<input accept="image/png,image/jpeg,image/webp" class="input" id="adStoreListImageFile" type="file"/><small class="field-help">첫 광고 소재의 매장 목록 전용 이미지입니다. 등록하지 않으면 매장 목록에는 노출되지 않습니다.</small></label>
+<label class="wide">첫 소재 클릭 URL<input class="input" id="adClickUrl" placeholder="https://" type="url"/></label>
 <label>시작일시<div class="admin-datetime-control"><input id="adStartsDatePicker" class="input admin-picker-input admin-date-part" type="date" aria-label="날짜 선택"><input id="adStartsTimePicker" class="input admin-picker-input admin-time-part" type="time" step="60" aria-label="시간 선택"></div><input aria-hidden="true" class="admin-native-datetime-value" id="adStartsAt" required="" tabindex="-1" type="datetime-local"/></label>
 <label>종료일시<div class="admin-datetime-control"><input id="adEndsDatePicker" class="input admin-picker-input admin-date-part" type="date" aria-label="날짜 선택"><input id="adEndsTimePicker" class="input admin-picker-input admin-time-part" type="time" step="60" aria-label="시간 선택"></div><input aria-hidden="true" class="admin-native-datetime-value" id="adEndsAt" tabindex="-1" type="datetime-local"/></label>
 <label>상태<select class="input" id="adIsActive"><option value="true">활성</option><option value="false">비활성</option></select></label>
@@ -352,7 +371,7 @@
 <div class="admin-form-actions wide"><button class="primary-btn" type="submit">캠페인 저장</button><button class="text-btn hidden" id="adCampaignCancel" type="button">수정 취소</button></div>
 <p aria-live="polite" class="asset-status wide" id="adCampaignStatus"></p>
 </form>
-<div class="admin-ad-guide"><span>홈·점령 대기 3:1 · 1200×400 / 매장 목록은 전용 이미지를 사용합니다.</span><span>같은 우선순위는 랜덤 노출됩니다. 매장 목록 전용 이미지가 없는 캠페인은 매장 목록에 노출하지 않습니다.</span></div>
+<div class="admin-ad-guide"><span>캠페인은 기간·대상·위치를 관리하고, 광고 소재는 실제 이미지를 관리합니다.</span><span>같은 캠페인의 활성 소재는 랜덤 노출되며 소재별 노출·클릭·CTR·방문·점령 성과를 따로 집계합니다.</span></div>
 </details>
 </div></section>
 <section class="admin-page" id="admin-maintenance">
@@ -586,6 +605,6 @@
 </div>
 </section>
 </div>
-<script src="./admin.js?v=82.10"></script>
+<script src="./admin.js?v=82.13"></script>
 </body>
 </html>

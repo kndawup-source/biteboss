@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.10";
+  const BITEBOSS_BUILD = "82.13";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1227,14 +1227,14 @@ await handleClaimParam();
 
     const highestPriority=eligible.reduce((max,item)=>Math.max(max,Number(item.sort_order || 0)),-Infinity);
     const topTier=eligible.filter(item=>Number(item.sort_order || 0)===highestPriority);
-    const signature=topTier.map(item=>String(item.id)).sort().join(",");
+    const signature=topTier.map(item=>String(item.creative_id || item.id)).sort().join(",");
     const key=`${Number(page)||1}:${signature}`;
     const cachedId=storeListAdSelection.get(key);
-    const cached=topTier.find(item=>String(item.id)===String(cachedId));
+    const cached=topTier.find(item=>String(item.creative_id || item.id)===String(cachedId));
     if(cached) return cached;
 
     const selected=topTier[Math.floor(Math.random()*topTier.length)] || null;
-    if(selected) storeListAdSelection.set(key,String(selected.id));
+    if(selected) storeListAdSelection.set(key,String(selected.creative_id || selected.id));
     return selected;
   }
 
@@ -1244,7 +1244,7 @@ await handleClaimParam();
     const clickUrl=/^https?:\/\//i.test(String(campaign.click_url || "")) ? String(campaign.click_url) : "";
     const tag=clickUrl ? "a" : "div";
     const href=clickUrl ? ` href="${escapeAttr(clickUrl)}" target="_blank" rel="noopener noreferrer"` : "";
-    return `<${tag} class="store-list-ad" data-store-list-ad="${escapeAttr(campaign.id)}" data-store-list-ad-store="${escapeAttr(campaign.target_store_id || "")}"${href}><img src="${escapeAttr(imageUrl)}" alt="" loading="lazy" decoding="async" /></${tag}>`;
+    return `<${tag} class="store-list-ad" data-store-list-ad="${escapeAttr(campaign.id)}" data-store-list-ad-creative="${escapeAttr(campaign.creative_id || `primary:${campaign.id}`)}" data-store-list-ad-store="${escapeAttr(campaign.target_store_id || "")}"${href}><img src="${escapeAttr(imageUrl)}" alt="" loading="lazy" decoding="async" /></${tag}>`;
   }
 
   function bindStoreListAd(campaign){
@@ -1261,7 +1261,7 @@ await handleClaimParam();
       }
       trackAdEvent(campaign.id,"click",`${adSessionKey}:store-list:${storePage}`,{
         store_id:campaign.target_store_id || "",
-        placement:"store_list"
+        placement:"store_list", creative_id:campaign.creative_id || `primary:${campaign.id}`
       });
     });
 
@@ -1270,7 +1270,7 @@ await handleClaimParam();
       node.dataset.impressionTracked="1";
       trackAdEvent(campaign.id,"impression",`${adSessionKey}:store-list:${storePage}`,{
         store_id:campaign.target_store_id || "",
-        placement:"store_list"
+        placement:"store_list", creative_id:campaign.creative_id || `primary:${campaign.id}`
       });
     };
 
@@ -1342,10 +1342,10 @@ await handleClaimParam();
     banner.classList.remove("hidden");
     banner.onclick = event => {
       if(!homeCampaign?.click_url){ event.preventDefault(); return; }
-      trackAdEvent(homeCampaign.id, "click", adSessionKey, { store_id:homeCampaign.target_store_id || "", placement:"home" });
+      trackAdEvent(homeCampaign.id, "click", adSessionKey, { store_id:homeCampaign.target_store_id || "", placement:"home", creative_id:homeCampaign.creative_id || `primary:${homeCampaign.id}` });
     };
     image.onerror = () => { banner.classList.add("hidden"); image.removeAttribute("src"); };
-    trackAdEvent(homeCampaign.id, "impression", adSessionKey, { store_id:homeCampaign.target_store_id || "", placement:"home" });
+    trackAdEvent(homeCampaign.id, "impression", adSessionKey, { store_id:homeCampaign.target_store_id || "", placement:"home", creative_id:homeCampaign.creative_id || `primary:${homeCampaign.id}` });
   }
 
   function hideTakeoverAd(){
@@ -1393,11 +1393,11 @@ await handleClaimParam();
     if(clickUrl) link.href=clickUrl; else link.removeAttribute("href");
     link.onclick=event=>{
       if(!clickUrl){ event.preventDefault(); return; }
-      trackAdEvent(campaign.id,"click",`${adSessionKey}:takeover:${storeId}`,{ store_id:campaign.target_store_id || storeId, placement:"takeover" });
+      trackAdEvent(campaign.id,"click",`${adSessionKey}:takeover:${storeId}`,{ store_id:campaign.target_store_id || storeId, placement:"takeover", creative_id:campaign.creative_id || `primary:${campaign.id}` });
     };
     image.onerror=hideTakeoverAd;
     slot.classList.remove("hidden");
-    trackAdEvent(campaign.id,"impression",`${adSessionKey}:takeover:${storeId}`,{ store_id:campaign.target_store_id || storeId, placement:"takeover" });
+    trackAdEvent(campaign.id,"impression",`${adSessionKey}:takeover:${storeId}`,{ store_id:campaign.target_store_id || storeId, placement:"takeover", creative_id:campaign.creative_id || `primary:${campaign.id}` });
   }
 
   function rememberAdAttribution(campaign, eventType, storeId=""){
@@ -1406,7 +1406,8 @@ await handleClaimParam();
     if(!targetStoreId) return;
     try{
       sessionStorage.setItem("biteboss-ad-attribution",JSON.stringify({
-        campaign_id:String(campaign.id),
+        campaign_id:String(campaign.campaign_id || campaign.id),
+        creative_id:String(campaign.creative_id || `primary:${campaign.campaign_id || campaign.id}`),
         target_store_id:targetStoreId,
         event_type:String(eventType||"impression"),
         at:Date.now()
@@ -1416,18 +1417,32 @@ await handleClaimParam();
 
   async function trackAdEvent(campaignId, eventType, sessionKey=adSessionKey, context={}){
     if(!campaignId || !window.sb) return;
-    const campaign=(Array.isArray(config.ad_public_campaigns)?config.ad_public_campaigns:[]).find(row=>String(row.id)===String(campaignId)) || {id:campaignId};
+    const rows=Array.isArray(config.ad_public_campaigns)?config.ad_public_campaigns:[];
+    const creativeId=String(context.creative_id || "").trim();
+    const campaign=rows.find(row=>String(row.campaign_id || row.id)===String(campaignId) && (!creativeId || String(row.creative_id || `primary:${row.id}`)===creativeId))
+      || rows.find(row=>String(row.campaign_id || row.id)===String(campaignId))
+      || {id:campaignId,campaign_id:campaignId,creative_id:creativeId || `primary:${campaignId}`};
+    const resolvedCreativeId=creativeId || String(campaign.creative_id || `primary:${campaignId}`);
     const storeId=String(context.store_id || campaign.target_store_id || "").trim();
     rememberAdAttribution(campaign,eventType,storeId);
     try{
-      const { error } = await sb.rpc("biteboss_track_ad_event_v8179", {
+      const legacy = await sb.rpc("biteboss_track_ad_event_v8179", {
         p_campaign_id:campaignId,
         p_event_type:eventType,
         p_session_key:sessionKey,
         p_store_id:storeId || null,
         p_placement:String(context.placement || "")
       });
-      if(error) console.warn("BiteBoss ad tracking:", error);
+      if(legacy.error) console.warn("BiteBoss ad tracking:", legacy.error);
+      const creative = await sb.rpc("biteboss_track_ad_creative_event_v8211", {
+        p_campaign_id:campaignId,
+        p_creative_id:resolvedCreativeId,
+        p_event_type:eventType,
+        p_session_key:sessionKey,
+        p_store_id:storeId || null,
+        p_placement:String(context.placement || "")
+      });
+      if(creative.error && !String(creative.error.message||"").includes("Could not find the function")) console.warn("BiteBoss creative tracking:",creative.error);
     }catch(error){
       console.warn("BiteBoss ad tracking:", error);
     }
@@ -1440,7 +1455,7 @@ await handleClaimParam();
       const attribution=raw?JSON.parse(raw):null;
       if(!attribution?.campaign_id || String(attribution.target_store_id)!==id) return;
       if(Date.now()-Number(attribution.at||0)>7*86400000) return;
-      await trackAdEvent(attribution.campaign_id,eventType,`${adSessionKey}:conversion:${id}`,{store_id:id,placement:"conversion"});
+      await trackAdEvent(attribution.campaign_id,eventType,`${adSessionKey}:conversion:${id}`,{store_id:id,placement:"conversion",creative_id:attribution.creative_id || `primary:${attribution.campaign_id}`});
     }catch{}
   }
 
@@ -2223,7 +2238,12 @@ await handleClaimParam();
 
     let status = "";
     if(ownedByMe){
-      if(["tracking","grace"].includes(String(presence?.status || "")) && String(presence?.mode || "") === "reclaim"){
+      // A successful capture starts the player-wide capture cooldown. During that
+      // window this store is simply an owned territory; do not surface a reclaim
+      // countdown/presence state that implies the user can immediately reclaim it.
+      if(captureCooldownActive()){
+        status = "";
+      }else if(["tracking","grace"].includes(String(presence?.status || "")) && String(presence?.mode || "") === "reclaim"){
         status = `자동 재점령 확인 중 · ${formatPresenceSeconds(remainingSeconds)} 남음`;
       }else if(presence?.status === "outside"){
         status = `${Math.round(Number(presence.distance_m || 0))}m · ${Math.max(1, Number(config.gps_radius_m || 50))}m 안에서 재점령 확인`;
@@ -2517,6 +2537,15 @@ await handleClaimParam();
   function applyOwnerReclaimState(reclaim = {}){
     const card = $(".owner-store-reclaim");
     if(!card) return;
+    // The global capture cooldown takes precedence over reclaim presentation.
+    // Keep background state fresh, but never expose a reclaim timer until the
+    // player-wide capture cooldown has ended.
+    if(captureCooldownActive()){
+      card.classList.add("hidden");
+      storeReclaimTimer = clearIntervalRef(storeReclaimTimer);
+      return;
+    }
+    card.classList.remove("hidden");
     const label = card.querySelector("span");
     const value = card.querySelector("strong");
     const note = card.querySelector("small");
@@ -2546,6 +2575,12 @@ await handleClaimParam();
     if(String(activeStoreDetailId || "") !== String(storeId || "")) return;
     const card = $(".owner-store-reclaim");
     if(!card) return;
+    if(captureCooldownActive()){
+      card.classList.add("hidden");
+      storeReclaimTimer = clearIntervalRef(storeReclaimTimer);
+      return;
+    }
+    card.classList.remove("hidden");
     const label = card.querySelector("span");
     const value = card.querySelector("strong");
     const note = card.querySelector("small");
@@ -3025,7 +3060,7 @@ await handleClaimParam();
                 ? `다음 약화 ${escapeHtml(formatRemaining(nextDefenseAt))}`
                 : "점령 유지 중")}</small>
           </article>
-          ${reclaimAvailableAt ? `<article class="owner-store-reclaim">
+          ${globalCaptureCooldownNow ? "" : (reclaimAvailableAt ? `<article class="owner-store-reclaim">
             <span>재점령 가능까지</span>
             <strong id="ownerReclaimCountdown" data-reclaim-at="${escapeAttr(reclaimAvailableAt)}">${escapeHtml(formatOwnStoreReclaim(reclaimAvailableAt))}</strong>
             <small>${reclaim?.eligible ? "재방문 시 자동 재점령" : "시간 종료 후 재방문 시 자동 재점령"}</small>
@@ -3033,7 +3068,7 @@ await handleClaimParam();
             <span>재점령</span>
             <strong>—</strong>
             <small>재점령 시간은 자동으로 갱신됩니다.</small>
-          </article>`}
+          </article>`)}
         </div>
       </section>
     ` : "";
@@ -5425,7 +5460,12 @@ await handleClaimParam();
           loadHome(),
           loadMyOrganization()
         ]);
-        if(String(activeStoreDetailId || "") === String(nearest.store.id))
+        // Keep the capture result modal authoritative. Refreshing the store detail
+        // while the victory modal is visible would reuse #modalBody and erase the
+        // existing 확인 / 공유하기 / 매장 보기 actions before the user can act.
+        const victoryModalVisible = !$("#modal")?.classList.contains("hidden")
+          && $("#modal")?.classList.contains("victory-modal");
+        if(String(activeStoreDetailId || "") === String(nearest.store.id) && !victoryModalVisible)
           await openStoreDetail(nearest.store.id, { preserveModal:true, showStoreManagerCard:false });
         return;
       }
@@ -5438,7 +5478,13 @@ await handleClaimParam();
 
   function updateStoreListReclaimCountdowns(){
     let active = false;
+    const captureCooldownNow = captureCooldownActive();
     $$("#storeList [data-store-reclaim-at]").forEach(node => {
+      if(captureCooldownNow){
+        node.textContent = "";
+        node.removeAttribute("data-store-reclaim-at");
+        return;
+      }
       const availableAt = String(node.dataset.storeReclaimAt || "").trim();
       if(!availableAt) return;
       const remaining = getOwnStoreReclaimRemainingSeconds(availableAt);

@@ -15,7 +15,7 @@
           detectSessionInUrl:false,
           storageKey:"biteboss-admin-auth"
         },
-        global:{ headers:{ "x-client-info":"biteboss-admin-web/81.93" } }
+        global:{ headers:{ "x-client-info":"biteboss-admin-web/82.12" } }
       })
     : null;
 
@@ -32,6 +32,8 @@
   let adminVideoSyncSignature = "";
   let editingStoreBundle = null;
   let adCampaigns = [];
+  let selectedAdCampaignId = "";
+  const adCreativeAnalyticsMap = new Map();
   let partnerRequests = [];
   let storeRequests = [];
   let analyticsRange = "7d";
@@ -280,6 +282,9 @@
     $("#homeCopyForm")?.addEventListener("submit", saveHomeCopy);
     $("#firstCaptureGuideForm")?.addEventListener("submit", saveFirstCaptureGuide);
     $("#adCampaignForm")?.addEventListener("submit", saveAdCampaign);
+    $("#adCreativeForm")?.addEventListener("submit", saveAdCreative);
+    $("#adCreativeCancel")?.addEventListener("click", resetAdCreativeForm);
+    $("#adCreativePanelClose")?.addEventListener("click", closeAdCreativePanel);
     $("#adTargetStoreSearch")?.addEventListener("input",event=>{clearTimeout(adTargetStoreSearchTimer);const value=event.currentTarget.value;adTargetStoreSearchTimer=setTimeout(()=>searchAdTargetStores(value),220);});
     $("#adTargetStoreSearch")?.addEventListener("focus",event=>{if(String(event.currentTarget.value || "").trim().length>=2) searchAdTargetStores(event.currentTarget.value);});
     $("#adTargetStoreClear")?.addEventListener("click",()=>setAdTargetStore(null));
@@ -2449,6 +2454,40 @@
     return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
   }
 
+  function adCreativeConfig(){
+    const raw = appConfig.ad_creatives;
+    return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+  }
+
+  function storedCampaignCreatives(campaignId){
+    const rows=adCreativeConfig()[String(campaignId)];
+    return Array.isArray(rows) ? rows.filter(item=>item && item.id) : [];
+  }
+
+  function primaryCreativeForCampaign(item){
+    if(!item?.id) return null;
+    const setting=campaignSetting(item.id);
+    return {
+      id:`primary:${item.id}`, campaign_id:String(item.id), name:"기본 소재", is_primary:true,
+      image_url:String(item.image_url || ""), storage_path:String(item.storage_path || ""),
+      store_list_image_url:setting.store_list_image_url, store_list_storage_path:setting.store_list_storage_path,
+      click_url:String(item.click_url || ""), is_active:true, sort_order:0
+    };
+  }
+
+  function campaignCreatives(item){
+    const primary=primaryCreativeForCampaign(item);
+    return [primary,...storedCampaignCreatives(item?.id)].filter(Boolean);
+  }
+
+  async function saveAdCreativeConfig(next){
+    const { error }=await adminSb.from("biteboss_app_config").upsert({
+      key:"ad_creatives", value:next, updated_by:session.user.id, updated_at:new Date().toISOString()
+    },{ onConflict:"key" });
+    if(error) throw error;
+    appConfig.ad_creatives=next;
+  }
+
   function campaignSetting(id){
     const value = adPlacementConfig()[String(id)] || {};
     return {
@@ -2486,16 +2525,17 @@
   }
 
   async function syncPublicAdCampaigns(){
-    const settings=adPlacementConfig();
-    const publicRows=adCampaigns.map(item=>{
+    const publicRows=adCampaigns.flatMap(item=>{
       const setting=campaignSetting(item.id);
-      return {
-        id:item.id, advertiser_name:item.advertiser_name || "", campaign_name:item.campaign_name || "",
-        image_url:item.image_url || "", click_url:item.click_url || "", starts_at:item.starts_at || null,
+      return campaignCreatives(item).filter(creative=>creative.is_active !== false && creative.image_url).map(creative=>({
+        id:item.id, campaign_id:item.id, creative_id:creative.id, creative_name:creative.name || "광고 소재",
+        advertiser_name:item.advertiser_name || "", campaign_name:item.campaign_name || "",
+        image_url:creative.image_url || "", click_url:creative.click_url || "", starts_at:item.starts_at || null,
         ends_at:item.ends_at || null, is_active:Boolean(item.is_active), sort_order:Number(item.sort_order || 0),
-        placement:setting.placement, target_type:setting.target_type, target_region:setting.target_region,
-        target_store_id:setting.target_store_id, store_list_image_url:setting.store_list_image_url
-      };
+        creative_sort_order:Number(creative.sort_order || 0), placement:setting.placement, target_type:setting.target_type,
+        target_region:setting.target_region, target_store_id:setting.target_store_id,
+        store_list_image_url:creative.store_list_image_url || ""
+      }));
     });
     const { error }=await adminSb.from("biteboss_app_config").upsert({
       key:"ad_public_campaigns", value:publicRows, updated_by:session.user.id, updated_at:new Date().toISOString()
@@ -2567,6 +2607,21 @@
     renderAdAnalytics(data || {});
   }
 
+  async function loadAdCreativeAnalytics(days){
+    adCreativeAnalyticsMap.clear();
+    const {data,error}=await adminSb.rpc("biteboss_admin_ad_creative_analytics_v8211",{p_days:Math.max(1,Number(days||30))});
+    if(error){
+      console.warn("BiteBoss creative analytics:",error);
+      renderAdCreatives();
+      return;
+    }
+    (Array.isArray(data?.creatives)?data.creatives:Array.isArray(data)?data:[]).forEach(row=>{
+      const key=`${String(row.campaign_id||"")}:${String(row.creative_id||"")}`;
+      adCreativeAnalyticsMap.set(key,row);
+    });
+    renderAdCreatives();
+  }
+
   function renderAdAnalytics(data){
     const total=data.total || {};
     const impressions=Number(total.impressions||0), clicks=Number(total.clicks||0);
@@ -2598,6 +2653,7 @@
       funnel.innerHTML=`<div><span>노출</span><strong>${impressions.toLocaleString("ko-KR")}</strong><small>100%</small></div><div><span>클릭</span><strong>${clicks.toLocaleString("ko-KR")}</strong><small>${impressions?(clicks/impressions*100).toFixed(1):"0.0"}%</small></div><div><span>방문</span><strong>${Number(total.visits||0).toLocaleString("ko-KR")}</strong><small>클릭 대비 ${visitRate.toFixed(1)}%</small></div><div><span>점령</span><strong>${Number(total.captures||0).toLocaleString("ko-KR")}</strong><small>방문 대비 ${captureRate.toFixed(1)}%</small></div>`;
     }
     renderAds();
+    loadAdCreativeAnalytics(Math.max(1,Number($("#adAnalyticsDays")?.value || 30)));
   }
 
   async function loadAds(){
@@ -2626,35 +2682,170 @@
       const start = item.starts_at ? new Date(item.starts_at).getTime() : 0;
       const end = item.ends_at ? new Date(item.ends_at).getTime() : Infinity;
       const live = item.is_active && start <= now && end > now;
-      const impressions = Number(item.impressions || 0);
-      const clicks = Number(item.clicks || 0);
-      const ctr = impressions > 0 ? (clicks / impressions * 100).toFixed(1) : "0.0";
-      const setting = campaignSetting(item.id);
       const measured = adAnalyticsCampaignMap.get(String(item.id)) || {};
+      const impressions = Number(measured.impressions ?? item.impressions ?? 0);
+      const clicks = Number(measured.clicks ?? item.clicks ?? 0);
+      const ctr = impressions > 0 ? (clicks / impressions * 100).toFixed(1) : "0.0";
       const visits = Number(measured.visits || 0);
       const captures = Number(measured.captures || 0);
-      const placementLabel = ({
-        home:"홈", takeover:"점령 대기", store_list:"매장 목록",
-        both:"홈 + 점령 대기", all:"전체 위치"
-      })[setting.placement] || "홈 + 점령 대기";
+      const creativeCount=campaignCreatives(item).filter(c=>c.is_active!==false && c.image_url).length;
+      const setting = campaignSetting(item.id);
+      const placementLabel = ({home:"홈", takeover:"점령 대기", store_list:"매장 목록", both:"홈 + 점령 대기", all:"전체 위치"})[setting.placement] || "홈 + 점령 대기";
       const targetLabel = setting.target_type === "region" && setting.target_region ? ` · ${setting.target_region}` : " · 전체";
       return `
-        <article class="admin-ad-row">
+        <article class="admin-ad-row ${String(selectedAdCampaignId)===String(item.id)?"is-selected":""}">
           <img class="admin-ad-thumb" src="${escapeAttr(item.image_url)}" alt="" />
           <div class="admin-ad-copy">
             <div class="admin-ad-title"><strong>${escapeHtml(item.campaign_name)}</strong><span>${live ? "LIVE" : (item.is_active ? "SCHEDULED" : "OFF")}</span></div>
-            <p>${escapeHtml(item.advertiser_name)} · ${escapeHtml(placementLabel + targetLabel)} · ${escapeHtml(formatAdPeriod(item.starts_at, item.ends_at))}</p>
+            <p>${escapeHtml(item.advertiser_name)} · ${creativeCount.toLocaleString("ko-KR")}개 소재 · ${escapeHtml(placementLabel + targetLabel)} · ${escapeHtml(formatAdPeriod(item.starts_at, item.ends_at))}</p>
             <div class="admin-ad-stats"><span>${impressions.toLocaleString("ko-KR")} 노출</span><span>${clicks.toLocaleString("ko-KR")} 클릭</span><span>CTR ${ctr}%</span><span>${visits.toLocaleString("ko-KR")} 방문</span><span>${captures.toLocaleString("ko-KR")} 점령</span></div>
           </div>
           <div class="admin-data-actions">
-            <button class="text-btn" data-edit-ad="${escapeAttr(item.id)}" type="button">수정</button>
+            <button class="text-btn" data-manage-ad-creatives="${escapeAttr(item.id)}" type="button">광고 소재</button>
+            <button class="text-btn" data-edit-ad="${escapeAttr(item.id)}" type="button">캠페인 수정</button>
             <button class="text-btn danger-text" data-delete-ad="${escapeAttr(item.id)}" type="button">삭제</button>
           </div>
         </article>`;
     }).join("") || `<div class="admin-empty">등록된 광고 캠페인이 없습니다.</div>`;
 
+    $$('[data-manage-ad-creatives]').forEach(btn => btn.onclick = () => openAdCreativePanel(btn.dataset.manageAdCreatives));
     $$('[data-edit-ad]').forEach(btn => btn.onclick = () => editAdCampaign(btn.dataset.editAd));
     $$('[data-delete-ad]').forEach(btn => btn.onclick = () => deleteAdCampaign(btn.dataset.deleteAd));
+  }
+
+  function openAdCreativePanel(campaignId){
+    selectedAdCampaignId=String(campaignId || "");
+    const campaign=adCampaigns.find(item=>String(item.id)===selectedAdCampaignId);
+    if(!campaign) return;
+    $("#adCreativePanel")?.classList.remove("hidden");
+    setText("#adCreativePanelDescription",`${campaign.campaign_name} · 실제 노출 소재와 소재별 성과`);
+    resetAdCreativeForm();
+    renderAds();
+    renderAdCreatives();
+    $("#adCreativePanel")?.scrollIntoView({behavior:"smooth",block:"start"});
+  }
+
+  function closeAdCreativePanel(){
+    selectedAdCampaignId="";
+    $("#adCreativePanel")?.classList.add("hidden");
+    resetAdCreativeForm();
+    renderAds();
+  }
+
+  function creativeMetric(campaignId, creativeId){
+    const exact=adCreativeAnalyticsMap.get(`${String(campaignId)}:${String(creativeId)}`);
+    if(exact) return exact;
+    const hasCreativeRows=[...adCreativeAnalyticsMap.keys()].some(key=>key.startsWith(`${String(campaignId)}:`));
+    if(!hasCreativeRows && String(creativeId)===`primary:${String(campaignId)}`){
+      return adAnalyticsCampaignMap.get(String(campaignId)) || {};
+    }
+    return {};
+  }
+
+  function renderAdCreatives(){
+    const box=$("#adCreativeList");
+    if(!box || !selectedAdCampaignId) return;
+    const campaign=adCampaigns.find(item=>String(item.id)===String(selectedAdCampaignId));
+    if(!campaign){ closeAdCreativePanel(); return; }
+    const rows=campaignCreatives(campaign);
+    box.innerHTML=rows.map(creative=>{
+      const metric=creativeMetric(campaign.id,creative.id);
+      const impressions=Number(metric.impressions||0), clicks=Number(metric.clicks||0);
+      const ctr=impressions ? (clicks/impressions*100).toFixed(1) : "0.0";
+      const image=creative.image_url || creative.store_list_image_url || "";
+      return `<article class="admin-ad-row admin-ad-creative-row">
+        ${image?`<img class="admin-ad-thumb" src="${escapeAttr(image)}" alt="" />`:`<div class="admin-ad-thumb"></div>`}
+        <div class="admin-ad-copy">
+          <div class="admin-ad-title"><strong>${escapeHtml(creative.name || "광고 소재")}</strong><span class="admin-ad-creative-badge ${creative.is_primary?"is-primary":""}">${creative.is_primary?"기본 소재":(creative.is_active===false?"OFF":"ACTIVE")}</span></div>
+          <p>${creative.store_list_image_url?"홈 · 점령 대기 · 매장 목록":"홈 · 점령 대기"}${creative.click_url?" · 클릭 연결":""}</p>
+          <div class="admin-ad-stats"><span>${impressions.toLocaleString("ko-KR")} 노출</span><span>${clicks.toLocaleString("ko-KR")} 클릭</span><span>CTR ${ctr}%</span><span>${Number(metric.visits||0).toLocaleString("ko-KR")} 방문</span><span>${Number(metric.captures||0).toLocaleString("ko-KR")} 점령</span></div>
+        </div>
+        <div class="admin-data-actions">
+          ${creative.is_primary?`<button class="text-btn" data-edit-primary-creative="${escapeAttr(campaign.id)}" type="button">기본 소재 수정</button>`:`<button class="text-btn" data-edit-creative="${escapeAttr(creative.id)}" type="button">수정</button><button class="text-btn danger-text" data-delete-creative="${escapeAttr(creative.id)}" type="button">삭제</button>`}
+        </div>
+      </article>`;
+    }).join("") || '<div class="admin-empty">등록된 광고 소재가 없습니다.</div>';
+    $$('[data-edit-primary-creative]',box).forEach(btn=>btn.onclick=()=>editAdCampaign(btn.dataset.editPrimaryCreative));
+    $$('[data-edit-creative]',box).forEach(btn=>btn.onclick=()=>editAdCreative(btn.dataset.editCreative));
+    $$('[data-delete-creative]',box).forEach(btn=>btn.onclick=()=>deleteAdCreative(btn.dataset.deleteCreative));
+  }
+
+  function editAdCreative(id){
+    const campaign=adCampaigns.find(item=>String(item.id)===String(selectedAdCampaignId));
+    const creative=storedCampaignCreatives(campaign?.id).find(item=>String(item.id)===String(id));
+    if(!creative) return;
+    const editor=$("#adCreativeEditor"); if(editor) editor.open=true;
+    $("#adCreativeId").value=creative.id;
+    $("#adCreativeName").value=creative.name || "";
+    $("#adCreativeClickUrl").value=creative.click_url || "";
+    $("#adCreativeIsActive").value=creative.is_active===false?"false":"true";
+    $("#adCreativeSortOrder").value=String(Number(creative.sort_order||0));
+    $("#adCreativeForm").dataset.imageUrl=creative.image_url || "";
+    $("#adCreativeForm").dataset.storagePath=creative.storage_path || "";
+    $("#adCreativeForm").dataset.storeListImageUrl=creative.store_list_image_url || "";
+    $("#adCreativeForm").dataset.storeListStoragePath=creative.store_list_storage_path || "";
+    $("#adCreativeCancel")?.classList.remove("hidden");
+    setStatusText($("#adCreativeStatus"),"새 이미지를 선택하지 않으면 기존 이미지를 유지합니다.");
+  }
+
+  function resetAdCreativeForm(){
+    const form=$("#adCreativeForm"); if(!form) return;
+    form.reset();
+    $("#adCreativeId").value="";
+    $("#adCreativeIsActive").value="true";
+    $("#adCreativeSortOrder").value="0";
+    delete form.dataset.imageUrl; delete form.dataset.storagePath; delete form.dataset.storeListImageUrl; delete form.dataset.storeListStoragePath;
+    $("#adCreativeCancel")?.classList.add("hidden");
+    setStatusText($("#adCreativeStatus"),"");
+  }
+
+  async function saveAdCreative(event){
+    event.preventDefault();
+    const campaign=adCampaigns.find(item=>String(item.id)===String(selectedAdCampaignId));
+    const form=$("#adCreativeForm"), status=$("#adCreativeStatus"), submit=event.submitter;
+    if(!campaign || !form) return;
+    if(submit) submit.disabled=true;
+    let uploaded=[];
+    try{
+      const id=String($("#adCreativeId")?.value || "").trim() || (window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+      let imageUrl=String(form.dataset.imageUrl||""), storagePath=String(form.dataset.storagePath||"");
+      let storeListImageUrl=String(form.dataset.storeListImageUrl||""), storeListStoragePath=String(form.dataset.storeListStoragePath||"");
+      const imageFile=$("#adCreativeImageFile")?.files?.[0];
+      const storeListFile=$("#adCreativeStoreListImageFile")?.files?.[0];
+      if(imageFile){
+        const blob=await imageFileToJpegBlob(imageFile,1800,900,.88); const path=`ads/${campaign.id}/creative-${id}-${Date.now()}.jpg`;
+        const up=await adminSb.storage.from("biteboss-assets").upload(path,blob,{contentType:"image/jpeg",cacheControl:"86400",upsert:false}); if(up.error) throw up.error;
+        uploaded.push(path); imageUrl=adminSb.storage.from("biteboss-assets").getPublicUrl(path).data.publicUrl; storagePath=path;
+      }
+      if(!imageUrl) throw new Error("광고 소재 이미지를 선택하세요.");
+      if(storeListFile){
+        const blob=await imageFileToJpegBlob(storeListFile,1800,1200,.88); const path=`ads/${campaign.id}/creative-list-${id}-${Date.now()}.jpg`;
+        const up=await adminSb.storage.from("biteboss-assets").upload(path,blob,{contentType:"image/jpeg",cacheControl:"86400",upsert:false}); if(up.error) throw up.error;
+        uploaded.push(path); storeListImageUrl=adminSb.storage.from("biteboss-assets").getPublicUrl(path).data.publicUrl; storeListStoragePath=path;
+      }
+      const all={...adCreativeConfig()}; const rows=storedCampaignCreatives(campaign.id); const old=rows.find(x=>String(x.id)===id);
+      const next={id,campaign_id:String(campaign.id),name:String($("#adCreativeName")?.value||"").trim(),image_url:imageUrl,storage_path:storagePath,store_list_image_url:storeListImageUrl,store_list_storage_path:storeListStoragePath,click_url:String($("#adCreativeClickUrl")?.value||"").trim(),is_active:String($("#adCreativeIsActive")?.value||"true")==="true",sort_order:Number($("#adCreativeSortOrder")?.value||0)};
+      all[String(campaign.id)]=[...rows.filter(x=>String(x.id)!==id),next];
+      await saveAdCreativeConfig(all); await syncPublicAdCampaigns();
+      const oldPaths=[old?.storage_path && old.storage_path!==storagePath?old.storage_path:"",old?.store_list_storage_path && old.store_list_storage_path!==storeListStoragePath?old.store_list_storage_path:""].filter(Boolean);
+      if(oldPaths.length) await adminSb.storage.from("biteboss-assets").remove(oldPaths);
+      resetAdCreativeForm(); setStatusText(status,"광고 소재가 저장되었습니다."); renderAds(); renderAdCreatives();
+    }catch(error){
+      if(uploaded.length) try{await adminSb.storage.from("biteboss-assets").remove(uploaded);}catch{}
+      setStatusText(status,`저장 실패 · ${error?.message||"다시 시도하세요."}`);
+    }finally{ if(submit) submit.disabled=false; }
+  }
+
+  async function deleteAdCreative(id){
+    const campaign=adCampaigns.find(item=>String(item.id)===String(selectedAdCampaignId)); if(!campaign) return;
+    const rows=storedCampaignCreatives(campaign.id); const creative=rows.find(item=>String(item.id)===String(id)); if(!creative) return;
+    if(!confirm(`${creative.name||"광고 소재"}를 삭제할까요?`)) return;
+    const all={...adCreativeConfig()}; all[String(campaign.id)]=rows.filter(item=>String(item.id)!==String(id));
+    try{
+      await saveAdCreativeConfig(all); await syncPublicAdCampaigns();
+      const paths=[creative.storage_path,creative.store_list_storage_path].filter(Boolean); if(paths.length) await adminSb.storage.from("biteboss-assets").remove(paths);
+      renderAds(); renderAdCreatives();
+    }catch(error){ alert(error?.message||"광고 소재 삭제에 실패했습니다."); }
   }
 
   function editAdCampaign(id){
@@ -2838,9 +3029,14 @@
         if(removed.error) console.warn("Ad asset cleanup:", removed.error);
       }
       if(String($("#adCampaignId")?.value || "") === String(id)) resetAdCampaignForm();
+      const extraCreatives=storedCampaignCreatives(id);
+      const creativePaths=extraCreatives.flatMap(row=>[row.storage_path,row.store_list_storage_path]).filter(Boolean);
+      if(creativePaths.length){ const removed=await adminSb.storage.from("biteboss-assets").remove(creativePaths); if(removed.error) console.warn("Creative asset cleanup:",removed.error); }
+      const creatives={...adCreativeConfig()}; delete creatives[String(id)]; await saveAdCreativeConfig(creatives);
       const settings={ ...adPlacementConfig() }; delete settings[String(id)];
       await adminSb.from("biteboss_app_config").upsert({ key:"ad_campaign_settings", value:settings, updated_by:session.user.id, updated_at:new Date().toISOString() },{ onConflict:"key" });
       appConfig.ad_campaign_settings=settings;
+      if(String(selectedAdCampaignId)===String(id)) closeAdCreativePanel();
       await loadAds();
     }catch(error){
       alert(error?.message || "캠페인 삭제에 실패했습니다.");
