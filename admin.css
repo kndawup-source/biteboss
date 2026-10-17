@@ -785,3 +785,160 @@ body.admin-app{min-height:100dvh;background:#f1f1f3;color:#111}
 .admin-app .admin-ad-toolbar{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}.admin-app .admin-ad-toolbar .input{width:min(260px,52vw);min-height:38px}.admin-app .admin-ad-toolbar .text-btn{white-space:nowrap}@media(max-width:640px){.admin-app .admin-ad-toolbar{width:100%;justify-content:stretch}.admin-app .admin-ad-toolbar .input{width:100%;flex:1 1 100%}.admin-app .admin-ad-toolbar .text-btn{margin-left:auto}}
 
 .role-hidden{display:none!important}
+
+/* 82.42 — ad performance page tone alignment */
+.admin-app .admin-ad-performance,
+.admin-app .admin-ad-performance-campaigns,
+.admin-app .admin-ad-performance-creatives{
+  padding:20px;
+  border:1px solid rgba(17,17,19,.035);
+  border-radius:18px;
+  background:var(--admin-surface);
+  box-shadow:none;
+}
+.admin-app .admin-ad-performance .admin-section-title-row,
+.admin-app .admin-ad-performance-campaigns .admin-section-title-row,
+.admin-app .admin-ad-performance-creatives .admin-section-title-row{
+  align-items:flex-start;
+  gap:14px;
+}
+.admin-app .admin-ad-period{
+  width:104px;
+  min-width:104px;
+  min-height:42px;
+  background:var(--admin-soft);
+}
+.admin-app .admin-ad-kpis{
+  gap:10px;
+  margin:0 0 14px;
+}
+.admin-app .admin-ad-kpis article{
+  min-height:88px;
+  padding:15px 16px;
+  border:1px solid rgba(17,17,19,.035);
+  border-radius:15px;
+  background:var(--admin-surface);
+}
+.admin-app .admin-ad-kpis strong{
+  margin:8px 0 5px;
+  font-variant-numeric:tabular-nums;
+}
+.admin-app .admin-ad-chart-panel{
+  margin-top:0;
+  padding:16px;
+  border:1px solid rgba(17,17,19,.035);
+  border-radius:15px;
+  background:var(--admin-soft);
+}
+.admin-app .admin-ad-chart{
+  height:236px;
+}
+.admin-app .admin-ad-chart-bars{
+  padding-top:16px;
+  border-bottom:1px solid #e3e3e6;
+}
+.admin-app .admin-ad-funnel{
+  gap:10px;
+  margin-top:14px;
+}
+.admin-app .admin-ad-funnel>div{
+  padding:15px 16px;
+  border:1px solid rgba(17,17,19,.03);
+  border-radius:15px;
+  background:var(--admin-soft);
+}
+.admin-app .admin-ad-funnel strong{
+  font-variant-numeric:tabular-nums;
+}
+.admin-app .admin-ad-toolbar{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.admin-app .admin-ad-toolbar .input{
+  width:min(260px,52vw);
+  min-height:42px;
+  background:var(--admin-soft);
+}
+.admin-app .admin-ad-toolbar .text-btn,
+.admin-app #adPerformanceCreativeClose{
+  min-height:34px;
+  padding:0 12px;
+  border:0;
+  border-radius:10px;
+  background:#f2f2f4;
+  color:#111;
+  white-space:nowrap;
+}
+.admin-app .admin-ad-list{
+  gap:10px;
+}
+.admin-app .admin-ad-row{
+  padding:15px 16px!important;
+  border-radius:16px;
+  background:var(--admin-soft);
+}
+.admin-app .admin-ad-performance-row{
+  width:100%;
+  border:0;
+  background:transparent;
+  color:inherit;
+  text-align:left;
+  font:inherit;
+  cursor:pointer;
+}
+.admin-app button.admin-ad-performance-row:hover{
+  background:#efeff1;
+}
+.admin-app button.admin-ad-performance-row:focus-visible{
+  outline:2px solid rgba(17,17,19,.12);
+  outline-offset:2px;
+}
+.admin-app .admin-ad-row.is-selected,
+.admin-app .admin-ad-performance-row.is-selected{
+  background:#ececef;
+  outline:none;
+  box-shadow:inset 0 0 0 1px rgba(17,17,19,.08);
+}
+.admin-app .admin-ad-performance-meta{
+  display:block;
+  margin-top:5px;
+  color:var(--admin-muted);
+  font-size:8px;
+  line-height:1.4;
+}
+.admin-app .admin-ad-performance-row .admin-ad-stats{
+  display:flex;
+  flex-wrap:wrap;
+  gap:4px 10px;
+  margin-top:8px;
+}
+.admin-app .admin-ad-performance-creatives,
+.admin-app .admin-ad-creatives-section{
+  border-top:0;
+}
+@media(max-width:759px){
+  .admin-app .admin-ad-performance,
+  .admin-app .admin-ad-performance-campaigns,
+  .admin-app .admin-ad-performance-creatives{
+    padding:16px;
+  }
+  .admin-app .admin-ad-period{
+    width:100%;
+    min-width:0;
+  }
+  .admin-app .admin-ad-toolbar{
+    width:100%;
+    justify-content:stretch;
+  }
+  .admin-app .admin-ad-toolbar .input{
+    width:100%;
+    flex:1 1 100%;
+  }
+  .admin-app .admin-ad-toolbar .text-btn,
+  .admin-app #adPerformanceCreativeClose{
+    margin-left:auto;
+  }
+}
