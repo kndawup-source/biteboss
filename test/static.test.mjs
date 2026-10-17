@@ -297,6 +297,9 @@ test('advertising security layer enforces server-side config and analytics capab
   assert.match(admin, /biteboss_admin_config_upsert_v8217/);
   assert.match(admin, /biteboss_admin_list_campaigns_v8217/);
   assert.match(admin, /biteboss_admin_upsert_campaign_v8217/);
+
+  assert.match(admin, /campaignIdFromResult/);
+  assert.match(admin, /CAMPAIGN_ID_NOT_RETURNED/);
   assert.match(admin, /biteboss_admin_delete_campaign_v8217/);
   assert.match(admin, /biteboss_admin_ad_analytics_v8217/);
   assert.match(admin, /biteboss_admin_ad_creative_analytics_v8217/);
@@ -469,7 +472,7 @@ test('82.31 current territory ranking and territory store modal have no decorati
 
 
 
-test('82.34 store-list-only ads save without requiring a home banner image', () => {
+test('82.35 store-list-only ads save without requiring a home banner image', () => {
   const adminHtml = read('admin.html');
   assert.match(adminHtml, /id="adStoreListImageFile"[\s\S]*?1200×240/);
   assert.match(admin, /placement === "store_list" && !storeListImageUrl/);
@@ -480,7 +483,7 @@ test('82.34 store-list-only ads save without requiring a home banner image', () 
   assert.doesNotMatch(admin, /setStatusText\(status, "배너 이미지를 선택하세요\."\)/);
 });
 
-test('82.34 current territory store modal paginates 10 stores per page', () => {
+test('82.35 current territory store modal paginates 10 stores per page', () => {
   assert.match(app, /const TERRITORY_STORE_PAGE_SIZE = 10/);
   assert.match(app, /rank-territory-pagination hidden/);
   assert.match(app, /pageSlice\(rows, territoryStorePage, TERRITORY_STORE_PAGE_SIZE\)/);
