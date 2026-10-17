@@ -1859,17 +1859,40 @@
   async function saveAdminStoreSlug(){
     if(!editingStoreId) return;
     const slug=String($("#adminStoreSlug")?.value || "").trim().toLowerCase();
-    const status=$("#adminStoreSlugStatus"); setStatusText(status,"저장 중…");
-    const {data,error}=await adminSb.rpc("biteboss_admin_set_store_seo_slug",{p_store_id:editingStoreId,p_slug:slug});
-    if(error || !data?.ok){
-      const code=data?.error || "";
-      const message=code==="SLUG_TAKEN"?"이미 사용 중인 주소입니다.":code==="INVALID_SLUG"?"영문 소문자, 숫자, 하이픈만 입력하세요.":error?.message || code || "저장 실패";
-      return setStatusText(status,message);
+    const status=$("#adminStoreSlugStatus");
+    const button=$("#adminStoreSlugSave");
+    if(button){ button.disabled=true; button.classList.remove("is-saved"); button.textContent="저장 중…"; }
+    setStatusText(status,"저장 중…");
+    try{
+      const {data,error}=await adminSb.rpc("biteboss_admin_set_store_seo_slug",{p_store_id:editingStoreId,p_slug:slug});
+      if(error || !data?.ok){
+        const code=data?.error || "";
+        const message=code==="SLUG_TAKEN"?"이미 사용 중인 주소입니다.":code==="INVALID_SLUG"?"영문 소문자, 숫자, 하이픈만 입력하세요.":error?.message || code || "저장 실패";
+        if(button){ button.classList.add("is-error"); button.textContent="저장 실패"; }
+        setStatusText(status,message);
+        return;
+      }
+      if(button){ button.classList.remove("is-error"); button.classList.add("is-saved"); button.textContent="저장 완료 ✓"; }
+      setStatusText(status,slug ? "고유주소가 저장되었습니다." : "자동 주소로 설정되었습니다.");
+      await reloadStoreEditor();
+      setTimeout(()=>{
+        if(!button) return;
+        button.classList.remove("is-saved");
+        button.textContent="주소 저장";
+        button.disabled=false;
+      },1400);
+    }catch(error){
+      if(button){ button.classList.add("is-error"); button.textContent="저장 실패"; }
+      setStatusText(status,error?.message || "저장하지 못했습니다.");
+    }finally{
+      if(button && !button.classList.contains("is-saved")){
+        button.disabled=false;
+        setTimeout(()=>{ button.classList.remove("is-error"); button.textContent="주소 저장"; },1600);
+      }
     }
-    setStatusText(status,slug ? "고유주소가 저장되었습니다." : "자동 주소로 설정되었습니다.");
-    await reloadStoreEditor();
   }
-  async function copyAdminStoreUrl(){
+
+    async function copyAdminStoreUrl(){
     const url=String($("#adminStoreUrlPreview")?.textContent || "").trim();
     if(!url) return;
     await navigator.clipboard.writeText(url);

@@ -391,18 +391,42 @@
     setText("#storeUrlPreview",storePublicUrl(String(data?.slug || "")));
   }
   async function saveStoreSeo(event){
-    event.preventDefault(); if(!currentStore) return;
-    const slug=String(new FormData(event.currentTarget).get("slug") || "").trim().toLowerCase();
+    event.preventDefault();
+    if(!currentStore) return;
+    const formEl=event.currentTarget;
+    const button=formEl.querySelector('button[type="submit"]');
+    const slug=String(new FormData(formEl).get("slug") || "").trim().toLowerCase();
+    if(button){ button.disabled=true; button.classList.remove("is-saved"); button.textContent="저장 중…"; }
     setText("#storeSeoStatus","저장 중…");
-    const {data,error}=await storeSb.rpc("biteboss_store_set_seo_slug",{p_store_id:currentStore.id,p_slug:slug});
-    if(error || !data?.ok){
-      const code=data?.error || "";
-      return setText("#storeSeoStatus",code==="SLUG_TAKEN"?"이미 사용 중인 주소입니다.":code==="INVALID_SLUG"?"영문 소문자, 숫자, 하이픈만 입력하세요.":error?.message || code || "저장 실패");
+    try{
+      const {data,error}=await storeSb.rpc("biteboss_store_set_seo_slug",{p_store_id:currentStore.id,p_slug:slug});
+      if(error || !data?.ok){
+        const code=data?.error || "";
+        if(button){ button.classList.add("is-error"); button.textContent="저장 실패"; }
+        setText("#storeSeoStatus",code==="SLUG_TAKEN"?"이미 사용 중인 주소입니다.":code==="INVALID_SLUG"?"영문 소문자, 숫자, 하이픈만 입력하세요.":error?.message || code || "저장 실패");
+        return;
+      }
+      if(button){ button.classList.remove("is-error"); button.classList.add("is-saved"); button.textContent="저장 완료 ✓"; }
+      setText("#storeSeoStatus",slug ? "고유주소가 저장되었습니다." : "자동 주소로 설정되었습니다.");
+      await loadStoreSeo();
+      setTimeout(()=>{
+        if(!button) return;
+        button.classList.remove("is-saved");
+        button.textContent="주소 저장";
+        button.disabled=false;
+      },1400);
+    }catch(error){
+      if(button){ button.classList.add("is-error"); button.textContent="저장 실패"; }
+      setText("#storeSeoStatus",error?.message || "저장하지 못했습니다.");
+    }finally{
+      if(button && !button.classList.contains("is-saved")){
+        button.disabled=false;
+        setTimeout(()=>{ button.classList.remove("is-error"); button.textContent="주소 저장"; },1600);
+      }
     }
-    setText("#storeSeoStatus",slug ? "고유주소가 저장되었습니다." : "자동 주소로 설정되었습니다.");
-    await loadStoreSeo();
   }
-  async function copyStoreUrl(){
+
+    async function copyStoreUrl(){
     const url=String($("#storeUrlPreview")?.textContent || "").trim();
     if(!url) return;
     await navigator.clipboard.writeText(url);
