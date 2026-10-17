@@ -288,20 +288,18 @@ test('advertising manager is scoped to ad performance and ad management only', (
 
 test('advertising security layer enforces server-side config and analytics capabilities', () => {
   const sql = read('sql/biteboss-82.17-ad-security.sql');
+  const canonicalSql = read('sql/biteboss-82.41-ad-campaign-canonical-config.sql');
   assert.match(sql, /biteboss_admin_has_capability_v8217/);
   assert.match(sql, /AD_CONFIG_KEY_FORBIDDEN/);
-  assert.match(sql, /ad_campaign_settings','ad_creatives','ad_public_campaigns/);
+  assert.match(canonicalSql, /'ad_campaigns','ad_campaign_settings','ad_creatives','ad_public_campaigns'/);
   assert.match(sql, /revoke insert, update, delete on table public\.biteboss_app_config from anon, authenticated/);
   assert.match(sql, /AD_EVENT_INPUT_TOO_LONG/);
   assert.match(sql, /name like 'ads\/%'/);
   assert.match(admin, /biteboss_admin_config_upsert_v8217/);
   assert.match(admin, /biteboss_admin_list_campaigns_v8239/);
-  assert.match(admin, /biteboss_admin_upsert_campaign_v8239/);
-  assert.match(admin, /CAMPAIGN_ID_NOT_RETURNED/);
-  assert.match(admin, /biteboss_admin_delete_campaign_v8239/);
-  assert.doesNotMatch(admin, /const campaignId = id \|\| globalThis\.crypto\?\.randomUUID/);
-  assert.match(admin, /p_id:id \|\| null/);
-  assert.match(admin, /const savedCampaignId=String\(data\?\.campaign_id \|\| data\?\.id \|\| ""\)\.trim\(\)/);
+  assert.match(admin, /key:"ad_campaigns"/);
+  assert.match(admin, /const campaignId = editingId \|\| crypto\.randomUUID\(\)/);
+  assert.doesNotMatch(admin, /adminRpc\("biteboss_admin_upsert_campaign_v8239"/);
   assert.match(admin, /biteboss_admin_ad_analytics_v8217/);
   assert.match(admin, /biteboss_admin_ad_creative_analytics_v8217/);
   assert.doesNotMatch(admin, /from\("biteboss_app_config"\)\.upsert/);
@@ -493,23 +491,23 @@ test('82.35 current territory store modal paginates 10 stores per page', () => {
   assert.match(app, /renderTerritoryStorePage\(\)/);
 });
 
-test('82.40 ad campaign save uses server-created id contract and keeps uploaded assets after database commit', () => {
-  assert.match(admin, /biteboss_admin_upsert_campaign_v8239/);
-  assert.match(admin, /p_id:id \|\| null/);
-  assert.doesNotMatch(admin, /const campaignId = id \|\| globalThis\.crypto\?\.randomUUID/);
-  assert.doesNotMatch(admin, /data\?\.campaign_id \|\| data\?\.id \|\| campaignId/);
-  assert.match(admin, /biteboss_admin_delete_campaign_v8239/);
-  assert.match(admin, /let campaignPersisted=false/);
-  assert.match(admin, /campaignPersisted=true/);
-  assert.match(admin, /if\(!campaignPersisted && newStoreListStoragePath\)/);
-  assert.match(admin, /await refreshAdCampaignRows\(\);\s*await syncPublicAdCampaigns\(\);/s);
+test('82.41 ad campaign CRUD uses one canonical config contract', () => {
+  assert.match(admin, /function adCampaignConfig\(\)/);
+  assert.match(admin, /const campaignId = editingId \|\| crypto\.randomUUID\(\)/);
+  assert.match(admin, /\{key:"ad_campaigns",value:campaigns\}/);
+  assert.doesNotMatch(admin, /CAMPAIGN_NOT_RESOLVED_AFTER_CREATE|CAMPAIGN_ID_NOT_RETURNED/);
+  assert.doesNotMatch(admin, /adminRpc\("biteboss_admin_upsert_campaign_v8239"/);
+  assert.match(admin, /configPersisted=true/);
+  assert.match(admin, /if\(!configPersisted && newStoreListStoragePath\)/);
 });
 
-test('82.39 ad campaign delete clears campaign settings, creatives and public inventory together', () => {
+test('82.41 ad campaign delete clears canonical campaigns, settings, creatives and public inventory together', () => {
   assert.match(admin, /const uniquePaths=\[\.\.\.new Set\(paths\)\]/);
-  assert.match(admin, /secureAdminConfigUpsert\(\[\s*\{key:"ad_creatives"/s);
+  assert.match(admin, /secureAdminConfigUpsert\(\[\s*\{key:"ad_campaigns",value:campaigns\}/s);
+  assert.match(admin, /\{key:"ad_creatives",value:creatives\}/);
   assert.match(admin, /\{key:"ad_campaign_settings",value:settings\}/);
   assert.match(admin, /\{key:"ad_public_campaigns",value:publicRows\}/);
-  assert.match(admin, /adCampaigns=adCampaigns\.filter\(row=>String\(row\.id\)!==String\(id\)\)/);
+  assert.match(admin, /const campaigns=adCampaigns\.filter\(row=>String\(row\.id\)!==String\(id\)\)/);
+  assert.match(admin, /Best-effort legacy cleanup only/);
   assert.match(admin, /creativeCount=campaignCreatives\(item\)\.filter\(c=>c\.is_active!==false && \(c\.image_url \|\| c\.store_list_image_url\)\)\.length/);
 });

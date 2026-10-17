@@ -2678,6 +2678,29 @@
     return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
   }
 
+  function adCampaignConfig(){
+    const raw = appConfig.ad_campaigns;
+    return Array.isArray(raw) ? raw : null;
+  }
+
+  function normalizeAdCampaignRow(item = {}){
+    const id=String(item?.id || item?.campaign_id || "").trim();
+    if(!id) return null;
+    return {
+      id,
+      campaign_id:id,
+      advertiser_name:String(item?.advertiser_name || "").trim(),
+      campaign_name:String(item?.campaign_name || "").trim(),
+      image_url:String(item?.image_url || "").trim(),
+      storage_path:String(item?.storage_path || "").trim(),
+      click_url:String(item?.click_url || "").trim(),
+      starts_at:item?.starts_at || null,
+      ends_at:item?.ends_at || null,
+      is_active:item?.is_active !== false,
+      sort_order:Number(item?.sort_order || 0)
+    };
+  }
+
   function storedCampaignCreatives(campaignId){
     const rows=adCreativeConfig()[String(campaignId)];
     return Array.isArray(rows) ? rows.filter(item=>item && item.id) : [];
@@ -2765,9 +2788,22 @@
   }
 
   async function refreshAdCampaignRows(){
+    const canonical=adCampaignConfig();
+    if(canonical){
+      adCampaigns=canonical.map(normalizeAdCampaignRow).filter(Boolean);
+      return adCampaigns;
+    }
+
+    // One-time migration from the legacy campaign RPC. Invalid/nameless rows are
+    // intentionally excluded so failed historical saves cannot remain as ghost campaigns.
     const {data,error}=await adminRpc("biteboss_admin_list_campaigns_v8239");
     if(error) throw error;
-    adCampaigns=Array.isArray(data) ? data : Array.isArray(data?.campaigns) ? data.campaigns : [];
+    const legacy=(Array.isArray(data) ? data : Array.isArray(data?.campaigns) ? data.campaigns : [])
+      .map(normalizeAdCampaignRow)
+      .filter(item=>item && item.campaign_name && item.advertiser_name);
+    adCampaigns=legacy;
+    await secureAdminConfigUpsert({key:"ad_campaigns",value:legacy});
+    appConfig.ad_campaigns=legacy;
     return adCampaigns;
   }
 
@@ -3244,14 +3280,15 @@
     const form = event.currentTarget;
     const status = $("#adCampaignStatus");
     const submit = form?.querySelector('button[type="submit"]');
-    const id = String($("#adCampaignId")?.value || "").trim();
-    const previous = id ? adCampaigns.find(item => String(item.id) === id) : null;
+    const editingId = String($("#adCampaignId")?.value || "").trim();
+    const campaignId = editingId || crypto.randomUUID();
+    const previous = editingId ? adCampaigns.find(item => String(item.id) === editingId) : null;
     const file = $("#adImageFile")?.files?.[0] || null;
     const storeListFile = $("#adStoreListImageFile")?.files?.[0] || null;
     const startsRaw = String($("#adStartsAt")?.value || "").trim();
     const endsRaw = String($("#adEndsAt")?.value || "").trim();
     const placement=String($("#adPlacement")?.value || "both");
-    const previousSetting=id ? campaignSetting(id) : {};
+    const previousSetting=editingId ? campaignSetting(editingId) : {};
     const previousUsesStoreListFallback=previousSetting.primary_image_kind === "store_list";
     let imageUrl = previousUsesStoreListFallback ? "" : String(previous?.image_url || "");
     let storagePath = previousUsesStoreListFallback ? "" : String(previous?.storage_path || "");
@@ -3259,7 +3296,7 @@
     let storeListImageUrl=String(previousSetting.store_list_image_url || form?.dataset.storeListImageUrl || "");
     let storeListStoragePath=String(previousSetting.store_list_storage_path || form?.dataset.storeListStoragePath || "");
     let newStoreListStoragePath="";
-    let campaignPersisted=false;
+    let configPersisted=false;
 
     if(!startsRaw){
       setStatusText(status, "시작일시를 입력하세요.");
@@ -3271,7 +3308,7 @@
     try{
       if(file){
         const blob = await imageFileToJpegBlob(file, 1800, 600, 0.9);
-        newStoragePath = `ads/${crypto.randomUUID()}.jpg`;
+        newStoragePath = `ads/${campaignId}/home-${crypto.randomUUID()}.jpg`;
         const upload = await adminSb.storage.from("biteboss-assets").upload(newStoragePath, blob, {
           contentType:"image/jpeg",
           cacheControl:"86400",
@@ -3284,7 +3321,7 @@
 
       if(storeListFile){
         const blob=await imageFileToJpegBlob(storeListFile,1800,360,0.9);
-        newStoreListStoragePath=`ads/store-list-${crypto.randomUUID()}.jpg`;
+        newStoreListStoragePath=`ads/${campaignId}/store-list-${crypto.randomUUID()}.jpg`;
         const upload=await adminSb.storage.from("biteboss-assets").upload(newStoreListStoragePath,blob,{
           contentType:"image/jpeg", cacheControl:"86400", upsert:false
         });
@@ -3300,37 +3337,52 @@
       const usesStoreListFallback=!imageUrl && Boolean(storeListImageUrl);
       const canonicalImageUrl=imageUrl || storeListImageUrl;
       const canonicalStoragePath=storagePath || storeListStoragePath;
-      if(form){
-        form.dataset.storeListImageUrl=storeListImageUrl;
-        form.dataset.storeListStoragePath=storeListStoragePath;
-        form.dataset.primaryImageKind=usesStoreListFallback ? "store_list" : "home";
-      }
-
-      const { data, error } = await adminRpc("biteboss_admin_upsert_campaign_v8239", {
-        // New campaigns must pass NULL. The legacy base RPC interprets any
-        // non-null id as UPDATE and returns CAMPAIGN_NOT_FOUND for a client UUID.
-        p_id:id || null,
-        p_advertiser_name:String($("#adAdvertiserName")?.value || "").trim(),
-        p_campaign_name:String($("#adCampaignName")?.value || "").trim(),
-        p_image_url:canonicalImageUrl,
-        p_storage_path:canonicalStoragePath || null,
-        p_click_url:String($("#adClickUrl")?.value || "").trim(),
-        p_starts_at:new Date(startsRaw).toISOString(),
-        p_ends_at:endsRaw ? new Date(endsRaw).toISOString() : null,
-        p_is_active:String($("#adIsActive")?.value || "true") === "true",
-        p_sort_order:Number($("#adSortOrder")?.value || 0)
+      const nextCampaign=normalizeAdCampaignRow({
+        id:campaignId,
+        advertiser_name:String($("#adAdvertiserName")?.value || "").trim(),
+        campaign_name:String($("#adCampaignName")?.value || "").trim(),
+        image_url:canonicalImageUrl,
+        storage_path:canonicalStoragePath,
+        click_url:String($("#adClickUrl")?.value || "").trim(),
+        starts_at:new Date(startsRaw).toISOString(),
+        ends_at:endsRaw ? new Date(endsRaw).toISOString() : null,
+        is_active:String($("#adIsActive")?.value || "true") === "true",
+        sort_order:Number($("#adSortOrder")?.value || 0)
       });
-      if(error) throw error;
-      if(!data?.ok) throw new Error(data?.error || "CAMPAIGN_SAVE_FAILED");
-      const savedCampaignId=String(data?.campaign_id || data?.id || "").trim();
-      if(!savedCampaignId) throw new Error("CAMPAIGN_ID_NOT_RETURNED");
+      if(!nextCampaign?.advertiser_name) throw new Error("광고주를 입력하세요.");
+      if(!nextCampaign?.campaign_name) throw new Error("캠페인명을 입력하세요.");
 
-      // From this point the database may already reference the new asset.
-      // Never delete it in the catch path; preserve consistency and allow retry.
-      campaignPersisted=true;
-      await saveAdCampaignSetting(savedCampaignId);
-      await refreshAdCampaignRows();
-      await syncPublicAdCampaigns();
+      const campaigns=[...adCampaigns.filter(item=>String(item.id)!==campaignId),nextCampaign];
+      const settings={...adPlacementConfig()};
+      settings[campaignId]={
+        placement,
+        target_type:String($("#adTargetType")?.value || "all"),
+        target_region:String($("#adTargetRegion")?.value || "").trim(),
+        target_store_id:String($("#adTargetStore")?.value || "").trim(),
+        store_list_image_url:storeListImageUrl,
+        store_list_storage_path:storeListStoragePath,
+        primary_image_kind:usesStoreListFallback ? "store_list" : "home"
+      };
+
+      const previousCampaigns=adCampaigns;
+      const previousSettings=appConfig.ad_campaign_settings;
+      adCampaigns=campaigns;
+      appConfig.ad_campaign_settings=settings;
+      const publicRows=buildPublicAdCampaigns(campaigns);
+      try{
+        await secureAdminConfigUpsert([
+          {key:"ad_campaigns",value:campaigns},
+          {key:"ad_campaign_settings",value:settings},
+          {key:"ad_public_campaigns",value:publicRows}
+        ]);
+        appConfig.ad_campaigns=campaigns;
+        appConfig.ad_public_campaigns=publicRows;
+        configPersisted=true;
+      }catch(configError){
+        adCampaigns=previousCampaigns;
+        appConfig.ad_campaign_settings=previousSettings;
+        throw configError;
+      }
 
       if(newStoragePath && previous?.storage_path && previous.storage_path !== newStoragePath && previous.storage_path !== storeListStoragePath){
         const removed = await adminSb.storage.from("biteboss-assets").remove([previous.storage_path]);
@@ -3345,14 +3397,13 @@
       setStatusText(status, "캠페인이 저장되었습니다.");
       await loadAds();
     }catch(error){
-      if(!campaignPersisted && newStoragePath){
+      if(!configPersisted && newStoragePath){
         try{ await adminSb.storage.from("biteboss-assets").remove([newStoragePath]); }catch{}
       }
-      if(!campaignPersisted && newStoreListStoragePath){
+      if(!configPersisted && newStoreListStoragePath){
         try{ await adminSb.storage.from("biteboss-assets").remove([newStoreListStoragePath]); }catch{}
       }
-      const prefix=campaignPersisted ? "캠페인은 저장됐지만 광고 설정 동기화 실패" : "저장 실패";
-      setStatusText(status, `${prefix} · ${error?.message || "다시 시도하세요."}`);
+      setStatusText(status, `저장 실패 · ${error?.message || "다시 시도하세요."}`);
     }finally{
       if(submit) submit.disabled = false;
     }
@@ -3361,7 +3412,7 @@
   async function deleteAdCampaign(id){
     const item = adCampaigns.find(row => String(row.id) === String(id));
     if(!item) return;
-    if(!confirm(`${item.campaign_name} 캠페인을 삭제할까요?`)) return;
+    if(!confirm(`${item.campaign_name || "광고"} 캠페인을 삭제할까요?`)) return;
 
     const setting=campaignSetting(id);
     const extraCreatives=storedCampaignCreatives(id);
@@ -3373,33 +3424,38 @@
     const uniquePaths=[...new Set(paths)];
 
     try{
-      const { data, error } = await adminRpc("biteboss_admin_delete_campaign_v8239", { p_campaign_id:item.id });
-      if(error) throw error;
-      if(!data?.ok) throw new Error(data?.error || "CAMPAIGN_DELETE_FAILED");
-
-      adCampaigns=adCampaigns.filter(row=>String(row.id)!==String(id));
+      const campaigns=adCampaigns.filter(row=>String(row.id)!==String(id));
       const creatives={...adCreativeConfig()};
       delete creatives[String(id)];
       const settings={...adPlacementConfig()};
       delete settings[String(id)];
+      const previousCampaigns=adCampaigns;
       const previousCreatives=appConfig.ad_creatives;
       const previousSettings=appConfig.ad_campaign_settings;
+      adCampaigns=campaigns;
       appConfig.ad_creatives=creatives;
       appConfig.ad_campaign_settings=settings;
-      const publicRows=buildPublicAdCampaigns(adCampaigns);
+      const publicRows=buildPublicAdCampaigns(campaigns);
 
       try{
         await secureAdminConfigUpsert([
+          {key:"ad_campaigns",value:campaigns},
           {key:"ad_creatives",value:creatives},
           {key:"ad_campaign_settings",value:settings},
           {key:"ad_public_campaigns",value:publicRows}
         ]);
+        appConfig.ad_campaigns=campaigns;
         appConfig.ad_public_campaigns=publicRows;
       }catch(configError){
+        adCampaigns=previousCampaigns;
         appConfig.ad_creatives=previousCreatives;
         appConfig.ad_campaign_settings=previousSettings;
         throw configError;
       }
+
+      // Best-effort legacy cleanup only. Canonical deletion above is authoritative,
+      // so a stale legacy row can never block the UI or public ad feed again.
+      try{ await adminRpc("biteboss_admin_delete_campaign_v8239", {p_campaign_id:item.id}); }catch{}
 
       if(uniquePaths.length){
         const removed=await adminSb.storage.from("biteboss-assets").remove(uniquePaths);
