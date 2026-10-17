@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.97";
+  const BITEBOSS_BUILD = "81.98";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -272,6 +272,8 @@
   let rankViewItems = [];
   let profileActivityRows = [];
   let visitRows = [];
+  let profileActivityAllPage = 1;
+  const PROFILE_ACTIVITY_ALL_PAGE_SIZE = 10;
   let summary = null;
   let homeLoadPromise = null;
   let storeSearchTimer = null;
@@ -3986,11 +3988,22 @@ await handleClaimParam();
     });
   }
 
-  function openProfileActivityAll(){
+  function profileActivityAllPageCount(){
+    return Math.max(1,Math.ceil(profileActivityItems().length / PROFILE_ACTIVITY_ALL_PAGE_SIZE));
+  }
+
+  function renderProfileActivityAllPage(){
+    const body=$("#modalBody");
+    if(!body) return;
     const items=profileActivityItems();
-    openModal("전체 활동",`
+    const pageCount=profileActivityAllPageCount();
+    profileActivityAllPage=Math.min(Math.max(1,profileActivityAllPage),pageCount);
+    const start=(profileActivityAllPage-1)*PROFILE_ACTIVITY_ALL_PAGE_SIZE;
+    const pageItems=items.slice(start,start+PROFILE_ACTIVITY_ALL_PAGE_SIZE);
+
+    body.innerHTML=`
       <div class="profile-activity-all">
-        ${items.length ? items.map(item => {
+        ${pageItems.length ? pageItems.map(item => {
           const row=item.row || {};
           if(item.type === "visit"){
             const storeName=String(row.store_name || "매장").trim();
@@ -4008,10 +4021,36 @@ await handleClaimParam();
           </button>`;
         }).join("") : `<div class="profile-record-empty">아직 활동 기록이 없습니다.</div>`}
       </div>
-    `,{type:"detail-sheet"});
-    const body=$("#modalBody");
-    if(body) attachProfileRecentActivityHandlers(body);
+      ${items.length > PROFILE_ACTIVITY_ALL_PAGE_SIZE ? `
+        <nav class="list-pagination profile-activity-pagination" aria-label="전체 활동 페이지">
+          <button type="button" data-profile-activity-page="prev" ${profileActivityAllPage<=1 ? "disabled" : ""}>이전</button>
+          <span>${profileActivityAllPage} / ${pageCount}</span>
+          <button type="button" data-profile-activity-page="next" ${profileActivityAllPage>=pageCount ? "disabled" : ""}>다음</button>
+        </nav>
+      ` : ""}
+    `;
+
+    attachProfileRecentActivityHandlers(body);
+    body.querySelector('[data-profile-activity-page="prev"]')?.addEventListener("click",()=>{
+      if(profileActivityAllPage<=1) return;
+      profileActivityAllPage-=1;
+      renderProfileActivityAllPage();
+      body.scrollTo?.({top:0,behavior:"smooth"});
+    });
+    body.querySelector('[data-profile-activity-page="next"]')?.addEventListener("click",()=>{
+      if(profileActivityAllPage>=pageCount) return;
+      profileActivityAllPage+=1;
+      renderProfileActivityAllPage();
+      body.scrollTo?.({top:0,behavior:"smooth"});
+    });
   }
+
+  function openProfileActivityAll(){
+    profileActivityAllPage=1;
+    openModal("전체 활동",`<div class="profile-record-empty">활동 기록을 불러오는 중입니다.</div>`,{type:"detail-sheet"});
+    renderProfileActivityAllPage();
+  }
+
 
   async function loadGameActivity(){
     const homeBox = $("#homeActivity");
