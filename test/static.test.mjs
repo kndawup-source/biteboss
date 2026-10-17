@@ -358,7 +358,7 @@ test('82.20 dashboard performance and partner request controls use direct button
 });
 
 
-test('82.21 home hook copy paints before network config resolves', () => {
+test('82.22 home hook copy paints before network config resolves', () => {
   const initBlock = blockBetween(app, 'async function init()', 'function readPartnerBannerPhotoCache');
   assert.match(app, /HOME_COPY_CACHE_KEY = "biteboss:home-copy-v1"/);
   assert.match(app, /function restoreCachedHomeCopy\(\)/);
@@ -371,4 +371,15 @@ test('82.21 home hook copy paints before network config resolves', () => {
   assert.ok(sessionIndex > renderIndex && configIndex > sessionIndex, 'home copy renders before auth/config network waits');
   const configBlock = blockBetween(app, 'async function loadConfig()', 'function renderHomeCopy');
   assert.match(configBlock, /cacheHomeCopy\(\)/);
+});
+
+
+test('store info renders every supported social account as an information row', () => {
+  assert.match(app, /\["웹사이트",store\.website_url\]/);
+  assert.match(app, /\["Instagram",store\.instagram_url\]/);
+  assert.match(app, /\["YouTube",store\.youtube_url\]/);
+  assert.match(app, /\["TikTok",store\.tiktok_url\]/);
+  assert.match(app, /\["네이버 블로그",store\.naver_blog_url\]/);
+  assert.match(app, /class="store-detail-link-row"/);
+  assert.doesNotMatch(css, /\.store-social-links/);
 });

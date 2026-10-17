@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.21";
+  const BITEBOSS_BUILD = "82.22";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -3076,13 +3076,41 @@ await handleClaimParam();
       try{ const url=new URL(raw); return ["http:","https:"].includes(url.protocol) ? url.href : ""; }
       catch{return "";}
     };
+    const socialChannelDisplay = (label, value) => {
+      const url=safeExternalUrl(value);
+      if(!url) return "";
+      try{
+        const parsed=new URL(url);
+        const path=decodeURIComponent(parsed.pathname || "").replace(/^\/+|\/+$/g, "");
+        if(label === "Instagram" || label === "TikTok"){
+          const account=(path.split("/")[0] || "").replace(/^@/, "");
+          return account ? `@${account}` : parsed.hostname.replace(/^www\./, "");
+        }
+        if(label === "YouTube"){
+          const first=path.split("/")[0] || "";
+          if(first.startsWith("@")) return first;
+          return path ? "채널 보기" : parsed.hostname.replace(/^www\./, "");
+        }
+        if(label === "네이버 블로그"){
+          const account=path.split("/")[0] || "";
+          return account || "블로그 보기";
+        }
+        return parsed.hostname.replace(/^www\./, "");
+      }catch{return "바로가기";}
+    };
     const socialChannels = [
       ["웹사이트",store.website_url],["Instagram",store.instagram_url],["YouTube",store.youtube_url],
       ["TikTok",store.tiktok_url],["네이버 블로그",store.naver_blog_url]
-    ].map(([label,url])=>[label,safeExternalUrl(url)]).filter(([,url])=>url);
-    const socialHtml=socialChannels.length
-      ? `<div class="store-social-links">${socialChannels.map(([label,url])=>`<a href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`).join("")}</div>`
-      : "";
+    ].map(([label,value])=>{
+      const url=safeExternalUrl(value);
+      return url ? {label,url,display:socialChannelDisplay(label,url)} : null;
+    }).filter(Boolean);
+    const socialHtml=socialChannels.map(({label,url,display})=>`
+      <div class="store-detail-link-row">
+        <span>${escapeHtml(label)}</span>
+        <a href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(display)}</a>
+      </div>
+    `).join("");
 
     const businessInfo = storeBusinessInfo(store.hours);
     const storeInfoHtml = (store.hours || store.phone || socialChannels.length || (!managerManagedStore && store.notice)) ? `
