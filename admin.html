@@ -126,28 +126,56 @@
 </section>
 <section class="admin-section-card admin-dashboard-section admin-access-section" aria-labelledby="accessOverviewTitle">
 <div class="admin-section-title admin-section-title-row">
-<div><h3 id="accessOverviewTitle">접속 현황</h3><p>현재 접속과 선택한 기간의 활성 사용자를 회원·매장주·등급별로 확인합니다.</p></div>
-<span class="admin-data-note">앱 세션 기준 · 현재 접속 5분</span>
+<div><h3 id="accessOverviewTitle">접속 현황</h3><p>게스트를 포함한 전체 방문과 회원 접속을 국가·지역·기기·등급별로 확인합니다.</p></div>
+<span class="admin-data-note">익명 세션 기준 · 현재 접속 5분</span>
 </div>
 <div class="admin-access-kpis" aria-label="접속 핵심 지표">
 <article><span>현재 접속</span><strong id="accessOnlineNow">0</strong><small>최근 5분</small></article>
-<article><span>기간 활성</span><strong id="accessPeriodActive">0</strong><small id="accessPeriodLabel">최근 7일</small></article>
+<article><span>전체 방문자</span><strong id="accessPeriodActive">0</strong><small id="accessPeriodLabel">최근 7일</small></article>
+<article><span>신규</span><strong id="accessNewVisitors">0</strong><small>기간 첫 방문</small></article>
+<article><span>재방문</span><strong id="accessReturningVisitors">0</strong><small>이전 방문 이력 있음</small></article>
 <article><span>회원</span><strong id="accessMembers">0</strong><small>기간 내 고유 사용자</small></article>
 <article><span>게스트</span><strong id="accessGuests">0</strong><small>기간 내 고유 사용자</small></article>
-<article><span>매장주</span><strong id="accessStoreOwners">0</strong><small>관리 권한 감지 세션</small></article>
 </div>
-<div class="admin-access-grid">
+<div class="admin-access-group-head"><h3>회원 접속</h3><span>매장주 · PARTNER · PLUS · PRO 포함</span></div>
+<div class="admin-access-grid admin-access-grid-2">
 <article class="admin-access-panel">
 <div class="section-head"><h3>등급별 접속</h3><span>현재 / 기간 활성</span></div>
 <div class="admin-access-breakdown" id="accessTierBreakdown"><div class="analytics-loading">불러오는 중…</div></div>
 </article>
 <article class="admin-access-panel">
-<div class="section-head"><h3>접속 환경</h3><span>기기·플랫폼</span></div>
+<div class="section-head"><h3>플랫폼</h3><span>Web · PWA · 앱</span></div>
 <div class="admin-access-breakdown" id="accessSurfaceBreakdown"><div class="analytics-loading">불러오는 중…</div></div>
 </article>
 </div>
+<div class="admin-access-group-head"><h3>지역별 방문</h3><span>IP 원문 없이 국가·광역지역 코드만 집계</span></div>
+<div class="admin-access-grid admin-access-grid-2">
+<article class="admin-access-panel">
+<div class="section-head"><h3>국가별</h3><span>기간 방문자</span></div>
+<div class="admin-access-bars" id="accessCountryBreakdown"><div class="analytics-loading">불러오는 중…</div></div>
+</article>
+<article class="admin-access-panel">
+<div class="section-head"><h3>지역별</h3><span>상위 광역지역</span></div>
+<div class="admin-access-bars" id="accessRegionBreakdown"><div class="analytics-loading">불러오는 중…</div></div>
+</article>
+</div>
+<div class="admin-access-group-head"><h3>기기별 방문</h3><span>기기 유형 · OS · 브라우저</span></div>
+<div class="admin-access-grid admin-access-grid-3">
+<article class="admin-access-panel">
+<div class="section-head"><h3>기기</h3><span>Mobile · Tablet · Desktop</span></div>
+<div class="admin-access-bars" id="accessDeviceBreakdown"><div class="analytics-loading">불러오는 중…</div></div>
+</article>
+<article class="admin-access-panel">
+<div class="section-head"><h3>운영체제</h3><span>OS</span></div>
+<div class="admin-access-bars" id="accessOsBreakdown"><div class="analytics-loading">불러오는 중…</div></div>
+</article>
+<article class="admin-access-panel">
+<div class="section-head"><h3>브라우저</h3><span>Browser</span></div>
+<div class="admin-access-bars" id="accessBrowserBreakdown"><div class="analytics-loading">불러오는 중…</div></div>
+</article>
+</div>
 <div class="admin-access-recent-head">
-<div><h3>최근 접속</h3><p>개인정보를 최소화해 닉네임·등급·화면·마지막 활동만 표시합니다.</p></div>
+<div><h3>최근 접속</h3><p>닉네임·등급·국가/지역·기기·화면·마지막 활동만 표시합니다. IP와 GPS는 저장하지 않습니다.</p></div>
 <button class="secondary-btn admin-small-btn" id="refreshAccessAnalytics" type="button">새로고침</button>
 </div>
 <div class="admin-access-recent" id="accessRecentList"><div class="analytics-loading">불러오는 중…</div></div>

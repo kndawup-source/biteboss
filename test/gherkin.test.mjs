@@ -6,7 +6,7 @@ const feature=read('features/core.feature');
 const app=read('app.js');
 
 test('Gherkin release feature contains all critical acceptance scenarios',()=>{
-  for(const name of ['Guest browses nearby stores','Member challenges a store','Crew invitation by QR','Native build uses the canonical web bundle','Admin pages are excluded from search indexing','Live takeover countdown holds outside the store','Retake and hot stores surface the next action','Store conquest history is visible','Seasonal territory ranking preserves lifetime records','Admin reviews live access by account and store plan']){
+  for(const name of ['Guest browses nearby stores','Member challenges a store','Crew invitation by QR','Native build uses the canonical web bundle','Admin pages are excluded from search indexing','Live takeover countdown holds outside the store','Retake and hot stores surface the next action','Store conquest history is visible','Seasonal territory ranking preserves lifetime records','Admin reviews privacy-minimized total traffic and member access']){
     assert.match(feature,new RegExp(`Scenario: ${name.replace(/[.*+?^${}()|[\\]\\]/g,'\\$&')}`));
   }
 });

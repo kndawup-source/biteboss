@@ -315,21 +315,29 @@ test('82.18 routes legacy admin RPCs through a full-admin server proxy', () => {
   assert.match(sql, /has_function_privilege\('authenticated'/);
 });
 
-test('82.19 tracks privacy-minimized access presence and renders role/plan access analytics', () => {
-  const sql = read('sql/biteboss-82.19-access-analytics.sql');
+test('82.24 tracks privacy-minimized total traffic and member access analytics', () => {
+  const baseSql = read('sql/biteboss-82.19-access-analytics.sql');
+  const sql = read('sql/biteboss-82.24-traffic-analytics.sql');
   const adminHtml = read('admin.html');
-  assert.match(app, /biteboss_access_ping_v8219/);
-  assert.match(app, /function accessTelemetryOwnerContext\(\)/);
-  assert.match(app, /tier:\"plus\"/);
-  assert.match(app, /tier:\"pro\"/);
-  assert.match(sql, /create table if not exists public\.biteboss_access_sessions/);
-  assert.match(sql, /biteboss_admin_access_analytics_v8219/);
-  assert.match(sql, /revoke all on table public\.biteboss_access_sessions from public, anon, authenticated/);
-  assert.match(sql, /stores no GPS, IP address, email, PIN/);
-  assert.match(adminHtml, /id="accessOnlineNow"/);
-  assert.match(adminHtml, /id="accessTierBreakdown"/);
+  const geoApi = read('api/access-context.js');
+  assert.match(app, /biteboss_access_ping_v8224/);
+  assert.match(app, /function accessTelemetryVisitorKey\(\)/);
+  assert.match(app, /function accessTelemetryDevice\(\)/);
+  assert.match(app, /function accessTelemetryGeo\(\)/);
+  assert.match(app, /tier:"plus"/);
+  assert.match(app, /tier:"pro"/);
+  assert.match(baseSql, /create table if not exists public\.biteboss_access_sessions/);
+  assert.match(sql, /biteboss_admin_access_analytics_v8224/);
+  assert.match(sql, /add column if not exists country_code/);
+  assert.match(sql, /add column if not exists device_class/);
+  assert.match(sql, /never stores IP addresses, GPS coordinates/);
+  assert.match(geoApi, /x-vercel-ip-country/);
+  assert.doesNotMatch(geoApi, /x-forwarded-for|req\.socket|remoteAddress/i);
+  assert.match(adminHtml, /id="accessNewVisitors"/);
+  assert.match(adminHtml, /id="accessCountryBreakdown"/);
+  assert.match(adminHtml, /id="accessDeviceBreakdown"/);
   assert.match(adminHtml, /id="accessRecentList"/);
-  assert.match(admin, /biteboss_admin_access_analytics_v8219/);
+  assert.match(admin, /biteboss_admin_access_analytics_v8224/);
   assert.match(admin, /PARTNER/);
   assert.match(admin, /PLUS/);
   assert.match(admin, /PRO/);
@@ -358,7 +366,7 @@ test('82.20 dashboard performance and partner request controls use direct button
 });
 
 
-test('82.23 home hook copy paints before network config resolves', () => {
+test('82.24 home hook copy paints before network config resolves', () => {
   const initBlock = blockBetween(app, 'async function init()', 'function readPartnerBannerPhotoCache');
   assert.match(app, /HOME_COPY_CACHE_KEY = "biteboss:home-copy-v1"/);
   assert.match(app, /function restoreCachedHomeCopy\(\)/);

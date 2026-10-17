@@ -62,9 +62,10 @@ Feature: BiteBoss release-critical flows
     And the challenge page shows the remaining wait time
     And the member can still visit their own occupied store
 
-  Scenario: Admin reviews live access by account and store plan
-    Given BiteBoss clients report privacy-minimized access presence
+  Scenario: Admin reviews privacy-minimized total traffic and member access
+    Given BiteBoss guest and member clients report privacy-minimized access presence
     When a full admin opens the service status dashboard
-    Then current and period active users are shown separately
-    And member, guest, store owner, PARTNER, PLUS, and PRO access can be compared
+    Then current, new, returning, member, and guest visitors are shown separately
+    And store owner, PARTNER, PLUS, and PRO access can be compared
+    And country, broad region, device, operating system, and browser distributions are visible
     And recent access does not expose GPS coordinates, PINs, or IP addresses

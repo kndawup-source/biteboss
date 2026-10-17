@@ -6,10 +6,10 @@ window.BITEBOSS_CONFIG = Object.freeze({
   supportUrl: "./support.html",
   // Public HTTPS URL used for Crew invite links in native builds.
   // Example: "https://biteboss.example.com/"
-  publicAppUrl: "",
+  publicAppUrl: "https://biteboss.dasaft.com/",
   // Optional HTTPS origin for /api/* calls in the native build.
   // If empty, native-only auto-import is skipped safely.
-  apiBaseUrl: "",
+  apiBaseUrl: "https://biteboss.dasaft.com/",
   // Xcode Debug = "sandbox", TestFlight/App Store = "production".
   pushEnvironment: "production",
   appStoreBuild: true,

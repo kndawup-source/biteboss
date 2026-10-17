@@ -596,23 +596,22 @@
 
 
   async function loadAccessAnalytics(period = resolveAnalyticsPeriod()){
-    const tierBox=$("#accessTierBreakdown");
-    const surfaceBox=$("#accessSurfaceBreakdown");
-    const recentBox=$("#accessRecentList");
-    if(!tierBox || !surfaceBox || !recentBox) return;
-    tierBox.innerHTML='<div class="analytics-loading">불러오는 중…</div>';
-    surfaceBox.innerHTML='<div class="analytics-loading">불러오는 중…</div>';
-    recentBox.innerHTML='<div class="analytics-loading">불러오는 중…</div>';
+    const loadingTargets=[
+      "#accessTierBreakdown","#accessSurfaceBreakdown","#accessCountryBreakdown","#accessRegionBreakdown",
+      "#accessDeviceBreakdown","#accessOsBreakdown","#accessBrowserBreakdown","#accessRecentList"
+    ];
+    if(!$("#accessTierBreakdown") || !$("#accessRecentList")) return;
+    loadingTargets.forEach(selector=>{ const node=$(selector); if(node) node.innerHTML='<div class="analytics-loading">불러오는 중…</div>'; });
     setText("#accessPeriodLabel",period.label || "선택 기간");
 
-    const {data,error}=await adminRpc("biteboss_admin_access_analytics_v8219",{
+    const {data,error}=await adminRpc("biteboss_admin_access_analytics_v8224",{
       p_from:period.from.toISOString(),
       p_to:period.to.toISOString()
     });
     if(error){
       console.warn("BiteBoss access analytics:",error);
-      const empty='<div class="analytics-empty">접속 데이터를 불러오지 못했습니다. 접속 분석 SQL 배포 상태를 확인하세요.</div>';
-      tierBox.innerHTML=empty; surfaceBox.innerHTML=empty; recentBox.innerHTML=empty;
+      const empty='<div class="analytics-empty">접속 데이터를 불러오지 못했습니다. 82.24 접속 분석 SQL 배포 상태를 확인하세요.</div>';
+      loadingTargets.forEach(selector=>{ const node=$(selector); if(node) node.innerHTML=empty; });
       return;
     }
     renderAccessAnalytics(data || {});
@@ -620,13 +619,19 @@
 
   function renderAccessAnalytics(data){
     const now=data.now || {}, period=data.period || {};
-    setText("#accessOnlineNow",Number(now.online_users||0).toLocaleString("ko-KR"));
-    setText("#accessPeriodActive",Number(period.active_users||0).toLocaleString("ko-KR"));
+    setText("#accessOnlineNow",Number(now.online_visitors||0).toLocaleString("ko-KR"));
+    setText("#accessPeriodActive",Number(period.active_visitors||0).toLocaleString("ko-KR"));
+    setText("#accessNewVisitors",Number(period.new_visitors||0).toLocaleString("ko-KR"));
+    setText("#accessReturningVisitors",Number(period.returning_visitors||0).toLocaleString("ko-KR"));
     setText("#accessMembers",Number(period.member_users||0).toLocaleString("ko-KR"));
     setText("#accessGuests",Number(period.guest_users||0).toLocaleString("ko-KR"));
-    setText("#accessStoreOwners",Number(period.store_owner_users||0).toLocaleString("ko-KR"));
     renderAccessBreakdown("#accessTierBreakdown",Array.isArray(data.tiers)?data.tiers:[],"tier");
     renderAccessBreakdown("#accessSurfaceBreakdown",Array.isArray(data.surfaces)?data.surfaces:[],"surface");
+    renderAccessBars("#accessCountryBreakdown",Array.isArray(data.countries)?data.countries:[],row=>accessCountryLabel(row.country_code));
+    renderAccessBars("#accessRegionBreakdown",Array.isArray(data.regions)?data.regions:[],row=>accessRegionLabel(row.country_code,row.region_code));
+    renderAccessBars("#accessDeviceBreakdown",Array.isArray(data.devices)?data.devices:[],row=>accessDeviceLabel(row.device_class));
+    renderAccessBars("#accessOsBreakdown",Array.isArray(data.os)?data.os:[],row=>accessOsLabel(row.os_family));
+    renderAccessBars("#accessBrowserBreakdown",Array.isArray(data.browsers)?data.browsers:[],row=>accessBrowserLabel(row.browser_family));
     renderRecentAccess(Array.isArray(data.recent)?data.recent:[]);
   }
 
@@ -635,7 +640,37 @@
   }
 
   function accessSurfaceLabel(value){
-    return ({web:"Web",pwa:"PWA",ios:"iOS",android:"Android"})[String(value||"")] || String(value||"기타").toUpperCase();
+    return ({web:"Web",pwa:"PWA",ios:"iOS 앱",android:"Android 앱"})[String(value||"")] || String(value||"기타").toUpperCase();
+  }
+
+  function accessDeviceLabel(value){
+    return ({mobile:"모바일",tablet:"태블릿",desktop:"데스크톱",other:"기타"})[String(value||"")] || "기타";
+  }
+
+  function accessOsLabel(value){
+    return ({ios:"iOS / iPadOS",android:"Android",windows:"Windows",macos:"macOS",linux:"Linux",chromeos:"ChromeOS",other:"기타"})[String(value||"")] || "기타";
+  }
+
+  function accessBrowserLabel(value){
+    return ({safari:"Safari",chrome:"Chrome",firefox:"Firefox",edge:"Edge",samsung:"Samsung Internet",other:"기타"})[String(value||"")] || "기타";
+  }
+
+  function accessCountryLabel(code){
+    const value=String(code||"").toUpperCase();
+    if(!value || value==="ZZ") return "알 수 없음";
+    try{
+      const names=new Intl.DisplayNames(["ko"],{type:"region"});
+      return names.of(value) || value;
+    }catch{return value;}
+  }
+
+  function accessRegionLabel(country,region){
+    const countryCode=String(country||"").toUpperCase();
+    const regionCode=String(region||"").toUpperCase();
+    if(!regionCode || regionCode==="UNKNOWN") return `${accessCountryLabel(countryCode)} · 지역 미확인`;
+    const kr={"11":"서울","26":"부산","27":"대구","28":"인천","29":"광주","30":"대전","31":"울산","36":"세종","41":"경기","42":"강원","43":"충북","44":"충남","45":"전북","46":"전남","47":"경북","48":"경남","50":"제주"};
+    if(countryCode==="KR" && kr[regionCode]) return kr[regionCode];
+    return `${accessCountryLabel(countryCode)} · ${regionCode}`;
   }
 
   function renderAccessBreakdown(selector,rows,type){
@@ -661,17 +696,36 @@
     </div>`).join("") || '<div class="analytics-empty">접속 기록이 없습니다.</div>';
   }
 
+  function renderAccessBars(selector,rows,labeler){
+    const box=$(selector); if(!box) return;
+    const normalized=rows.map(row=>({row,value:Number(row.active_users||0),online:Number(row.online_users||0)})).sort((a,b)=>b.value-a.value);
+    const max=Math.max(1,...normalized.map(item=>item.value));
+    box.innerHTML=normalized.slice(0,12).map(item=>{
+      const label=String(labeler(item.row)||"기타");
+      const width=Math.max(item.value?5:0,Math.round(item.value/max*100));
+      return `<div class="admin-access-bar-row">
+        <div class="admin-access-bar-copy"><span>${escapeHtml(label)}</span><div><strong>${item.value.toLocaleString("ko-KR")}</strong><small>${item.online ? `현재 ${item.online.toLocaleString("ko-KR")}` : "기간"}</small></div></div>
+        <div class="admin-access-bar-track" aria-hidden="true"><i style="width:${width}%"></i></div>
+      </div>`;
+    }).join("") || '<div class="analytics-empty">접속 기록이 없습니다.</div>';
+  }
+
   function renderRecentAccess(rows){
     const box=$("#accessRecentList"); if(!box) return;
-    box.innerHTML=rows.slice(0,30).map(row=>{
+    box.innerHTML=rows.slice(0,40).map(row=>{
       const tier=accessTierLabel(row.access_tier || (row.account_kind==="guest"?"guest":"member"));
       const surface=accessSurfaceLabel(row.surface);
       const nickname=String(row.nickname || (row.account_kind==="guest"?"게스트":"회원"));
       const page=String(row.current_path || "home").replace(/^page-/,"");
       const online=Boolean(row.is_online);
+      const country=accessCountryLabel(row.country_code);
+      const region=String(row.region_code||"") ? accessRegionLabel(row.country_code,row.region_code) : country;
+      const device=accessDeviceLabel(row.device_class);
+      const os=accessOsLabel(row.os_family);
+      const browser=accessBrowserLabel(row.browser_family);
       return `<article class="admin-access-recent-row">
         <div class="admin-access-user"><span class="admin-presence-dot ${online?"is-online":""}" aria-hidden="true"></span><div><strong>${escapeHtml(nickname)}</strong><small>${escapeHtml(tier)}${row.is_store_owner?" · 매장주":""}</small></div></div>
-        <div class="admin-access-context"><span>${escapeHtml(surface)}</span><span>${escapeHtml(page)}</span></div>
+        <div class="admin-access-context"><span>${escapeHtml(region)}</span><span>${escapeHtml(device)}</span><span>${escapeHtml(os)}</span><span>${escapeHtml(browser)}</span><span>${escapeHtml(surface)}</span><span>${escapeHtml(page)}</span></div>
         <time datetime="${escapeAttr(row.last_seen_at||"")}">${escapeHtml(formatDate(row.last_seen_at))}</time>
       </article>`;
     }).join("") || '<div class="analytics-empty">최근 접속 기록이 없습니다.</div>';

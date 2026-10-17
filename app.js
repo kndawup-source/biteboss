@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.23";
+  const BITEBOSS_BUILD = "82.24";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -288,6 +288,7 @@
   let accessTelemetryTimer = null;
   let accessTelemetryBusy = false;
   let accessTelemetryUnavailable = false;
+  let accessTelemetryGeoPromise = null;
   let delayedTakeoverCloseTimer = null;
   let takeoverCancelResetTimer = null;
   const autoImportAttempts = new Map();
@@ -378,6 +379,69 @@
     }
   }
 
+  function accessTelemetryVisitorKey(){
+    const storageKey="biteboss-access-visitor-v1";
+    try{
+      let value=localStorage.getItem(storageKey);
+      if(!value){
+        value=globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        localStorage.setItem(storageKey,value);
+      }
+      return String(value).slice(0,80);
+    }catch{
+      return accessTelemetrySessionKey();
+    }
+  }
+
+  function accessTelemetryDevice(){
+    const ua=String(navigator.userAgent || "");
+    const platform=String(navigator.userAgentData?.platform || navigator.platform || "").toLowerCase();
+    const mobileHint=navigator.userAgentData?.mobile === true;
+    const isIpad=/iPad/i.test(ua) || (platform.includes("mac") && navigator.maxTouchPoints>1);
+    const isMobile=mobileHint || /iPhone|iPod|Android.+Mobile|Mobile Safari/i.test(ua);
+    const isTablet=isIpad || /Tablet|Android(?!.*Mobile)/i.test(ua);
+    const deviceClass=isTablet ? "tablet" : isMobile ? "mobile" : "desktop";
+    let os="other";
+    if(/iPhone|iPad|iPod/i.test(ua) || isIpad) os="ios";
+    else if(/Android/i.test(ua)) os="android";
+    else if(/Windows/i.test(ua)) os="windows";
+    else if(/CrOS/i.test(ua)) os="chromeos";
+    else if(/Macintosh|Mac OS X/i.test(ua)) os="macos";
+    else if(/Linux/i.test(ua)) os="linux";
+    let browser="other";
+    if(/SamsungBrowser/i.test(ua)) browser="samsung";
+    else if(/Edg\//i.test(ua)) browser="edge";
+    else if(/Firefox|FxiOS/i.test(ua)) browser="firefox";
+    else if(/CriOS|Chrome\//i.test(ua)) browser="chrome";
+    else if(/Safari\//i.test(ua)) browser="safari";
+    return {deviceClass,os,browser};
+  }
+
+  async function accessTelemetryGeo(){
+    if(accessTelemetryGeoPromise) return accessTelemetryGeoPromise;
+    accessTelemetryGeoPromise=(async()=>{
+      try{
+        const configuredApiBase=String(cfg.apiBaseUrl || cfg.publicAppUrl || "").trim();
+        let endpoint="/api/access-context";
+        if(configuredApiBase){
+          endpoint=new URL("/api/access-context",configuredApiBase).toString();
+        }else if(location.protocol !== "https:" && location.protocol !== "http:"){
+          return {countryCode:"",regionCode:""};
+        }
+        const response=await fetch(endpoint,{cache:"no-store",credentials:"same-origin"});
+        if(!response.ok) return {countryCode:"",regionCode:""};
+        const data=await response.json();
+        return {
+          countryCode:String(data?.country_code || "").toUpperCase().slice(0,2),
+          regionCode:String(data?.region_code || "").toUpperCase().slice(0,32)
+        };
+      }catch{
+        return {countryCode:"",regionCode:""};
+      }
+    })();
+    return accessTelemetryGeoPromise;
+  }
+
   function accessTelemetrySurface(){
     try{
       const platform=String(window.Capacitor?.getPlatform?.() || "web").toLowerCase();
@@ -421,19 +485,27 @@
     try{
       const owner=accessTelemetryOwnerContext();
       const nickname=String(profile?.nickname || playerSession?.nickname || authUser?.user_metadata?.nickname || (playerSession?.authenticated?"회원":"게스트")).trim().slice(0,40);
-      const {error}=await sb.rpc("biteboss_access_ping_v8219",{
+      const device=accessTelemetryDevice();
+      const geo=await accessTelemetryGeo();
+      const {error}=await sb.rpc("biteboss_access_ping_v8224",{
         p_session_key:accessTelemetrySessionKey(),
+        p_visitor_key:accessTelemetryVisitorKey(),
         p_player_user_id:playerSession?.authenticated ? (playerSession?.player_user_id || null) : null,
         p_nickname:nickname,
         p_account_kind:playerSession?.authenticated ? "member" : "guest",
         p_access_tier:owner.tier,
         p_is_store_owner:owner.isStoreOwner,
         p_surface:accessTelemetrySurface(),
-        p_current_path:accessTelemetryPath()
+        p_current_path:accessTelemetryPath(),
+        p_country_code:geo.countryCode,
+        p_region_code:geo.regionCode,
+        p_device_class:device.deviceClass,
+        p_os_family:device.os,
+        p_browser_family:device.browser
       });
       if(error){
         const message=String(error?.message || error || "");
-        if(/function .*biteboss_access_ping_v8219|PGRST202|42883/i.test(message)) accessTelemetryUnavailable=true;
+        if(/function .*biteboss_access_ping_v8224|PGRST202|42883/i.test(message)) accessTelemetryUnavailable=true;
         console.warn("BiteBoss access telemetry:",error);
       }
     }catch(error){

@@ -526,13 +526,18 @@ body.admin-app{min-height:100dvh;background:#f1f1f3;color:#111}
 
 /* access presence */
 .admin-app .admin-data-note{flex:0 0 auto;color:#9b9ba1;font-size:8px;line-height:1.4}
-.admin-app .admin-access-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.admin-app .admin-access-kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-bottom:12px}
 .admin-app .admin-access-kpis article{min-width:0;padding:15px;border-radius:14px;background:#f7f7f8}
 .admin-app .admin-access-kpis span,.admin-app .admin-access-kpis small{display:block;color:#99999f;font-size:8px;line-height:1.35}
 .admin-app .admin-access-kpis strong{display:block;margin:8px 0 6px;color:#111;font-size:24px;line-height:1;font-weight:950;font-variant-numeric:tabular-nums}
-.admin-app .admin-access-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.admin-app .admin-access-grid{display:grid;gap:10px}
+.admin-app .admin-access-grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.admin-app .admin-access-grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
 .admin-app .admin-access-panel{min-width:0;padding:18px;border-radius:15px;background:#f7f7f8}
 .admin-app .admin-access-panel .section-head{margin-bottom:10px}
+.admin-app .admin-access-group-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin:24px 0 9px;padding-top:20px;border-top:1px solid #ededee}
+.admin-app .admin-access-group-head h3{margin:0;color:#111;font-size:12px;font-weight:900;letter-spacing:-.02em}
+.admin-app .admin-access-group-head span{color:#99999f;font-size:8px;line-height:1.35;text-align:right}
 .admin-app .admin-access-breakdown{display:grid}
 .admin-app .admin-access-breakdown-row{display:grid;grid-template-columns:minmax(0,1fr) 62px 62px;align-items:center;gap:8px;min-height:43px;border-top:1px solid #e7e7e9}
 .admin-app .admin-access-breakdown-row:first-child{border-top:0}
@@ -553,9 +558,19 @@ body.admin-app{min-height:100dvh;background:#f1f1f3;color:#111}
 .admin-app .admin-access-user strong,.admin-app .admin-access-user small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .admin-app .admin-access-user strong{font-size:10px;font-weight:900}
 .admin-app .admin-access-user small{margin-top:3px;color:#939399;font-size:8px}
-.admin-app .admin-access-context{display:flex;gap:6px;justify-content:flex-start;min-width:0}
+.admin-app .admin-access-context{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-start;min-width:0}
 .admin-app .admin-access-context span{padding:4px 7px;border-radius:7px;background:#f3f3f4;color:#77777e;font-size:8px;white-space:nowrap}
 .admin-app .admin-access-recent-row time{color:#99999f;font-size:8px;text-align:right;white-space:nowrap}
+
+.admin-app .admin-access-bars{display:grid;gap:10px}
+.admin-app .admin-access-bar-row{display:grid;gap:6px}
+.admin-app .admin-access-bar-copy{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.admin-app .admin-access-bar-copy>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#333339;font-size:9px;font-weight:850}
+.admin-app .admin-access-bar-copy>div{display:flex;align-items:baseline;gap:5px;white-space:nowrap}
+.admin-app .admin-access-bar-copy strong{color:#111;font-size:11px;font-weight:950;font-variant-numeric:tabular-nums}
+.admin-app .admin-access-bar-copy small{color:#9a9aa0;font-size:7px}
+.admin-app .admin-access-bar-track{height:4px;overflow:hidden;border-radius:999px;background:#e7e7e9}
+.admin-app .admin-access-bar-track i{display:block;height:100%;border-radius:inherit;background:#111}
 
 /* recent activity — matches the actual <time><strong><span> DOM */
 .admin-app .ops-recent{padding:20px;border:0;border-radius:18px;background:#fff;box-shadow:none}
@@ -658,7 +673,8 @@ body.admin-app{min-height:100dvh;background:#f1f1f3;color:#111}
   .admin-app .admin-main{width:100%;max-width:1240px;padding:40px 40px 72px}
 }
 @media(max-width:900px){
-  .admin-app .admin-access-grid{grid-template-columns:1fr}
+  .admin-app .admin-access-grid-3{grid-template-columns:1fr}
+  .admin-app .admin-access-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
   .admin-app .analytics-grid{grid-template-columns:1fr}
   .admin-app .analytics-panel-wide{grid-row:auto}
   .admin-app .admin-store-toolbar{grid-template-columns:1fr}
@@ -678,7 +694,9 @@ body.admin-app{min-height:100dvh;background:#f1f1f3;color:#111}
   .admin-app .admin-section-card{padding:16px}
   .admin-app .ops-summary{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
   .admin-app .analytics-kpis,.admin-app .admin-ad-kpis,.admin-app .admin-access-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .admin-app .admin-access-kpis article:last-child{grid-column:1/-1}
+  .admin-app .admin-access-grid-2{grid-template-columns:1fr}
+  .admin-app .admin-access-group-head{align-items:flex-start;flex-direction:column;gap:5px}
+  .admin-app .admin-access-group-head span{text-align:left}
   .admin-app .admin-access-recent-row{grid-template-columns:minmax(0,1fr) auto;gap:8px}
   .admin-app .admin-access-recent-row time{grid-column:1/-1;text-align:left;padding-left:16px}
   .admin-app .admin-ad-row{grid-template-columns:72px minmax(0,1fr);gap:12px;padding:14px!important}
