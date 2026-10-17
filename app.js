@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.01";
+  const BITEBOSS_BUILD = "82.02";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -4268,6 +4268,10 @@ await handleClaimParam();
         return;
       }
       paintMemberSummary(data || {}, { cache:true });
+      if($("#page-stores")?.classList.contains("active")){
+        gamePulseLoadedAt=0;
+        void loadGamePulse(true);
+      }
     })().finally(() => {
       homeLoadPromise = null;
     });
@@ -4869,6 +4873,18 @@ await handleClaimParam();
     return request;
   }
 
+  function shouldShowFirstCaptureGuide(pulseData){
+    // Guests always need the first-capture guide. For members, use the
+    // canonical lifetime claim count when available; the pulse flag remains
+    // a compatibility fallback while summary data is still loading.
+    if(!playerSession?.authenticated) return true;
+
+    const claimCount=Number(summary?.claim_count);
+    if(Number.isFinite(claimCount)) return claimCount < 1;
+
+    return pulseData?.new_player_protected === true;
+  }
+
   function bindGamePulseStoreLinks(box){
     $$("[data-pulse-store]",box).forEach(btn => btn.addEventListener("click",()=>{
       const rawStoreId=String(btn.dataset.pulseStore||"").trim();
@@ -4907,9 +4923,14 @@ await handleClaimParam();
     // Paint the campaign from config immediately. No network request is required
     // before the user can see the store banner.
     const partnerBanner=currentPartnerBanner();
-    const immediateMarkup=partnerBannerMarkup(partnerBanner);
-    if(immediateMarkup){
-      box.innerHTML=immediateMarkup;
+    const immediateItems=[];
+    if(shouldShowFirstCaptureGuide(null)){
+      immediateItems.push(`<div class="game-pulse-item is-guide" role="note"><span class="guide-bulb" aria-hidden="true">💡</span><strong>첫 점령 가이드</strong><small>가까운 미점령 매장부터 시작해 보세요.</small></div>`);
+    }
+    const immediateBannerMarkup=partnerBannerMarkup(partnerBanner);
+    if(immediateBannerMarkup) immediateItems.push(immediateBannerMarkup);
+    if(immediateItems.length){
+      box.innerHTML=immediateItems.join("");
       box.classList.remove("hidden");
       bindGamePulseStoreLinks(box);
     }
@@ -4937,10 +4958,10 @@ await handleClaimParam();
     const localHot=fallbackHot.map(normalizePulseStore).filter(Boolean);
     const hot=nearbyHotRows([...serverHot,...localHot])
       .filter(row=>!isMyBossStore(stores.find(store=>String(store.id)===String(row.store_id))||{}));
-    const newcomer=data?.new_player_protected===true;
+    const showFirstCaptureGuide=shouldShowFirstCaptureGuide(data);
 
     const items=[];
-    if(newcomer){
+    if(showFirstCaptureGuide){
       items.push(`<div class="game-pulse-item is-guide" role="note"><span class="guide-bulb" aria-hidden="true">💡</span><strong>첫 점령 가이드</strong><small>가까운 미점령 매장부터 시작해 보세요.</small></div>`);
     }
     if(partnerBanner) items.push(partnerBannerMarkup(partnerBanner));
