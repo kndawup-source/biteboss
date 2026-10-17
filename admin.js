@@ -275,6 +275,9 @@
     $("#homeCopyForm")?.addEventListener("submit", saveHomeCopy);
     $("#firstCaptureGuideForm")?.addEventListener("submit", saveFirstCaptureGuide);
     $("#adCampaignForm")?.addEventListener("submit", saveAdCampaign);
+    $("#adTargetStoreSearch")?.addEventListener("input",event=>{clearTimeout(adTargetStoreSearchTimer);const value=event.currentTarget.value;adTargetStoreSearchTimer=setTimeout(()=>searchAdTargetStores(value),220);});
+    $("#adTargetStoreSearch")?.addEventListener("focus",event=>{if(String(event.currentTarget.value || "").trim().length>=2) searchAdTargetStores(event.currentTarget.value);});
+    $("#adTargetStoreClear")?.addEventListener("click",()=>setAdTargetStore(null));
   }
 
   async function fillCurrentStoreLocation(){
@@ -646,7 +649,7 @@
         ${code ? `<div class="partner-activation-code"><span>활성화 코드</span><code>${escapeHtml(code)}</code><button class="text-btn" data-copy-partner-code="${escapeAttr(code)}" type="button">복사</button></div>` : ""}
         ${canReview ? `<div class="partner-request-actions"><button class="primary-btn" data-partner-approve="${escapeAttr(row.id)}" type="button">제휴 승인</button><button class="secondary-btn" data-partner-reject="${escapeAttr(row.id)}" type="button">거절</button></div>` : ""}
       </article>`;
-    }).join("") : `<div class="timeline-item muted">해당 상태의 제휴 신청이 없습니다.</div>`;
+    }).join("") : `<div class="partner-request-empty"><strong>제휴 신청이 없습니다.</strong><span>선택한 상태에 해당하는 신청이 없습니다.</span></div>`;
 
     $$('[data-partner-approve]').forEach(btn => btn.onclick = () => reviewPartnerRequest(btn.dataset.partnerApprove, "approve", btn));
     $$('[data-partner-reject]').forEach(btn => btn.onclick = () => reviewPartnerRequest(btn.dataset.partnerReject, "reject", btn));
@@ -2498,12 +2501,52 @@
 
   const adAnalyticsCampaignMap = new Map();
 
+  let adTargetStoreSearchTimer=0;
+  let adTargetStoreSearchSeq=0;
+
+  function adStoreLabel(store){
+    const meta=[store?.brand_name,store?.district || store?.city,store?.address].filter(Boolean);
+    return {name:String(store?.name || "매장"),meta:meta.join(" · ")};
+  }
+
+  function setAdTargetStore(store){
+    const id=String(store?.id || "");
+    if($("#adTargetStore")) $("#adTargetStore").value=id;
+    if(!id){
+      $("#adTargetStoreSelected")?.classList.add("hidden");
+      $("#adTargetStoreSearchWrap")?.classList.remove("hidden");
+      if($("#adTargetStoreSearch")) $("#adTargetStoreSearch").value="";
+      $("#adTargetStoreResults")?.classList.add("hidden");
+      return;
+    }
+    const label=adStoreLabel(store);
+    setText("#adTargetStoreSelectedName",label.name);
+    setText("#adTargetStoreSelectedMeta",label.meta || "매장 지정");
+    $("#adTargetStoreSelected")?.classList.remove("hidden");
+    $("#adTargetStoreSearchWrap")?.classList.add("hidden");
+  }
+
   function populateAdTargetStores(){
-    const select=$("#adTargetStore"); if(!select) return;
-    const selected=select.value;
-    const rows=[...stores].sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""),"ko"));
-    select.innerHTML='<option value="">브랜드/일반 광고 · 매장 지정 안 함</option>'+rows.map(store=>`<option value="${escapeAttr(store.id)}">${escapeHtml(store.name || "매장")}${store.district ? ` · ${escapeHtml(store.district)}` : ""}</option>`).join("");
-    if(rows.some(row=>String(row.id)===String(selected))) select.value=selected;
+    const id=String($("#adTargetStore")?.value || "");
+    if(!id){setAdTargetStore(null);return;}
+    const store=stores.find(row=>String(row.id)===id);
+    if(store) setAdTargetStore(store);
+  }
+
+  async function searchAdTargetStores(keyword){
+    const box=$("#adTargetStoreResults"); if(!box) return;
+    const q=String(keyword || "").trim();
+    if(q.length<2){box.innerHTML='<div class="admin-store-picker-hint">2자 이상 입력하세요.</div>';box.classList.remove("hidden");return;}
+    const seq=++adTargetStoreSearchSeq;
+    box.innerHTML='<div class="admin-store-picker-hint">검색 중…</div>';box.classList.remove("hidden");
+    const safe=q.replace(/[,%()]/g," ").replace(/\s+/g," ").trim();
+    const filter=`name.ilike.%${safe}%,brand_name.ilike.%${safe}%,district.ilike.%${safe}%,city.ilike.%${safe}%,address.ilike.%${safe}%`;
+    const {data,error}=await adminSb.from("biteboss_stores").select("id,name,brand_name,city,district,address").or(filter).order("name",{ascending:true}).limit(12);
+    if(seq!==adTargetStoreSearchSeq) return;
+    if(error){console.warn("Ad target store search:",error);box.innerHTML='<div class="admin-store-picker-hint">검색하지 못했습니다.</div>';return;}
+    const rows=Array.isArray(data)?data:[];
+    box.innerHTML=rows.length?rows.map(store=>{const label=adStoreLabel(store);return `<button class="admin-store-picker-result" data-ad-target-store="${escapeAttr(store.id)}" type="button"><strong>${escapeHtml(label.name)}</strong><span>${escapeHtml(label.meta || "매장")}</span></button>`;}).join(""):'<div class="admin-store-picker-hint">검색 결과가 없습니다.</div>';
+    $$("[data-ad-target-store]",box).forEach(btn=>btn.onclick=()=>{const store=rows.find(row=>String(row.id)===String(btn.dataset.adTargetStore));if(store)setAdTargetStore(store);});
   }
 
   async function loadAdAnalytics(){
@@ -2629,6 +2672,8 @@
     $("#adTargetType").value=setting.target_type;
     $("#adTargetRegion").value=setting.target_region;
     if($("#adTargetStore")) $("#adTargetStore").value=setting.target_store_id || "";
+    const selectedTarget=stores.find(row=>String(row.id)===String(setting.target_store_id || ""));
+    setAdTargetStore(selectedTarget || (setting.target_store_id ? {id:setting.target_store_id,name:"선택된 매장"} : null));
     const adForm=$("#adCampaignForm");
     if(adForm){
       adForm.dataset.storeListImageUrl=setting.store_list_image_url || "";
@@ -2650,6 +2695,7 @@
     if($("#adTargetType")) $("#adTargetType").value = "all";
     if($("#adTargetRegion")) $("#adTargetRegion").value = "";
     if($("#adTargetStore")) $("#adTargetStore").value = "";
+    setAdTargetStore(null);
     if(form){
       delete form.dataset.storeListImageUrl;
       delete form.dataset.storeListStoragePath;
