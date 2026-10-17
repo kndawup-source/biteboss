@@ -166,7 +166,7 @@ body.user-app #page-home{position:fixed;inset:0;height:auto;min-height:0;padding
 .my-rank-summary{display:grid;grid-template-columns:22px 46px minmax(0,1fr) auto;gap:10px;align-items:center;padding:14px 16px;margin:0 0 14px;background:#fff}
 .my-rank-position{color:var(--accent);font-size:17px;font-weight:850}.my-rank-avatar{width:46px;height:46px;min-width:46px;min-height:46px;max-width:46px;max-height:46px;aspect-ratio:1/1;border-radius:50%;object-fit:cover;overflow:hidden;display:grid;place-items:center;background:#e3e3e5;clip-path:circle(50% at 50% 50%)}.my-rank-copy{min-width:0}.my-rank-copy b{display:block;font-size:13px;line-height:1.12;overflow-wrap:anywhere}.my-rank-copy small,.my-rank-label{color:var(--muted);font-size:8px}
 .rank-tabs{display:grid;gap:2px;margin:0 0 18px;padding:4px;border-radius:14px;background:#e9e9ec;overflow:hidden}
-.rank-tabs.rank-type-tabs{grid-template-columns:repeat(5,minmax(0,1fr))}
+.rank-tabs.rank-type-tabs{grid-template-columns:repeat(5,minmax(0,1fr));margin-bottom:6px}
 .rank-tabs.rank-period-tabs{grid-template-columns:repeat(3,minmax(0,1fr))}
 .rank-tabs .chip{min-width:0;min-height:31px;padding:0 3px;border:0;border-radius:9px;background:transparent;color:#8f8f95;font-size:9px;font-weight:820;line-height:1.1;text-align:center;white-space:normal}
 .rank-tabs .chip.active{color:#111;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.04)}

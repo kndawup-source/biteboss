@@ -2095,10 +2095,6 @@
     const protectionSummary = protectedNow ? `보호 ${formatRemaining(protectionUntil)} 남음` : "";
     const details = [categoryLabel(store.category), place, distance, protectionSummary].filter(Boolean).join(" · ");
     const isPartner = String(store.partnership_status || "unclaimed") === "partnered";
-    if(isPartner){
-      syncPartnerStoreUrl({...store,seo_slug:data.seo?.slug || store.seo_slug}, options.historyMode || (options.fromRoute ? "replace" : "push"));
-      paintPartnerStoreSeoMeta({...data,store:{...store,seo_slug:data.seo?.slug || store.seo_slug}});
-    }
     const presence = presenceState.get(String(store.id));
     const requiredSeconds = Math.max(30, Number(presence?.required_seconds || config.gps_dwell_seconds || 120));
     const remainingSeconds = Math.max(0, Number(presence?.remaining_seconds ?? requiredSeconds));
@@ -2572,6 +2568,11 @@
       ? offerAccess.offers
       : (Array.isArray(data.offers) ? data.offers.filter(item => item.status === "active") : []);
     const isPartner = String(store.partnership_status || "unclaimed") === "partnered";
+    if(isPartner){
+      const seoSlug=String(data.seo?.slug || store.seo_slug || "").trim();
+      syncPartnerStoreUrl({...store,seo_slug:seoSlug}, options.historyMode || (options.fromRoute ? "replace" : "push"));
+      paintPartnerStoreSeoMeta({...data,store:{...store,seo_slug:seoSlug}});
+    }
 
     const protectionUntil = game.protected_until || store.protected_until || null;
     const protectedNow = Boolean(game.protected ?? (protectionUntil && new Date(protectionUntil).getTime() > Date.now()));
