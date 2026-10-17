@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.04";
+  const BITEBOSS_BUILD = "82.05";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -4902,17 +4902,28 @@ await handleClaimParam();
   function paintImmediatePartnerBanner(){
     const box=$("#gamePulse");
     if(!box) return;
+
+    const items=[];
+    if(shouldShowFirstCaptureGuide(null)){
+      items.push(`<div class="game-pulse-item is-guide" role="note"><span class="guide-bulb" aria-hidden="true">💡</span><strong>첫 점령 가이드</strong><small>가까운 미점령 매장부터 시작해 보세요.</small></div>`);
+    }
+
     const banner=currentPartnerBanner();
     const markup=partnerBannerMarkup(banner);
-    if(!markup){
+    if(markup) items.push(markup);
+
+    // This immediate painter shares #gamePulse with the guide. It must never
+    // clear the guide just because a partner banner is unavailable.
+    if(!items.length){
       box.innerHTML="";
       box.classList.add("hidden");
       return;
     }
-    box.innerHTML=markup;
+
+    box.innerHTML=items.join("");
     box.classList.remove("hidden");
     bindGamePulseStoreLinks(box);
-    void hydratePartnerBannerPhoto(banner);
+    if(banner) void hydratePartnerBannerPhoto(banner);
   }
 
   async function loadGamePulse(force=false){
