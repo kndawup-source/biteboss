@@ -15,7 +15,7 @@
           detectSessionInUrl:false,
           storageKey:"biteboss-admin-auth"
         },
-        global:{ headers:{ "x-client-info":"biteboss-admin-web/81.86" } }
+        global:{ headers:{ "x-client-info":"biteboss-admin-web/81.87" } }
       })
     : null;
 
@@ -883,35 +883,25 @@
       if(submit) submit.disabled = false;
     }
   }
-  async function hydrateVisibleStorePlans(rows=[]){
-    const targets=rows.filter(store=>
-      String(store.partnership_status || "")==="partnered" &&
-      !storePlanMap.has(String(store.id))
-    );
-    if(!targets.length) return;
-
-    const results=await Promise.all(targets.map(async store=>{
-      const {data,error}=await adminSb
-        .from("biteboss_store_plans")
-        .select("plan,started_at,expires_at")
-        .eq("store_id",store.id)
-        .maybeSingle();
-      if(error) return [String(store.id),{plan:"partner"}];
-      const expired=data?.plan==="pro" && data?.expires_at && new Date(data.expires_at).getTime()<=Date.now();
-      return [String(store.id),{
-        plan:expired ? "partner" : String(data?.plan || "partner"),
-        started_at:data?.started_at || null,
-        expires_at:data?.expires_at || null
-      }];
-    }));
-    let changed=false;
-    results.forEach(([id,plan])=>{
-      const before=storePlanMap.get(id)?.plan;
-      storePlanMap.set(id,plan);
-      if(before!==plan?.plan) changed=true;
-    });
-    if(changed) renderStores();
+  function normalizedStorePlans(){
+    const raw=appConfig.store_plans;
+    const rows=Array.isArray(raw) ? raw : [];
+    return rows.map(item=>({
+      store_id:String(item?.store_id || ""),
+      plan:String(item?.plan || "partner")==="pro" ? "pro" : "partner",
+      started_at:item?.started_at || null,
+      expires_at:item?.expires_at || null
+    })).filter(item=>item.store_id);
   }
+
+  function hydrateStorePlanMap(){
+    storePlanMap.clear();
+    normalizedStorePlans().forEach(item=>{
+      const expired=item.plan==="pro" && item.expires_at && new Date(item.expires_at).getTime()<=Date.now();
+      storePlanMap.set(item.store_id,{...item,plan:expired ? "partner" : item.plan});
+    });
+  }
+
 
   function renderStores(){
     const box = $("#adminStoreList");
@@ -964,8 +954,6 @@
           ${activationCodes.has(String(store.id)) ? (() => { const item = activationCodes.get(String(store.id)); return `<div class="activation-result" data-activation-result="${escapeAttr(store.id)}"><strong>직원 활성화 코드</strong><code>${escapeHtml(item.code)}</code><button class="secondary-btn" data-copy-code="${escapeAttr(item.code)}" type="button">코드 복사</button><p>${escapeHtml(item.expires || "7일 안에 매장 어드민에서 ID/PIN을 등록합니다.")}</p></div>`; })() : `<div class="activation-result hidden" data-activation-result="${escapeAttr(store.id)}"></div>`}
         </article>`;
     }).join("") || `<div class="admin-empty">${query ? "검색 결과가 없습니다." : "등록된 매장이 없습니다."}</div>`;
-
-    void hydrateVisibleStorePlans(pageRows);
 
     $$('[data-edit-store]').forEach(btn => {
       btn.onclick = () => openStoreEditor(btn.dataset.editStore);
@@ -1118,6 +1106,7 @@
     const { data, error } = await adminSb.from("biteboss_app_config").select("key,value");
     if(error) return console.warn(error);
     appConfig = Object.fromEntries((data || []).map(row => [row.key, row.value]));
+    hydrateStorePlanMap();
   }
 
   function renderRules(){
@@ -1633,7 +1622,7 @@
         adminSb.rpc("biteboss_admin_store_detail", { p_store_id:storeId }),
         adminSb.rpc("biteboss_admin_store_video", { p_store_id:storeId }),
         adminSb.rpc("biteboss_store_seo_settings", { p_store_id:storeId }),
-        adminSb.from("biteboss_store_plans").select("plan,started_at,expires_at").eq("store_id",storeId).maybeSingle()
+        Promise.resolve({data:storePlanMap.get(String(storeId)) || {plan:"partner"},error:null})
       ]);
       if(error) throw error;
       if(!data?.ok) throw new Error(data?.error || "STORE_LOAD_FAILED");
@@ -1768,7 +1757,7 @@
       adminSb.rpc("biteboss_admin_store_detail", { p_store_id:editingStoreId }),
       adminSb.rpc("biteboss_admin_store_video", { p_store_id:editingStoreId }),
       adminSb.rpc("biteboss_store_seo_settings", { p_store_id:editingStoreId }),
-      adminSb.from("biteboss_store_plans").select("plan,started_at,expires_at").eq("store_id",editingStoreId).maybeSingle()
+      Promise.resolve({data:storePlanMap.get(String(editingStoreId)) || {plan:"partner"},error:null})
     ]);
     if(error) throw error;
     if(!data?.ok) throw new Error(data?.error || "STORE_LOAD_FAILED");
@@ -1811,16 +1800,22 @@
     try{
       const existing=storePlanMap.get(String(editingStoreId)) || editingStoreBundle?.plan || {};
       const now=new Date().toISOString();
-      const {data,error}=await adminSb.from("biteboss_store_plans").upsert([{
-        store_id:editingStoreId,
+      const plans=normalizedStorePlans().filter(item=>item.store_id!==String(editingStoreId));
+      plans.push({
+        store_id:String(editingStoreId),
         plan,
         started_at:String(existing.plan || "partner")===plan && existing.started_at ? existing.started_at : now,
-        expires_at:plan==="pro" ? expires : null,
-        updated_at:now,
-        updated_by:session.user.id
-      }],{onConflict:"store_id"}).select("plan,started_at,expires_at").single();
+        expires_at:plan==="pro" ? expires : null
+      });
+      const {error}=await adminSb.from("biteboss_app_config").upsert([{
+        key:"store_plans",
+        value:plans,
+        updated_by:session.user.id,
+        updated_at:now
+      }],{onConflict:"key"});
       if(error) throw error;
-      storePlanMap.set(String(editingStoreId),data || {plan});
+      appConfig.store_plans=plans;
+      hydrateStorePlanMap();
 
       // Downgrading immediately removes paid banner exposure.
       if(plan!=="pro"){
