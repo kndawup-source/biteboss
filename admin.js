@@ -3245,7 +3245,6 @@
     const status = $("#adCampaignStatus");
     const submit = form?.querySelector('button[type="submit"]');
     const id = String($("#adCampaignId")?.value || "").trim();
-    const campaignId = id || globalThis.crypto?.randomUUID?.();
     const previous = id ? adCampaigns.find(item => String(item.id) === id) : null;
     const file = $("#adImageFile")?.files?.[0] || null;
     const storeListFile = $("#adStoreListImageFile")?.files?.[0] || null;
@@ -3266,11 +3265,6 @@
       setStatusText(status, "시작일시를 입력하세요.");
       return;
     }
-    if(!campaignId){
-      setStatusText(status, "캠페인 ID를 생성하지 못했습니다.");
-      return;
-    }
-
     if(submit) submit.disabled = true;
     setStatusText(status, "캠페인 저장 중…");
 
@@ -3313,7 +3307,9 @@
       }
 
       const { data, error } = await adminRpc("biteboss_admin_upsert_campaign_v8239", {
-        p_id:campaignId,
+        // New campaigns must pass NULL. The legacy base RPC interprets any
+        // non-null id as UPDATE and returns CAMPAIGN_NOT_FOUND for a client UUID.
+        p_id:id || null,
         p_advertiser_name:String($("#adAdvertiserName")?.value || "").trim(),
         p_campaign_name:String($("#adCampaignName")?.value || "").trim(),
         p_image_url:canonicalImageUrl,
@@ -3326,7 +3322,7 @@
       });
       if(error) throw error;
       if(!data?.ok) throw new Error(data?.error || "CAMPAIGN_SAVE_FAILED");
-      const savedCampaignId=String(data?.campaign_id || data?.id || campaignId).trim();
+      const savedCampaignId=String(data?.campaign_id || data?.id || "").trim();
       if(!savedCampaignId) throw new Error("CAMPAIGN_ID_NOT_RETURNED");
 
       // From this point the database may already reference the new asset.

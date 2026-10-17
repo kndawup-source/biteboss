@@ -299,9 +299,9 @@ test('advertising security layer enforces server-side config and analytics capab
   assert.match(admin, /biteboss_admin_upsert_campaign_v8239/);
   assert.match(admin, /CAMPAIGN_ID_NOT_RETURNED/);
   assert.match(admin, /biteboss_admin_delete_campaign_v8239/);
-  assert.match(admin, /const campaignId = id \|\| globalThis\.crypto\?\.randomUUID\?\.\(\)/);
-  assert.match(admin, /p_id:campaignId/);
-  assert.match(admin, /data\?\.campaign_id \|\| data\?\.id \|\| campaignId/);
+  assert.doesNotMatch(admin, /const campaignId = id \|\| globalThis\.crypto\?\.randomUUID/);
+  assert.match(admin, /p_id:id \|\| null/);
+  assert.match(admin, /const savedCampaignId=String\(data\?\.campaign_id \|\| data\?\.id \|\| ""\)\.trim\(\)/);
   assert.match(admin, /biteboss_admin_ad_analytics_v8217/);
   assert.match(admin, /biteboss_admin_ad_creative_analytics_v8217/);
   assert.doesNotMatch(admin, /from\("biteboss_app_config"\)\.upsert/);
@@ -493,8 +493,11 @@ test('82.35 current territory store modal paginates 10 stores per page', () => {
   assert.match(app, /renderTerritoryStorePage\(\)/);
 });
 
-test('82.39 ad campaign save uses deterministic create/update contract and keeps uploaded assets after database commit', () => {
+test('82.40 ad campaign save uses server-created id contract and keeps uploaded assets after database commit', () => {
   assert.match(admin, /biteboss_admin_upsert_campaign_v8239/);
+  assert.match(admin, /p_id:id \|\| null/);
+  assert.doesNotMatch(admin, /const campaignId = id \|\| globalThis\.crypto\?\.randomUUID/);
+  assert.doesNotMatch(admin, /data\?\.campaign_id \|\| data\?\.id \|\| campaignId/);
   assert.match(admin, /biteboss_admin_delete_campaign_v8239/);
   assert.match(admin, /let campaignPersisted=false/);
   assert.match(admin, /campaignPersisted=true/);
