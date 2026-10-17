@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.99";
+  const BITEBOSS_BUILD = "82.00";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -3063,20 +3063,8 @@ await handleClaimParam();
     bindStoreComments(store.id);
 
     if(ownerClaimHtml){
-      const ownerDetails = body.querySelector("details.store-owner-conversion");
-      ownerDetails?.addEventListener("toggle", () => {
-        if(!ownerDetails.open) return;
-        requestAnimationFrame(() => smoothScrollToStoreOwner(ownerDetails));
-      });
-      $("#detailPartnerRequest")?.addEventListener("click", event => {
-        const button = event.currentTarget;
-        if(button.dataset.transitioning === "true") return;
-        button.dataset.transitioning = "true";
-
-        smoothScrollToStoreOwner(
-          body.querySelector(".store-owner-conversion"),
-          () => openPartnerRequestForm(store)
-        );
+      $("#detailPartnerRequest")?.addEventListener("click", () => {
+        openPartnerRequestForm(store);
       });
       $("#detailPartnerAdmin")?.addEventListener("click", () => { location.href = "./store-admin.html"; });
     }
@@ -3551,9 +3539,9 @@ await handleClaimParam();
     return "available";
   }
 
-  function renderPartnerRequestCard(store, request, isPartner, activity = {}){
-    const ownerState = getStoreOwnerClaimState(store, request, isPartner);
-    const activationCode = String(request?.activation_code || "").trim();
+  function renderPartnerRequestCard(store, request, isPartner){
+    const ownerState=getStoreOwnerClaimState(store,request,isPartner);
+    const activationCode=String(request?.activation_code || "").trim();
     if(ownerState === "managed" || ownerState === "partner") return "";
 
     if(ownerState === "approved"){
@@ -3561,7 +3549,7 @@ await handleClaimParam();
         <section class="store-owner-conversion approved">
           <span class="store-owner-kicker">매장 관리자</span>
           <strong>매장 인증이 완료됐습니다.</strong>
-          <p>활성화 코드로 관리자 계정을 만들고 매장 활동과 혜택을 관리하세요.</p>
+          <p>활성화 코드로 관리자 계정을 만들고 매장 정보와 혜택을 관리하세요.</p>
           <code>${escapeHtml(activationCode)}</code>
           <button id="detailPartnerAdmin" class="primary-btn" type="button">매장 관리자 열기</button>
         </section>`;
@@ -3574,36 +3562,11 @@ await handleClaimParam();
           <p>확인이 끝나면 이 화면에서 관리자 활성화를 진행할 수 있습니다.</p>
         </section>`;
     }
-    const visits = Math.max(0, Number(activity.visits || 0));
-    const users = Math.max(0, Number(activity.users || 0));
-    const repeats = Math.max(0, Number(activity.repeats || 0));
-    const challengers = Math.max(0, Number(activity.challengers || 0));
-    const shares = Math.max(0, Number(activity.shares || 0));
-    const hasActivity = visits + users + repeats + challengers > 0;
 
     return `
-      <details class="store-owner-conversion ${hasActivity ? "has-activity" : "is-empty"}">
-        <summary class="store-owner-manage-btn">${ownerState === "rejected" ? "다시 매장 관리하기" : "이 매장 관리하기"}</summary>
-        <div class="store-owner-body">
-          ${hasActivity ? `
-            <div class="store-owner-body-head">
-              <span class="store-owner-kicker">최근 30일</span>
-              <strong>BiteBoss 활동 현황</strong>
-            </div>
-          ` : `<strong class="store-owner-empty-title">아직 집계된 활동이 없습니다.</strong>`}
-          ${hasActivity ? `
-            <div class="store-owner-stats" aria-label="최근 30일 BiteBoss 활동">
-              <article><span>방문</span><strong>${visits.toLocaleString("ko-KR")}</strong></article>
-              <article><span>사용자</span><strong>${users.toLocaleString("ko-KR")}</strong></article>
-              <article><span>재방문</span><strong>${repeats.toLocaleString("ko-KR")}</strong></article>
-              <article><span>도전</span><strong>${challengers.toLocaleString("ko-KR")}</strong></article>
-            </div>
-            ${shares ? `<p class="store-owner-share">공유 ${shares.toLocaleString("ko-KR")}회</p>` : ""}
-          ` : ""}
-          <p>${hasActivity ? "매장을 인증하면 이 현황을 직접 확인하고 매장 정보와 혜택을 관리할 수 있습니다." : "매장을 인증하면 매장 정보와 혜택을 직접 관리할 수 있습니다."}</p>
-          <button id="detailPartnerRequest" class="store-owner-auth-btn" type="button">${ownerState === "rejected" ? "다시 인증 요청" : "매장 인증하기"}</button>
-        </div>
-      </details>`;
+      <button id="detailPartnerRequest" class="store-owner-manage-btn store-owner-manage-direct" type="button">
+        ${ownerState === "rejected" ? "다시 매장 관리하기" : "이 매장 관리하기"}
+      </button>`;
   }
 
   function openPartnerRequestForm(store){
