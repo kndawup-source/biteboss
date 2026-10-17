@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.91";
+  const BITEBOSS_BUILD = "81.93";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -435,15 +435,8 @@
     startNearbyLocationWatch();
 
     // Cleanup is non-critical. Never delay app readiness for maintenance work.
-    void (async () => {
-      try{
-        await sb.rpc("biteboss_runtime_cleanup");
-      }catch(error){
-        console.warn("BiteBoss runtime cleanup:", error);
-      }
-    })();
 
-    await handleClaimParam();
+await handleClaimParam();
     await handleCrewInviteParam();
     startPresenceTracking();
     registerServiceWorker();
@@ -2288,6 +2281,7 @@
       const videoPromise=sb.rpc("biteboss_store_video",{p_store_id:storeId});
       const seoPromise=sb.rpc("biteboss_store_seo_settings",{p_store_id:storeId});
       const planPromise=Promise.resolve({data:{ok:true,plan:publicStorePlan(storeId)},error:null});
+      const socialPromise=sb.from("biteboss_stores").select("website_url,instagram_url,youtube_url,tiktok_url,naver_blog_url").eq("id",storeId).single();
       const secondaryPromise=Promise.all([
         playerSession?.authenticated && options?.showStoreManagerCard!==false
           ? sb.rpc("biteboss_partner_request_status",{p_store_id:storeId})
@@ -2296,8 +2290,8 @@
         sb.rpc("biteboss_store_game_board_v631",{p_store_id:storeId}),
         sb.rpc("biteboss_store_history_v71",{p_store_id:storeId,p_limit:12})
       ]);
-      const [detailResult,statusResult,orgResult,offerResult,videoResult,seoResult,planResult]=await Promise.all([
-        detailPromise,statusPromise,orgPromise,offerPromise,videoPromise,seoPromise,planPromise
+      const [detailResult,statusResult,orgResult,offerResult,videoResult,seoResult,planResult,socialResult]=await Promise.all([
+        detailPromise,statusPromise,orgPromise,offerPromise,videoPromise,seoPromise,planPromise,socialPromise
       ]);
       if(detailResult.error) throw detailResult.error;
       if(!detailResult.data?.store) throw new Error("STORE_NOT_FOUND");
@@ -2313,6 +2307,7 @@
       data.video=videoResult?.error ? null : (videoResult.data || null);
       data.seo=seoResult?.error ? null : (seoResult.data || null);
       data.plan=planResult?.error ? null : (planResult.data || null);
+      if(!socialResult?.error && socialResult?.data) data.store={...(data.store || {}),...socialResult.data};
       data.partnerRequest=null; data.publicGrowth=null; data.arena=null; data.history=[];
       const cachedReclaim=getCachedStoreReclaimState(storeId);
       data.reclaim=cachedReclaim?.data || deriveOptimisticStoreReclaimState([],String(data.game?.my_role||"visitor")==="boss");
@@ -2807,14 +2802,29 @@
         </div>
       </section>` : "";
 
+    const safeExternalUrl = value => {
+      const raw=String(value || "").trim();
+      if(!raw) return "";
+      try{ const url=new URL(raw); return ["http:","https:"].includes(url.protocol) ? url.href : ""; }
+      catch{return "";}
+    };
+    const socialChannels = [
+      ["웹사이트",store.website_url],["Instagram",store.instagram_url],["YouTube",store.youtube_url],
+      ["TikTok",store.tiktok_url],["네이버 블로그",store.naver_blog_url]
+    ].map(([label,url])=>[label,safeExternalUrl(url)]).filter(([,url])=>url);
+    const socialHtml=socialChannels.length
+      ? `<div class="store-social-links">${socialChannels.map(([label,url])=>`<a href="${escapeAttr(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`).join("")}</div>`
+      : "";
+
     const businessInfo = storeBusinessInfo(store.hours);
-    const storeInfoHtml = (store.hours || store.phone || (!managerManagedStore && store.notice)) ? `
+    const storeInfoHtml = (store.hours || store.phone || socialChannels.length || (!managerManagedStore && store.notice)) ? `
       <section class="store-detail-section store-detail-info">
         <h4>매장 정보</h4>
         ${businessInfo.status ? `<div><span>오늘</span><strong>${escapeHtml(businessInfo.status)}</strong></div>` : ""}
         ${businessInfo.schedule ? `<div><span>영업시간</span><strong>${escapeHtml(businessInfo.schedule)}</strong></div>` : ""}
         ${businessInfo.closedLabel ? `<div><span>정기휴무</span><strong>${escapeHtml(businessInfo.closedLabel)}요일</strong></div>` : ""}
         ${store.phone ? `<div><span>전화</span><strong>${escapeHtml(store.phone)}</strong></div>` : ""}
+        ${socialHtml}
         ${!managerManagedStore && store.notice ? `<div><span>안내</span><strong>${escapeHtml(store.notice)}</strong></div>` : ""}
       </section>` : "";
 
@@ -3148,6 +3158,18 @@
     renderPagination(pagination, safePage, total, 10, next => loadStoreComments(storeId, next));
   }
 
+  function commentYoutubeId(value){
+    const text=String(value || "");
+    const match=text.match(/https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?[^\s]*v=|shorts\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{6,15})[^\s]*/i);
+    return match ? match[1] : "";
+  }
+
+  function commentYoutubeEmbed(body){
+    const id=commentYoutubeId(body);
+    if(!id) return "";
+    return `<div class="store-comment-youtube"><iframe src="https://www.youtube-nocookie.com/embed/${escapeAttr(id)}" title="YouTube 영상" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>`;
+  }
+
   function storeCommentMarkup(comment){
     const nickname = String(comment.nickname || "사용자");
     const time = formatCommentTime(comment.created_at);
@@ -3170,6 +3192,7 @@
             </div>
           </div>
           <p>${escapeHtml(comment.body || "")}</p>
+          ${commentYoutubeEmbed(comment.body || "")}
         </div>
       </article>`;
   }
@@ -4918,7 +4941,8 @@
 
     const candidates = stores.filter(store => {
       if(!store?.id) return false;
-      if(String(store.partnership_status || "unclaimed") === "partnered") return false;
+      // Partnership controls store-management/benefit features only.
+      // GPS capture eligibility is identical for partnered and ordinary stores.
       if(!Number.isFinite(Number(store.latitude)) || !Number.isFinite(Number(store.longitude))) return false;
 
       const roleState = storeRoleMap.get(String(store.id)) || {};

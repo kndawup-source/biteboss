@@ -15,7 +15,7 @@
           detectSessionInUrl:false,
           storageKey:"biteboss-store-auth"
         },
-        global:{ headers:{ "x-client-info":"biteboss-store-admin-web/81.91" } }
+        global:{ headers:{ "x-client-info":"biteboss-store-admin-web/81.93" } }
       })
     : null;
 
@@ -391,7 +391,7 @@
   function renderStoreForm(){
     const form = $("#storeInfoForm");
     if(!form) return;
-    ["name","category","city","district","address","phone","notice"].forEach(key => {
+    ["name","category","city","district","address","phone","website_url","instagram_url","youtube_url","tiktok_url","naver_blog_url","notice"].forEach(key => {
       if(form.elements[key]) form.elements[key].value = currentStore[key] || "";
     });
     applyStoreHoursForm(form, currentStore.hours);
@@ -413,6 +413,14 @@
       p_notice:String(form.get("notice") || "").trim()
     });
     if(error) return alert(error.message);
+    const socialUpdate = await storeSb.from("biteboss_stores").update({
+      website_url:String(form.get("website_url") || "").trim() || null,
+      instagram_url:String(form.get("instagram_url") || "").trim() || null,
+      youtube_url:String(form.get("youtube_url") || "").trim() || null,
+      tiktok_url:String(form.get("tiktok_url") || "").trim() || null,
+      naver_blog_url:String(form.get("naver_blog_url") || "").trim() || null
+    }).eq("id",currentStore.id);
+    if(socialUpdate.error) return alert(socialUpdate.error.message);
     await refreshStore();
   }
 

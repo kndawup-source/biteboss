@@ -15,7 +15,7 @@
           detectSessionInUrl:false,
           storageKey:"biteboss-admin-auth"
         },
-        global:{ headers:{ "x-client-info":"biteboss-admin-web/81.91" } }
+        global:{ headers:{ "x-client-info":"biteboss-admin-web/81.93" } }
       })
     : null;
 
@@ -1632,15 +1632,16 @@
     resetAdminOfferForm();
 
     try{
-      const [{ data, error }, videoResult, seoResult, planResult] = await Promise.all([
+      const [{ data, error }, videoResult, seoResult, planResult, socialResult] = await Promise.all([
         adminSb.rpc("biteboss_admin_store_detail", { p_store_id:storeId }),
         adminSb.rpc("biteboss_admin_store_video", { p_store_id:storeId }),
         adminSb.rpc("biteboss_store_seo_settings", { p_store_id:storeId }),
-        Promise.resolve({data:storePlanMap.get(String(storeId)) || {plan:"partner"},error:null})
+        Promise.resolve({data:storePlanMap.get(String(storeId)) || {plan:"partner"},error:null}),
+        adminSb.from("biteboss_stores").select("website_url,instagram_url,youtube_url,tiktok_url,naver_blog_url").eq("id",storeId).single()
       ]);
       if(error) throw error;
       if(!data?.ok) throw new Error(data?.error || "STORE_LOAD_FAILED");
-      editingStoreBundle = { ...data, video:videoResult.error ? null : (videoResult.data || null), seo:seoResult?.error ? null : (seoResult?.data || null), plan:planResult?.error ? null : (planResult?.data || {plan:"partner"}) };
+      editingStoreBundle = { ...data, store:{...(data.store || {}), ...(socialResult?.error ? {} : (socialResult?.data || {}))}, video:videoResult.error ? null : (videoResult.data || null), seo:seoResult?.error ? null : (seoResult?.data || null), plan:planResult?.error ? null : (planResult?.data || {plan:"partner"}) };
       renderAdminStoreEditor();
     }catch(error){
       console.error(error);
@@ -1717,7 +1718,7 @@
 
     const form = $("#adminStoreEditForm");
     if(form){
-      ["name","brand_name","category","status","city","district","address","latitude","longitude","phone","notice"].forEach(key => {
+      ["name","brand_name","category","status","city","district","address","latitude","longitude","phone","website_url","instagram_url","youtube_url","tiktok_url","naver_blog_url","notice"].forEach(key => {
         if(form.elements[key]) form.elements[key].value = store[key] ?? "";
       });
       applyStoreHoursForm(form, store.hours);
@@ -1768,15 +1769,16 @@
   async function reloadStoreEditor(){
     if(!editingStoreId) return;
     await loadConfig();
-    const [{ data, error }, videoResult, seoResult, planResult] = await Promise.all([
+    const [{ data, error }, videoResult, seoResult, planResult, socialResult] = await Promise.all([
       adminSb.rpc("biteboss_admin_store_detail", { p_store_id:editingStoreId }),
       adminSb.rpc("biteboss_admin_store_video", { p_store_id:editingStoreId }),
       adminSb.rpc("biteboss_store_seo_settings", { p_store_id:editingStoreId }),
-      Promise.resolve({data:storePlanMap.get(String(editingStoreId)) || {plan:"partner"},error:null})
+      Promise.resolve({data:storePlanMap.get(String(editingStoreId)) || {plan:"partner"},error:null}),
+        adminSb.from("biteboss_stores").select("website_url,instagram_url,youtube_url,tiktok_url,naver_blog_url").eq("id",editingStoreId).single()
     ]);
     if(error) throw error;
     if(!data?.ok) throw new Error(data?.error || "STORE_LOAD_FAILED");
-    editingStoreBundle = { ...data, video:videoResult.error ? null : (videoResult.data || null), seo:seoResult?.error ? null : (seoResult?.data || null), plan:planResult?.error ? null : (planResult?.data || {plan:"partner"}) };
+    editingStoreBundle = { ...data, store:{...(data.store || {}), ...(socialResult?.error ? {} : (socialResult?.data || {}))}, video:videoResult.error ? null : (videoResult.data || null), seo:seoResult?.error ? null : (seoResult?.data || null), plan:planResult?.error ? null : (planResult?.data || {plan:"partner"}) };
     renderAdminStoreEditor();
   }
 
@@ -1989,6 +1991,15 @@
       });
       if(error) throw error;
       if(!data?.ok) throw new Error(data?.error || "STORE_UPDATE_FAILED");
+
+      const socialUpdate = await adminSb.from("biteboss_stores").update({
+        website_url:String(form.get("website_url") || "").trim() || null,
+        instagram_url:String(form.get("instagram_url") || "").trim() || null,
+        youtube_url:String(form.get("youtube_url") || "").trim() || null,
+        tiktok_url:String(form.get("tiktok_url") || "").trim() || null,
+        naver_blog_url:String(form.get("naver_blog_url") || "").trim() || null
+      }).eq("id",editingStoreId);
+      if(socialUpdate.error) throw socialUpdate.error;
 
       const existingBanner = bannerConfigForStore({ id:editingStoreId });
       if(existingBanner){
