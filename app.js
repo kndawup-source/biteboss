@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.96";
+  const BITEBOSS_BUILD = "81.97";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -270,11 +270,7 @@
   let rankPage = 1;
   const RANK_PAGE_SIZE = 10;
   let rankViewItems = [];
-  let profileActivityPage = 1;
-  const PROFILE_ACTIVITY_PAGE_SIZE = 8;
   let profileActivityRows = [];
-  let visitPage = 1;
-  const VISIT_PAGE_SIZE = 8;
   let visitRows = [];
   let summary = null;
   let homeLoadPromise = null;
@@ -608,10 +604,10 @@ await handleClaimParam();
           openTab("rank");
           return;
         }
-        const target = action === "boss" ? $("#profileBattleSection") : $("#profileVisitSection");
-        target?.scrollIntoView?.({ behavior:"smooth", block:"start" });
+        $("#profileRecentActivitySection")?.scrollIntoView?.({ behavior:"smooth", block:"start" });
       });
     });
+    $("#profileActivityAllBtn")?.addEventListener("click", openProfileActivityAll);
     $("#storesLoginBtn")?.addEventListener("click", openMemberLogin);
     $("#addStoreBtn")?.addEventListener("click", openMemberStoreForm);
     const organizationAction = (selector, handler) => {
@@ -3887,7 +3883,7 @@ await handleClaimParam();
       button.onclick = event => {
         const storeId = button.dataset.activityStore;
         if(!storeId) return;
-        const fromProfileBattleLog = Boolean(button.closest("#profileActivity"));
+        const fromProfileBattleLog = Boolean(button.closest("#profileRecentActivity"));
         if(fromProfileBattleLog){
           event?.preventDefault?.();
           event?.stopPropagation?.();
@@ -3900,27 +3896,130 @@ await handleClaimParam();
     });
   }
 
-  function renderProfileActivityPage(){
-    const box = $("#profileActivity");
+  function activityTimestamp(row, type){
+    const value = type === "visit"
+      ? (row.claimed_at || row.visited_at || row.created_at)
+      : row.created_at;
+    const time = new Date(value || 0).getTime();
+    return Number.isFinite(time) ? time : 0;
+  }
+
+  function profileActivityItems(){
+    const battles = profileActivityRows.map(row => ({
+      type:"battle",
+      row,
+      time:activityTimestamp(row,"battle")
+    }));
+    const visits = visitRows.map(row => ({
+      type:"visit",
+      row,
+      time:activityTimestamp(row,"visit")
+    }));
+    return [...battles,...visits].sort((a,b) => b.time-a.time);
+  }
+
+  function battleActivityCopy(row){
+    const result = String(row.result || "");
+    const perspective = String(row.viewer_side || "");
+    let title = "보스 도전";
+    if(result === "boss_win"){
+      if(perspective === "defender") title = "보스 상실";
+      else if(perspective === "org_defender") title = "크루 점령지 상실";
+      else if(perspective === "org_challenger") title = "크루 점령";
+      else title = "보스 점령";
+    }else if(result === "crew"){
+      if(perspective === "defender") title = "방어 성공";
+      else if(perspective === "org_defender") title = "크루 방어 성공";
+      else if(perspective === "org_challenger") title = "크루 점령 실패";
+      else title = "점령 실패";
+    }else if(result === "boss_visit"){
+      title = "방어 유지";
+    }
+    return { title, storeName:String(row.store_name || "매장").trim() };
+  }
+
+  function renderProfileRecentActivity(limit = 5){
+    const box=$("#profileRecentActivity");
     if(!box) return;
-    const view = pageSlice(profileActivityRows, profileActivityPage, PROFILE_ACTIVITY_PAGE_SIZE);
-    profileActivityPage = view.page;
-    box.innerHTML = renderActivityRows(view.rows, false);
-    attachActivityRowHandlers(box);
-    renderPagination("#activityPagination", profileActivityPage, profileActivityRows.length, PROFILE_ACTIVITY_PAGE_SIZE, nextPage => {
-      profileActivityPage = nextPage;
-      renderProfileActivityPage();
-      $("#profileBattleSection")?.scrollIntoView({ behavior:"smooth", block:"start" });
+    const items=profileActivityItems();
+    const visible=Number.isFinite(Number(limit)) ? items.slice(0,Number(limit)) : items;
+    const allBtn=$("#profileActivityAllBtn");
+    if(allBtn) allBtn.classList.toggle("hidden",items.length <= 5);
+
+    box.innerHTML=visible.map(item => {
+      const row=item.row || {};
+      if(item.type === "visit"){
+        const storeName=String(row.store_name || "매장").trim();
+        return `
+          <button class="profile-activity-line" type="button" data-visit-store="${escapeAttr(row.store_id || "")}">
+            <span class="profile-activity-kind">방문</span>
+            <span class="profile-activity-copy"><strong>${escapeHtml(storeName)}</strong><small>매장을 방문했습니다.</small></span>
+            <time>${escapeHtml(formatActivityTime(row.claimed_at || row.visited_at || row.created_at))}</time>
+          </button>
+        `;
+      }
+      const copy=battleActivityCopy(row);
+      return `
+        <button class="profile-activity-line" type="button" data-activity-store="${escapeAttr(row.store_id || "")}">
+          <span class="profile-activity-kind">${escapeHtml(copy.title)}</span>
+          <span class="profile-activity-copy"><strong>${escapeHtml(copy.storeName)}</strong><small>${escapeHtml(copy.title)} 기록</small></span>
+          <time>${escapeHtml(formatActivityTime(row.created_at))}</time>
+        </button>
+      `;
+    }).join("") || `<div class="profile-record-empty">아직 활동 기록이 없습니다.</div>`;
+
+    attachProfileRecentActivityHandlers(box);
+  }
+
+  function attachProfileRecentActivityHandlers(root){
+    [...root.querySelectorAll("[data-activity-store]")].forEach(row => {
+      row.addEventListener("click", () => {
+        const storeId=String(row.dataset.activityStore || "").trim();
+        if(storeId) openStoreDetail(storeId,{source:"profile_activity",showStoreManagerCard:false});
+      });
     });
+    [...root.querySelectorAll("[data-visit-store]")].forEach(row => {
+      row.addEventListener("click", () => {
+        const storeId=String(row.dataset.visitStore || "").trim();
+        if(storeId) openStoreDetail(storeId,{source:"profile_visit",showStoreManagerCard:false});
+      });
+    });
+  }
+
+  function openProfileActivityAll(){
+    const items=profileActivityItems();
+    openModal("전체 활동",`
+      <div class="profile-activity-all">
+        ${items.length ? items.map(item => {
+          const row=item.row || {};
+          if(item.type === "visit"){
+            const storeName=String(row.store_name || "매장").trim();
+            return `<button class="profile-activity-line" type="button" data-visit-store="${escapeAttr(row.store_id || "")}">
+              <span class="profile-activity-kind">방문</span>
+              <span class="profile-activity-copy"><strong>${escapeHtml(storeName)}</strong><small>매장을 방문했습니다.</small></span>
+              <time>${escapeHtml(formatActivityTime(row.claimed_at || row.visited_at || row.created_at))}</time>
+            </button>`;
+          }
+          const copy=battleActivityCopy(row);
+          return `<button class="profile-activity-line" type="button" data-activity-store="${escapeAttr(row.store_id || "")}">
+            <span class="profile-activity-kind">${escapeHtml(copy.title)}</span>
+            <span class="profile-activity-copy"><strong>${escapeHtml(copy.storeName)}</strong><small>${escapeHtml(copy.title)} 기록</small></span>
+            <time>${escapeHtml(formatActivityTime(row.created_at))}</time>
+          </button>`;
+        }).join("") : `<div class="profile-record-empty">아직 활동 기록이 없습니다.</div>`}
+      </div>
+    `,{type:"detail-sheet"});
+    const body=$("#modalBody");
+    if(body) attachProfileRecentActivityHandlers(body);
   }
 
   async function loadGameActivity(){
     const homeBox = $("#homeActivity");
-    const profileBox = $("#profileActivity");
+    const profileBox = $("#profileRecentActivity");
 
     if(!playerSession?.authenticated){
       if(homeBox) homeBox.innerHTML = `<div class="activity-empty">로그인 후 전투 기록을 확인할 수 있습니다.</div>`;
-      if(profileBox) profileBox.innerHTML = `<div class="activity-empty">로그인 후 전투 기록을 확인할 수 있습니다.</div>`;
+      if(profileBox) profileBox.innerHTML = `<div class="activity-empty">로그인 후 활동 기록을 확인할 수 있습니다.</div>`;
       return;
     }
 
@@ -3931,19 +4030,18 @@ await handleClaimParam();
     if(error){
       console.warn("BiteBoss activity:", error);
       if(homeBox) homeBox.innerHTML = `<div class="activity-empty">활동 기록을 불러오지 못했습니다.</div>`;
-      setRetryState(profileBox, "전투 기록을 불러오지 못했습니다.", loadGameActivity);
+      setRetryState(profileBox, "활동 기록을 불러오지 못했습니다.", loadGameActivity);
       return;
     }
 
     const rows = Array.isArray(data) ? data : [];
     profileActivityRows = rows;
-    profileActivityPage = 1;
 
     if(homeBox){
       homeBox.innerHTML = renderActivityRows(rows.slice(0,5), true);
       attachActivityRowHandlers(homeBox);
     }
-    if(profileBox) renderProfileActivityPage();
+    if(profileBox) renderProfileRecentActivity();
   }
 
   function renderActivityRows(rows, compact){
@@ -4196,82 +4294,13 @@ await handleClaimParam();
       return;
     }
 
-    renderVisitLog(data || []);
+    visitRows = Array.isArray(data) ? data : [];
+    renderProfileRecentActivity();
   }
 
-  function renderVisitLog(entries, options = {}){
-    const box = $("#myHistory");
-    if(!box) return;
-
-    if(Array.isArray(entries)){
-      visitRows = entries;
-      if(options.resetPage !== false) visitPage = 1;
-    }
-
-    const view = pageSlice(visitRows, visitPage, VISIT_PAGE_SIZE);
-    visitPage = view.page;
-    setText("#visitPlaceCount", `${visitRows.length}곳`);
-
-    const summaryText = $("#visitSummaryText");
-    if(summaryText){
-      summaryText.textContent = visitRows.length
-        ? `${visitRows[0].store_name}${visitRows.length > 1 ? ` 외 ${visitRows.length - 1}곳` : ""} 방문 기록`
-        : "매장을 방문하면 기록이 여기에 남습니다.";
-    }
-
-    box.innerHTML = view.rows.map(entry => {
-      const storeName = String(entry.store_name || "매장").trim();
-      const place = [entry.city, entry.district].filter(Boolean).join(" ") || entry.address || categoryLabel(entry.category) || "";
-      const cachedStore = stores.find(item => String(item.id) === String(entry.store_id)) || null;
-      const photoUrl = String(
-        entry.store_photo_url ||
-        entry.photo_url ||
-        cachedStore?.photo_url ||
-        ""
-      ).trim();
-      const fallback = Array.from(storeName)[0] || "B";
-      const thumb = photoUrl
-        ? `<img class="profile-record-thumb" src="${escapeAttr(photoUrl)}" alt="" loading="lazy" decoding="async" />`
-        : `<span class="profile-record-thumb profile-record-thumb-fallback" aria-hidden="true">${escapeHtml(fallback)}</span>`;
-      const visitTime = formatDate(entry.claimed_at || entry.visited_at || entry.created_at);
-      const meta = [place, visitTime].filter(Boolean).join(" · ");
-
-      return `
-        <button
-          class="profile-record-row has-thumb"
-          type="button"
-          data-visit-store="${escapeAttr(entry.store_id || "")}"
-          aria-label="${escapeAttr(storeName)} 매장 상세 보기"
-        >
-          ${thumb}
-          <span class="profile-record-main">
-            <strong class="profile-record-title">${escapeHtml(storeName)}</strong>
-            <span class="profile-record-meta">${escapeHtml(meta || "방문 기록")}</span>
-          </span>
-        </button>
-      `;
-    }).join("") || `<div class="profile-record-empty">아직 방문 기록이 없습니다.</div>`;
-
-    renderPagination("#visitPagination", visitPage, visitRows.length, VISIT_PAGE_SIZE, nextPage => {
-      visitPage = nextPage;
-      renderVisitLog(null, { resetPage:false });
-      $("#profileVisitSection")?.scrollIntoView({ behavior:"smooth", block:"start" });
-    });
-
-    [...box.querySelectorAll("[data-visit-store]")].forEach(row => {
-      const storeId = String(row.dataset.visitStore || "").trim();
-      if(!storeId){
-        row.disabled = true;
-        return;
-      }
-
-      row.addEventListener("click", () => {
-        openStoreDetail(storeId, {
-          source:"profile_visit",
-          showStoreManagerCard:false
-        });
-      });
-    });
+  function renderVisitLog(entries){
+    if(Array.isArray(entries)) visitRows=entries;
+    renderProfileRecentActivity();
   }
 
 

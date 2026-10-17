@@ -23,7 +23,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet" />
   <link rel="manifest" href="/manifest.webmanifest?v=76.6" />
-  <link rel="stylesheet" href="/styles.css?v=81.93" />
+  <link rel="stylesheet" href="/styles.css?v=81.97" />
 </head>
 <body class="user-app home-active">
 <div id="app" class="app-shell">
@@ -187,16 +187,12 @@
 
       <section id="organizationInvites" class="organization-invites hidden" aria-label="Crew invitations"></section>
 
-      <section id="profileBattleSection" class="section battle-log-section profile-record-section">
-        <div class="section-head visit-head"><h3>전투 기록</h3><small>나 + 크루</small></div>
-        <div id="profileActivity" class="activity-list"></div>
-        <nav id="activityPagination" class="list-pagination hidden" aria-label="전투 기록 페이지"></nav>
-      </section>
-
-      <section id="profileVisitSection" class="section profile-record-section">
-        <div class="section-head visit-head"><h3>방문 기록</h3><small id="visitPlaceCount">0곳</small></div>
-        <div id="myHistory" class="visit-log"></div>
-        <nav id="visitPagination" class="list-pagination hidden" aria-label="방문 기록 페이지"></nav>
+      <section id="profileRecentActivitySection" class="section profile-record-section profile-recent-activity-section">
+        <div class="section-head visit-head">
+          <h3>최근 활동</h3>
+          <button id="profileActivityAllBtn" class="profile-section-more hidden" type="button">전체보기</button>
+        </div>
+        <div id="profileRecentActivity" class="profile-recent-activity-list"></div>
       </section>
       <section id="profileCommentSection" class="section profile-record-section hidden">
         <div class="section-head visit-head"><h3>내 한마디</h3><small id="profileCommentCount">0건</small></div>
