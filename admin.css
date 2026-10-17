@@ -59,6 +59,242 @@ body.admin-app{min-height:100dvh;background:#f1f1f3;color:#111}
 
 @media(max-width:430px){.admin-app .admin-main{padding-left:16px;padding-right:16px}.admin-mobile-head{padding-left:16px;padding-right:16px}.admin-secondary-nav{padding-left:16px;padding-right:16px}.admin-app .admin-page-head h2{font-size:24px}.admin-section-card{padding:16px}.admin-store-row{padding:13px}.admin-app .partner-request-counters>div{padding:11px 8px}.admin-store-actions .text-btn{min-height:30px}.admin-store-edit-btn{width:100%;justify-content:center}.gameops-store-row{grid-template-columns:minmax(0,1fr) auto;gap:10px}.gameops-store-status{grid-column:1/-1;grid-row:2;text-align:left}.gameops-store-action{grid-column:2;grid-row:1}.gameops-org-row{grid-template-columns:minmax(0,1fr) 54px 54px;gap:8px}}
 
+
+/* =========================================================
+   BiteBoss Admin 81.80 — canonical layout & hierarchy
+   ========================================================= */
+.admin-app{
+  --admin-bg:#f3f3f5;
+  --admin-surface:#fff;
+  --admin-soft:#f7f7f8;
+  --admin-line:#e8e8eb;
+  --admin-text:#111113;
+  --admin-muted:#8f8f96;
+  --admin-faint:#a5a5ab;
+  --admin-radius:18px;
+  --admin-gap:16px;
+  background:var(--admin-bg);
+}
+.admin-app *{box-sizing:border-box}
+.admin-app .admin-main{min-width:0}
+.admin-app .admin-page-body{display:grid;gap:16px;min-width:0}
+.admin-app .admin-page-head{max-width:760px;margin-bottom:22px}
+.admin-app .admin-page-head h2{font-size:28px;line-height:1.05}
+.admin-app .admin-page-head p{margin-top:7px;font-size:10px;line-height:1.55}
+.admin-app .admin-page-section,
+.admin-app .admin-section-card,
+.admin-app .analytics-panel,
+.admin-app .ops-recent{
+  min-width:0;
+  margin:0;
+  padding:20px;
+  border:1px solid rgba(17,17,19,.035);
+  border-radius:var(--admin-radius);
+  background:var(--admin-surface);
+  box-shadow:none;
+}
+.admin-app .admin-section-card+.admin-section-card{margin-top:0}
+.admin-app .admin-section-title,
+.admin-app .section-head{min-height:24px;margin:0 0 16px;align-items:flex-start}
+.admin-app .admin-section-title h3,
+.admin-app .section-head h3{font-size:13px;line-height:1.25}
+.admin-app .admin-section-title p{max-width:620px;margin-top:4px;font-size:9px}
+.admin-app .admin-count-chip{height:26px;min-width:32px;border-radius:8px;background:var(--admin-soft)}
+.admin-app .admin-dashboard-section{margin-top:0}
+.admin-app .admin-summary-section{padding:0;border:0;background:transparent}
+.admin-app .ops-summary{gap:10px;margin:0}
+.admin-app .ops-summary>div,
+.admin-app .gameops-summary>div,
+.admin-app .partner-request-counters>div,
+.admin-app .analytics-kpis article{
+  min-height:88px;
+  padding:15px 16px;
+  border:1px solid rgba(17,17,19,.035);
+  border-radius:15px;
+  background:var(--admin-surface);
+  box-shadow:none;
+}
+.admin-app .ops-summary strong,
+.admin-app .gameops-summary strong{font-size:21px}
+.admin-app .admin-performance-inline{
+  padding:20px;
+}
+.admin-app .admin-performance-inline>.section-head{margin-bottom:14px}
+.admin-app .admin-performance-inline .analytics-toolbar{
+  margin:0 0 12px!important;
+  padding:14px!important;
+  border:0!important;
+  border-radius:14px;
+  background:var(--admin-soft);
+}
+.admin-app .admin-performance-inline .analytics-kpis{margin-bottom:12px}
+.admin-app .admin-performance-inline .analytics-panel{border:1px solid var(--admin-line);box-shadow:none}
+.admin-app .admin-collapsible{overflow:hidden;padding:0}
+.admin-app .admin-collapsible>summary{
+  min-height:62px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  padding:0 20px;
+  list-style:none;
+  cursor:pointer;
+}
+.admin-app .admin-collapsible>summary::-webkit-details-marker{display:none}
+.admin-app .admin-collapsible>summary::after{
+  content:"+";
+  flex:0 0 auto;
+  color:var(--admin-muted);
+  font-size:18px;
+  font-weight:500;
+}
+.admin-app .admin-collapsible[open]>summary::after{content:"−"}
+.admin-app .admin-collapsible[open]>summary{border-bottom:1px solid var(--admin-line)}
+.admin-app .admin-collapsible>summary+.admin-form,
+.admin-app .admin-collapsible>summary~.admin-form,
+.admin-app .admin-collapsible>summary~.admin-collapse-body{padding:20px}
+.admin-app .admin-collapse-summary{min-width:0}
+.admin-app .admin-collapse-summary strong{display:block;color:var(--admin-text);font-size:13px;font-weight:850}
+.admin-app .admin-collapse-summary span{display:block;margin-top:4px;color:var(--admin-muted);font-size:9px;font-weight:500}
+.admin-app .admin-setting-block{
+  min-width:0;
+  padding:16px 0;
+  border-top:1px solid var(--admin-line);
+}
+.admin-app .admin-setting-block:first-child{padding-top:0;border-top:0}
+.admin-app .admin-setting-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:12px}
+.admin-app .admin-setting-head h3{margin:0;font-size:12px;font-weight:850}
+.admin-app .admin-setting-head p{margin:4px 0 0;color:var(--admin-muted);font-size:9px;line-height:1.45}
+.admin-app .form-grid,
+.admin-app .store-form,
+.admin-app .compact-admin-form{align-items:start}
+.admin-app label{min-width:0}
+.admin-app .input{width:100%;min-width:0}
+.admin-app .admin-form-actions{min-height:42px;margin-top:2px}
+.admin-app .admin-form-actions .primary-btn{min-width:118px}
+.admin-app .asset-status{display:flex;align-items:center;min-width:0;overflow-wrap:anywhere}
+.admin-app .admin-list-toolbar{margin-bottom:12px}
+.admin-app .admin-store-list,
+.admin-app .partner-request-list,
+.admin-app .gameops-list,
+.admin-app .admin-ad-list{gap:8px}
+.admin-app .admin-store-row,
+.admin-app .partner-request-row,
+.admin-app .admin-ad-row,
+.admin-app .admin-user-row,
+.admin-app .admin-qr-row{
+  border:1px solid rgba(17,17,19,.035);
+  box-shadow:none;
+}
+.admin-app .admin-store-row{padding:14px 15px;background:var(--admin-soft)}
+.admin-app .admin-store-actions{min-width:0}
+.admin-app .admin-edit-section{
+  margin:0 0 12px;
+  padding:20px;
+  border:1px solid rgba(17,17,19,.035);
+  border-radius:18px;
+  background:#fff;
+}
+.admin-app .admin-edit-section:last-child{margin-bottom:0}
+.admin-app .admin-editor-panel{background:var(--admin-bg)}
+.admin-app #adminStoreEditorBody{display:grid;gap:0}
+.admin-app .admin-media-list,
+.admin-app .admin-data-list{min-width:0}
+.admin-app .admin-media-row,
+.admin-app .admin-data-row{min-width:0}
+.admin-app .admin-media-row>div,
+.admin-app .admin-data-row>div{min-width:0}
+.admin-app .store-url-settings{min-width:0}
+.admin-app .store-url-settings>*{min-width:0}
+.admin-app #adminStoreUrlPreview{
+  display:block;
+  max-width:100%;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}
+.admin-app .store-video-thumb-row{
+  min-width:0;
+  display:grid;
+  grid-template-columns:88px minmax(0,1fr) auto;
+  align-items:center;
+  gap:10px;
+}
+.admin-app .store-video-thumb-row .store-video-thumb{
+  width:88px;
+  max-width:100%;
+  aspect-ratio:16/9;
+}
+.admin-app .store-video-thumb-copy{min-width:0;overflow:hidden}
+.admin-app .store-video-thumb-copy p,
+.admin-app .store-video-thumb-copy span{
+  display:block;
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.admin-app .analytics-grid{gap:12px;margin-bottom:0}
+.admin-app .analytics-panel{padding:18px}
+.admin-app .analytics-toolbar{box-shadow:none}
+.admin-app .partner-request-toolbar{align-items:center}
+.admin-app .admin-maintenance-row{margin-bottom:8px;border:1px solid rgba(17,17,19,.035)}
+.admin-app .admin-danger-zone .admin-maintenance-row:last-child{margin-bottom:0}
+
+@media(min-width:760px){
+  .admin-app .admin-layout{grid-template-columns:216px minmax(0,1fr)}
+  .admin-app .admin-main{width:100%;max-width:1240px;padding:40px 40px 72px}
+  .admin-app .admin-page-body{gap:18px}
+  .admin-app .admin-page-head{margin-bottom:26px}
+  .admin-app .admin-section-card,
+  .admin-app .admin-page-section,
+  .admin-app .ops-recent{padding:22px}
+  .admin-app .admin-summary-section{padding:0}
+  .admin-app .ops-summary{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .admin-app .admin-editor-panel{width:min(780px,92vw)}
+  .admin-app .admin-edit-section{padding:22px}
+}
+@media(min-width:1180px){
+  .admin-app .admin-main{padding-left:48px;padding-right:48px}
+}
+@media(max-width:759px){
+  .admin-app .admin-main{padding:22px 16px calc(44px + env(safe-area-inset-bottom))}
+  .admin-app .admin-page-body{gap:12px}
+  .admin-app .admin-page-head{margin-bottom:20px}
+  .admin-app .admin-page-head h2{font-size:24px}
+  .admin-app .admin-section-card,
+  .admin-app .admin-page-section,
+  .admin-app .ops-recent,
+  .admin-app .admin-edit-section{padding:16px;border-radius:16px}
+  .admin-app .admin-summary-section{padding:0}
+  .admin-app .ops-summary{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .admin-app .admin-collapsible{padding:0}
+  .admin-app .admin-collapsible>summary{min-height:58px;padding:0 16px}
+  .admin-app .admin-collapsible>summary+.admin-form,
+  .admin-app .admin-collapsible>summary~.admin-form,
+  .admin-app .admin-collapsible>summary~.admin-collapse-body{padding:16px}
+  .admin-app .admin-editor-head{min-height:78px;padding:16px}
+  .admin-app #adminStoreEditorBody{padding:0 12px 28px}
+  .admin-app .admin-editor-panel{border-radius:20px 20px 0 0}
+  .admin-app .store-video-thumb-row{grid-template-columns:72px minmax(0,1fr) auto;gap:8px}
+  .admin-app .store-video-thumb-row .store-video-thumb{width:72px}
+  .admin-app .partner-request-toolbar{grid-template-columns:1fr}
+  .admin-app .admin-form-actions{width:100%}
+}
+@media(max-width:430px){
+  .admin-app .admin-main{padding-left:14px;padding-right:14px}
+  .admin-app .admin-section-card,
+  .admin-app .admin-page-section,
+  .admin-app .ops-recent,
+  .admin-app .admin-edit-section{padding:15px}
+  .admin-app .admin-summary-section{padding:0}
+  .admin-app .ops-summary>div,
+  .admin-app .gameops-summary>div{min-height:78px;padding:13px}
+  .admin-app .store-video-thumb-row{grid-template-columns:64px minmax(0,1fr) auto}
+  .admin-app .store-video-thumb-row .store-video-thumb{width:64px}
+  .admin-app .admin-store-actions{display:grid;grid-template-columns:1fr 1fr;width:100%}
+  .admin-app .admin-store-actions .admin-store-edit-btn{grid-column:1/-1}
+}
+
 /* Current boss list */
 
 .admin-current-bosses .store-list{
@@ -226,12 +462,17 @@ body.admin-app{min-height:100dvh;background:#f1f1f3;color:#111}
   .admin-comment-actions{justify-content:flex-end}
 }
 
-.admin-app .store-video-thumb-row{grid-template-columns:80px minmax(0,1fr) auto}
-.admin-app .store-video-thumb-row .store-video-thumb{width:80px}
-.admin-app .store-url-settings{min-width:0}
-.admin-app .store-url-settings>*{min-width:0}
-@media(max-width:560px){
-  .admin-app .store-video-thumb-row{grid-template-columns:72px minmax(0,1fr) auto;gap:8px}
-  .admin-app .store-video-thumb-row .store-video-thumb{width:72px}
-  .admin-app #adminStoreUrlPreview{overflow-wrap:anywhere;word-break:break-word}
-}
+
+/* 81.80 final normalization */
+.admin-app .admin-performance-inline,
+.admin-app .ops-recent,
+.admin-app .gameops-section,
+.admin-app .admin-ad-performance,
+.admin-app .admin-ad-campaigns-section,
+.admin-app .admin-ad-editor-section,
+.admin-app .admin-assets-section,
+.admin-app .admin-comments-card,
+.admin-app .admin-danger-zone{margin:0}
+.admin-app .analytics-kpis{margin:0 0 12px}
+.admin-app .gameops-summary{margin:0}
+.admin-app .admin-editor-danger{margin-top:4px}
