@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.76";
+  const BITEBOSS_BUILD = "81.77";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -331,7 +331,6 @@
   const NOTIFICATION_PAGE_SIZE = 8;
   const adSessionKey = getAdSessionKey();
 
-  init().catch(fatalError);
 
 
   function syncRuntimeShell(){
@@ -9563,8 +9562,10 @@
     if(!("serviceWorker" in navigator)) return;
     if(location.protocol !== "https:" && location.hostname !== "localhost") return;
 
-    navigator.serviceWorker.register("./service-worker.js")
+    navigator.serviceWorker.register("/service-worker.js")
       .catch(error => console.warn("SW:", error));
   }
+
+  init().catch(fatalError);
 
 })();
