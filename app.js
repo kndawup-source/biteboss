@@ -2655,7 +2655,7 @@
 
     const noticeHtml = managerManagedStore && store.notice ? `
       <section class="store-managed-notice" aria-label="매장 공지">
-        <span>공지</span>
+        <span aria-hidden="true">📢</span>
         <strong>${escapeHtml(store.notice)}</strong>
       </section>` : "";
 

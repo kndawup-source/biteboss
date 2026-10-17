@@ -512,3 +512,9 @@ body.biteboss-info-page{min-height:100dvh;background:var(--bg);color:#111}.info-
 .store-video-admin-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid #ececef}
 .store-video-admin-row>div{min-width:0;display:grid;gap:3px}
 .store-video-admin-row span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#777;font-size:11px}
+
+.store-video-thumb-row,.store-video-admin-row{display:grid;grid-template-columns:96px minmax(0,1fr) auto;align-items:center;gap:10px}
+.store-video-thumb{display:block;width:96px;aspect-ratio:16/9;overflow:hidden;border-radius:8px;background:#111}
+.store-video-thumb img{display:block;width:100%;height:100%;object-fit:cover}
+.store-video-thumb-copy{min-width:0;display:grid;gap:3px}
+.store-video-thumb-copy p,.store-video-thumb-copy span{margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#777;font-size:11px}

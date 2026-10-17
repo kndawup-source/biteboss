@@ -1898,17 +1898,39 @@
     setStatusText($("#adminStoreSlugStatus"),"주소를 복사했습니다.");
   }
 
+
+  function youtubeAdminMeta(value){
+    const raw=String(value || "").trim();
+    if(!raw) return null;
+    try{
+      const url=new URL(raw);
+      const host=url.hostname.replace(/^www\./,"").toLowerCase();
+      let id="";
+      if(host==="youtu.be") id=url.pathname.split("/").filter(Boolean)[0] || "";
+      else if(["youtube.com","m.youtube.com","music.youtube.com"].includes(host)){
+        const parts=url.pathname.split("/").filter(Boolean);
+        if(parts[0]==="shorts" || parts[0]==="embed") id=parts[1] || "";
+        else id=url.searchParams.get("v") || "";
+      }
+      if(!/^[A-Za-z0-9_-]{6,20}$/.test(id)) return null;
+      return {id,thumbnail:`https://i.ytimg.com/vi/${id}/hqdefault.jpg`,watch:`https://www.youtube.com/watch?v=${id}`};
+    }catch{return null;}
+  }
+
   function renderAdminVideo(video){
     const rows=Array.isArray(video?.videos) ? video.videos : [];
     const input=$("#adminVideoUrl");
     if(input) input.value="";
     const box=$("#adminVideoList");
     if(!box) return;
-    box.innerHTML=rows.map((item,index)=>`
-      <article class="admin-media-row">
-        <div><strong>영상 ${index+1}</strong><p>${escapeHtml(item.video_url || "")}</p></div>
+    box.innerHTML=rows.map((item,index)=>{
+      const meta=youtubeAdminMeta(item.video_url);
+      return `<article class="admin-media-row store-video-thumb-row">
+        ${meta ? `<a class="store-video-thumb" href="${escapeAttr(meta.watch)}" target="_blank" rel="noopener noreferrer" aria-label="영상 ${index+1} YouTube에서 보기"><img src="${escapeAttr(meta.thumbnail)}" alt="" loading="lazy" decoding="async"/></a>` : ""}
+        <div class="store-video-thumb-copy"><strong>영상 ${index+1}</strong><p>${escapeHtml(item.video_url || "")}</p></div>
         <button class="text-btn danger-text" data-admin-delete-video="${escapeAttr(item.id)}" type="button">삭제</button>
-      </article>`).join("") || `<div class="admin-empty">등록된 영상이 없습니다.</div>`;
+      </article>`;
+    }).join("") || `<div class="admin-empty">등록된 영상이 없습니다.</div>`;
     $$("[data-admin-delete-video]").forEach(button=>button.onclick=()=>deleteAdminStoreVideo(button.dataset.adminDeleteVideo));
   }
 
