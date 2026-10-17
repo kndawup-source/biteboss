@@ -298,6 +298,15 @@
 </form>
 <div aria-live="polite" class="admin-home-copy-preview" id="homeCopyPreview"></div>
 <p class="asset-status" id="homeCopyStatus"></p></div>
+<div class="admin-setting-block"><div class="admin-setting-head"><h3>앱 공지</h3><p class="admin-helper">매장 화면 상단에 표시되는 공지입니다. 로그인·점령 기록과 관계없이 노출 여부와 문구를 직접 관리합니다.</p></div>
+<form class="form-grid" id="firstCaptureGuideForm">
+<label>공지 노출<select class="input" id="firstCaptureGuideEnabled"><option value="true">ON</option><option value="false">OFF</option></select></label>
+<label>아이콘<input class="input" id="firstCaptureGuideIcon" maxlength="8" placeholder="💡"/></label>
+<label class="wide">제목<input class="input" id="firstCaptureGuideTitle" maxlength="40" placeholder="첫 점령 가이드" required=""/></label>
+<label class="wide">설명<input class="input" id="firstCaptureGuideBody" maxlength="100" placeholder="가까운 미점령 매장부터 시작해 보세요."/></label>
+<button class="primary-btn wide" type="submit">앱 공지 저장</button>
+</form>
+<p class="asset-status" id="firstCaptureGuideStatus"></p></div>
 </section>
 </div></section>
 <section class="admin-page" id="admin-ads">
@@ -579,6 +588,6 @@
 </div>
 </section>
 </div>
-<script src="./admin.js?v=81.96"></script>
+<script src="./admin.js?v=82.07"></script>
 </body>
 </html>

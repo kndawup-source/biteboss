@@ -96,7 +96,7 @@
       const status = $("#adminLoginStatus");
 
       if(!username || !/^\d{6}$/.test(pin)){
-        if(status) status.textContent = "ID와 6자리 PIN을 확인하세요.";
+        if(status) status.textContent = "ID와 숫자 6자리 비밀번호을 확인하세요.";
         return;
       }
 
@@ -273,6 +273,7 @@
     $("#splashForm")?.addEventListener("submit", saveSplash);
     $("#defaultProfileForm")?.addEventListener("submit", saveDefaultProfileImage);
     $("#homeCopyForm")?.addEventListener("submit", saveHomeCopy);
+    $("#firstCaptureGuideForm")?.addEventListener("submit", saveFirstCaptureGuide);
     $("#adCampaignForm")?.addEventListener("submit", saveAdCampaign);
   }
 
@@ -1479,6 +1480,11 @@
     if($("#homePrimaryCta")) $("#homePrimaryCta").value = primary;
     if($("#homeSecondaryCta")) $("#homeSecondaryCta").value = secondary;
 
+    if($("#firstCaptureGuideEnabled")) $("#firstCaptureGuideEnabled").value = String(appConfig.first_capture_guide_enabled ?? "true").toLowerCase() === "false" ? "false" : "true";
+    if($("#firstCaptureGuideIcon")) $("#firstCaptureGuideIcon").value = String(appConfig.first_capture_guide_icon ?? "💡");
+    if($("#firstCaptureGuideTitle")) $("#firstCaptureGuideTitle").value = String(appConfig.first_capture_guide_title ?? "첫 점령 가이드");
+    if($("#firstCaptureGuideBody")) $("#firstCaptureGuideBody").value = String(appConfig.first_capture_guide_body ?? "가까운 미점령 매장부터 시작해 보세요.");
+
     const copyPreview = $("#homeCopyPreview");
     if(copyPreview){
       copyPreview.innerHTML = `
@@ -1613,6 +1619,45 @@
       if(status) status.textContent = "저장에 실패했습니다.";
     }finally{
       if(button) button.disabled = false;
+    }
+  }
+
+
+  async function saveFirstCaptureGuide(event){
+    event.preventDefault();
+    const status=$("#firstCaptureGuideStatus");
+    const button=event.currentTarget?.querySelector('button[type="submit"]');
+    const enabled=$("#firstCaptureGuideEnabled")?.value !== "false";
+    const icon=String($("#firstCaptureGuideIcon")?.value ?? "").trim().slice(0,8);
+    const title=String($("#firstCaptureGuideTitle")?.value ?? "").trim().slice(0,40);
+    const body=String($("#firstCaptureGuideBody")?.value ?? "").trim().slice(0,100);
+
+    if(!title){
+      if(status) status.textContent="제목은 비워둘 수 없습니다.";
+      return;
+    }
+
+    if(button) button.disabled=true;
+    if(status) status.textContent="저장 중…";
+
+    const now=new Date().toISOString();
+    const rows=[
+      { key:"first_capture_guide_enabled", value:enabled, updated_by:session.user.id, updated_at:now },
+      { key:"first_capture_guide_icon", value:icon, updated_by:session.user.id, updated_at:now },
+      { key:"first_capture_guide_title", value:title, updated_by:session.user.id, updated_at:now },
+      { key:"first_capture_guide_body", value:body, updated_by:session.user.id, updated_at:now }
+    ];
+
+    try{
+      const { error }=await adminSb.from("biteboss_app_config").upsert(rows,{onConflict:"key"});
+      if(error) throw error;
+      rows.forEach(row=>{ appConfig[row.key]=row.value; });
+      if(status) status.textContent="저장되었습니다.";
+    }catch(error){
+      console.warn(error);
+      if(status) status.textContent="저장에 실패했습니다.";
+    }finally{
+      if(button) button.disabled=false;
     }
   }
 

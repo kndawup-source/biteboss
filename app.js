@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.05";
+  const BITEBOSS_BUILD = "82.07";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -154,6 +154,10 @@
     home_hook_text:"찍고, 점령하고, 보스가 돼.",
     home_primary_cta:"QR 스캔하기",
     home_secondary_cta:"내 주변 보스 찾기",
+    first_capture_guide_enabled:true,
+    first_capture_guide_icon:"💡",
+    first_capture_guide_title:"첫 점령 가이드",
+    first_capture_guide_body:"가까운 미점령 매장부터 시작해 보세요.",
     partner_banners:[],
     store_plans:[],
     ad_public_campaigns:[],
@@ -4268,10 +4272,6 @@ await handleClaimParam();
         return;
       }
       paintMemberSummary(data || {}, { cache:true });
-      if($("#page-stores")?.classList.contains("active")){
-        gamePulseLoadedAt=0;
-        void loadGamePulse(true);
-      }
     })().finally(() => {
       homeLoadPromise = null;
     });
@@ -4873,18 +4873,19 @@ await handleClaimParam();
     return request;
   }
 
-  function shouldShowFirstCaptureGuide(pulseData){
-    // Signed-out users always see the first-capture guide.
-    if(!playerSession?.authenticated) return true;
-
-    // Signed-in users see it only until their first lifetime capture.
-    const claimCount=Number(summary?.claim_count);
-    if(Number.isFinite(claimCount)) return claimCount < 1;
-
-    // While the member summary is still loading, keep the server newcomer
-    // signal as the compatibility fallback.
-    return pulseData?.new_player_protected === true;
+  function firstCaptureGuideMarkup(){
+    const icon=String(config.first_capture_guide_icon ?? "💡").trim().slice(0,8);
+    const title=String(config.first_capture_guide_title ?? "첫 점령 가이드").trim();
+    const body=String(config.first_capture_guide_body ?? "가까운 미점령 매장부터 시작해 보세요.").trim();
+    return `<div class="game-pulse-item is-guide" role="note">${icon ? `<span class="guide-bulb" aria-hidden="true">${escapeHtml(icon)}</span>` : ""}<strong>${escapeHtml(title)}</strong>${body ? `<small>${escapeHtml(body)}</small>` : ""}</div>`;
   }
+
+  function shouldShowFirstCaptureGuide(){
+    // Admin-controlled app notice. Visibility is intentionally independent
+    // of login state, capture history, GPS, and game-pulse responses.
+    return String(config.first_capture_guide_enabled ?? "true").toLowerCase() !== "false";
+  }
+
 
   function bindGamePulseStoreLinks(box){
     $$("[data-pulse-store]",box).forEach(btn => btn.addEventListener("click",()=>{
@@ -4904,8 +4905,8 @@ await handleClaimParam();
     if(!box) return;
 
     const items=[];
-    if(shouldShowFirstCaptureGuide(null)){
-      items.push(`<div class="game-pulse-item is-guide" role="note"><span class="guide-bulb" aria-hidden="true">💡</span><strong>첫 점령 가이드</strong><small>가까운 미점령 매장부터 시작해 보세요.</small></div>`);
+    if(shouldShowFirstCaptureGuide()){
+      items.push(firstCaptureGuideMarkup());
     }
 
     const banner=currentPartnerBanner();
@@ -4936,8 +4937,8 @@ await handleClaimParam();
     // before the user can see the store banner.
     const partnerBanner=currentPartnerBanner();
     const immediateItems=[];
-    if(shouldShowFirstCaptureGuide(null)){
-      immediateItems.push(`<div class="game-pulse-item is-guide" role="note"><span class="guide-bulb" aria-hidden="true">💡</span><strong>첫 점령 가이드</strong><small>가까운 미점령 매장부터 시작해 보세요.</small></div>`);
+    if(shouldShowFirstCaptureGuide()){
+      immediateItems.push(firstCaptureGuideMarkup());
     }
     const immediateBannerMarkup=partnerBannerMarkup(partnerBanner);
     if(immediateBannerMarkup) immediateItems.push(immediateBannerMarkup);
@@ -4970,11 +4971,11 @@ await handleClaimParam();
     const localHot=fallbackHot.map(normalizePulseStore).filter(Boolean);
     const hot=nearbyHotRows([...serverHot,...localHot])
       .filter(row=>!isMyBossStore(stores.find(store=>String(store.id)===String(row.store_id))||{}));
-    const showFirstCaptureGuide=shouldShowFirstCaptureGuide(data);
+    const showFirstCaptureGuide=shouldShowFirstCaptureGuide();
 
     const items=[];
     if(showFirstCaptureGuide){
-      items.push(`<div class="game-pulse-item is-guide" role="note"><span class="guide-bulb" aria-hidden="true">💡</span><strong>첫 점령 가이드</strong><small>가까운 미점령 매장부터 시작해 보세요.</small></div>`);
+      items.push(firstCaptureGuideMarkup());
     }
     if(partnerBanner) items.push(partnerBannerMarkup(partnerBanner));
     if(retakes[0]){
