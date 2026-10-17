@@ -3305,12 +3305,46 @@
       });
       if(error) throw error;
       if(!data?.ok) throw new Error(data?.error || "CAMPAIGN_SAVE_FAILED");
-      let savedCampaignId=String(data?.id || data?.campaign_id || id || "");
+      const campaignIdFromResult = value => {
+        if(value == null) return "";
+        if(typeof value === "string"){
+          const trimmed=value.trim();
+          if(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(trimmed)) return trimmed;
+          try{ return campaignIdFromResult(JSON.parse(trimmed)); }catch{ return ""; }
+        }
+        if(Array.isArray(value)){
+          for(const item of value){
+            const found=campaignIdFromResult(item);
+            if(found) return found;
+          }
+          return "";
+        }
+        if(typeof value === "object"){
+          for(const key of ["id","campaign_id","campaignId"]){
+            const candidate=String(value?.[key] || "").trim();
+            if(candidate) return candidate;
+          }
+          for(const key of ["campaign","row","result","data","value"]){
+            const found=campaignIdFromResult(value?.[key]);
+            if(found) return found;
+          }
+        }
+        return "";
+      };
+
+      let savedCampaignId=campaignIdFromResult(data) || String(id || "");
       if(!savedCampaignId){
         const listed=await adminRpc("biteboss_admin_list_campaigns_v8217");
         if(listed.error) throw listed.error;
-        const saved=(Array.isArray(listed.data) ? listed.data : []).find(item => String(item.image_url || "") === String(canonicalImageUrl));
-        savedCampaignId=String(saved?.id || "");
+        const rows=Array.isArray(listed.data) ? listed.data : Array.isArray(listed.data?.campaigns) ? listed.data.campaigns : [];
+        const advertiserName=String($("#adAdvertiserName")?.value || "").trim();
+        const campaignName=String($("#adCampaignName")?.value || "").trim();
+        const candidates=rows.filter(item =>
+          String(item?.advertiser_name || "").trim() === advertiserName &&
+          String(item?.campaign_name || "").trim() === campaignName
+        );
+        const saved=candidates.find(item => String(item?.image_url || "") === String(canonicalImageUrl)) || candidates[0];
+        savedCampaignId=String(saved?.id || saved?.campaign_id || "").trim();
       }
       if(!savedCampaignId) throw new Error("CAMPAIGN_ID_NOT_RETURNED");
       await saveAdCampaignSetting(savedCampaignId);
