@@ -15,7 +15,7 @@
           detectSessionInUrl:false,
           storageKey:"biteboss-admin-auth"
         },
-        global:{ headers:{ "x-client-info":"biteboss-admin-web/81.87" } }
+        global:{ headers:{ "x-client-info":"biteboss-admin-web/81.89" } }
       })
     : null;
 
@@ -900,6 +900,17 @@
       const expired=item.plan==="pro" && item.expires_at && new Date(item.expires_at).getTime()<=Date.now();
       storePlanMap.set(item.store_id,{...item,plan:expired ? "partner" : item.plan});
     });
+    normalizedPartnerBannerIds().forEach(storeId=>{
+      if(!storePlanMap.has(String(storeId))){
+        storePlanMap.set(String(storeId),{
+          store_id:String(storeId),
+          plan:"pro",
+          started_at:null,
+          expires_at:null,
+          migrated_from_banner:true
+        });
+      }
+    });
   }
 
 
@@ -912,9 +923,10 @@
     const filtered = stores.filter(store => {
       const isPartner = String(store.partnership_status || "") === "partnered";
       const plan=storePlanMap.get(String(store.id))?.plan || (isPartner ? "partner" : "none");
-      const bannerEnabled = plan==="pro" && partnerBannerIds.includes(String(store.id));
+      const bannerRegistered = partnerBannerIds.includes(String(store.id));
+      const bannerEnabled = bannerRegistered;
       if(adminStoreFilter === "partner" && !isPartner) return false;
-      if(adminStoreFilter === "banner" && !bannerEnabled) return false;
+      if(adminStoreFilter === "banner" && !bannerRegistered) return false;
       if(!query) return true;
       return [store.name, store.brand_name, store.city, store.district, store.address, categoryLabel(store.category)]
         .filter(Boolean)
@@ -931,7 +943,8 @@
     box.innerHTML = pageRows.map(store => {
       const isPartner = store.partnership_status === "partnered";
       const plan=storePlanMap.get(String(store.id))?.plan || (isPartner ? "partner" : "none");
-      const bannerEnabled = plan==="pro" && partnerBannerIds.includes(String(store.id));
+      const bannerRegistered = partnerBannerIds.includes(String(store.id));
+      const bannerEnabled = bannerRegistered;
       const location = [store.city, store.district].filter(Boolean).join(" ") || "지역 미등록";
       return `
         <article class="admin-store-row">
@@ -1816,6 +1829,14 @@
       if(error) throw error;
       appConfig.store_plans=plans;
       hydrateStorePlanMap();
+      if(editingStoreBundle){
+        editingStoreBundle.plan=storePlanMap.get(String(editingStoreId)) || {
+          store_id:String(editingStoreId),
+          plan,
+          started_at:now,
+          expires_at:plan==="pro" ? expires : null
+        };
+      }
 
       // Downgrading immediately removes paid banner exposure.
       if(plan!=="pro"){
@@ -1859,7 +1880,7 @@
     if(!section) return;
     section.classList.remove("hidden");
 
-    const plan=String(editingStoreBundle?.plan?.plan || storePlanMap.get(String(store.id))?.plan || "partner");
+    const plan=String(storePlanMap.get(String(store.id))?.plan || editingStoreBundle?.plan?.plan || "partner");
     const isPro=plan==="pro";
     const banner = isPro ? bannerConfigForStore(store) : null;
     const enabled = Boolean(banner);
@@ -1886,7 +1907,7 @@
     event.preventDefault();
     if(!editingStoreId || !editingStoreBundle?.store) return;
     const store = editingStoreBundle.store;
-    const plan=String(editingStoreBundle?.plan?.plan || storePlanMap.get(String(store.id))?.plan || "partner");
+    const plan=String(storePlanMap.get(String(store.id))?.plan || editingStoreBundle?.plan?.plan || "partner");
     if(plan!=="pro"){
       setStatusText($("#adminPartnerPromotionStatus"),"추천 배너는 PRO 플랜에서 사용할 수 있습니다.");
       return;
