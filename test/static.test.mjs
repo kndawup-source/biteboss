@@ -295,10 +295,10 @@ test('advertising security layer enforces server-side config and analytics capab
   assert.match(sql, /AD_EVENT_INPUT_TOO_LONG/);
   assert.match(sql, /name like 'ads\/%'/);
   assert.match(admin, /biteboss_admin_config_upsert_v8217/);
-  assert.match(admin, /biteboss_admin_list_campaigns_v8217/);
-  assert.match(admin, /biteboss_admin_upsert_campaign_v8238/);
+  assert.match(admin, /biteboss_admin_list_campaigns_v8239/);
+  assert.match(admin, /biteboss_admin_upsert_campaign_v8239/);
   assert.match(admin, /CAMPAIGN_ID_NOT_RETURNED/);
-  assert.match(admin, /biteboss_admin_delete_campaign_v8238/);
+  assert.match(admin, /biteboss_admin_delete_campaign_v8239/);
   assert.match(admin, /const campaignId = id \|\| globalThis\.crypto\?\.randomUUID\?\.\(\)/);
   assert.match(admin, /p_id:campaignId/);
   assert.match(admin, /data\?\.campaign_id \|\| data\?\.id \|\| campaignId/);
@@ -493,16 +493,16 @@ test('82.35 current territory store modal paginates 10 stores per page', () => {
   assert.match(app, /renderTerritoryStorePage\(\)/);
 });
 
-test('82.38 ad campaign save uses deterministic create/update contract and keeps uploaded assets after database commit', () => {
-  assert.match(admin, /biteboss_admin_upsert_campaign_v8238/);
-  assert.match(admin, /biteboss_admin_delete_campaign_v8238/);
+test('82.39 ad campaign save uses deterministic create/update contract and keeps uploaded assets after database commit', () => {
+  assert.match(admin, /biteboss_admin_upsert_campaign_v8239/);
+  assert.match(admin, /biteboss_admin_delete_campaign_v8239/);
   assert.match(admin, /let campaignPersisted=false/);
   assert.match(admin, /campaignPersisted=true/);
   assert.match(admin, /if\(!campaignPersisted && newStoreListStoragePath\)/);
   assert.match(admin, /await refreshAdCampaignRows\(\);\s*await syncPublicAdCampaigns\(\);/s);
 });
 
-test('82.38 ad campaign delete clears campaign settings, creatives and public inventory together', () => {
+test('82.39 ad campaign delete clears campaign settings, creatives and public inventory together', () => {
   assert.match(admin, /const uniquePaths=\[\.\.\.new Set\(paths\)\]/);
   assert.match(admin, /secureAdminConfigUpsert\(\[\s*\{key:"ad_creatives"/s);
   assert.match(admin, /\{key:"ad_campaign_settings",value:settings\}/);
