@@ -1,4 +1,4 @@
-const BUILD = "81.97";
+const BUILD = "81.79";
 const CACHE_NAME = `biteboss-v${BUILD}`;
 const versioned = path => `${path}?v=${BUILD}`;
 const SHELL = [
@@ -11,7 +11,13 @@ const SHELL = [
   versioned("./supabase.js"),
   versioned("./manifest.webmanifest"),
   versioned("./privacy-policy.html"),
-  versioned("./support.html")
+  versioned("./support.html"),
+  versioned("./admin.html"),
+  versioned("./admin.css"),
+  versioned("./admin.js"),
+  versioned("./store-admin.html"),
+  versioned("./store-admin.css"),
+  versioned("./store-admin.js")
 ];
 
 self.addEventListener("install", event => {
@@ -50,7 +56,7 @@ self.addEventListener("fetch", event => {
   }
 
   const isNavigation = request.mode === "navigate";
-  const isCriticalAsset = /\/(?:app\.js|styles\.css|index\.html)(?:\?|$)/.test(url.pathname + url.search);
+  const isCriticalAsset = /\/(?:app\.js|styles\.css|index\.html|bootstrap\.js|admin\.html|admin\.js|admin\.css|store-admin\.html|store-admin\.js|store-admin\.css)(?:\?|$)/.test(url.pathname + url.search);
 
   if(isNavigation || isCriticalAsset){
     event.respondWith(

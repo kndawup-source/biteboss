@@ -15,7 +15,7 @@
           detectSessionInUrl:false,
           storageKey:"biteboss-store-auth"
         },
-        global:{ headers:{ "x-client-info":"biteboss-store-admin-web/76.6" } }
+        global:{ headers:{ "x-client-info":"biteboss-store-admin-web/81.79" } }
       })
     : null;
 
@@ -27,6 +27,10 @@
   let snapshot = {};
   let activeQr = null;
   let commentAdminPage = 1;
+  let sharedSettingsSyncTimer = null;
+  let lastSeoSyncSignature = "";
+  let lastVideoSyncSignature = "";
+  let sharedSettingsSyncBusy = false;
 
   init().catch(showFatal);
 
@@ -40,6 +44,7 @@
     if(!storeSb) throw new Error(window.BITEBOSS_BOOT_ERROR || "Supabase unavailable");
     await ensureStoreAuthSession();
     await restoreStoreSession();
+    startSharedSettingsSync();
   }
 
   async function ensureStoreAuthSession(){
@@ -386,8 +391,10 @@
     const {data,error}=await storeSb.rpc("biteboss_store_seo_settings",{p_store_id:currentStore.id});
     if(error) return console.warn("BiteBoss store SEO:",error);
     const input=$("#storeSeoForm")?.elements?.slug;
-    if(input) input.value=String(data?.custom_slug || "");
+    const serverCustom=String(data?.custom_slug || "");
+    if(input && (document.activeElement !== input || !lastSeoSyncSignature)) input.value=serverCustom;
     setText("#storeUrlPreview",storePublicUrl(String(data?.slug || "")));
+    lastSeoSyncSignature=JSON.stringify([serverCustom,String(data?.slug || "")]);
   }
   async function saveStoreSeo(event){
     event.preventDefault();
@@ -457,10 +464,15 @@
     if(error) return console.warn("BiteBoss store video:",error);
     const input=$("#storeVideoForm")?.elements?.video_url;
     if(input) input.value="";
-    const rows=Array.isArray(data?.videos) ? data.videos : [];
+    renderStoreVideoRows(Array.isArray(data?.videos) ? data.videos : []);
+  }
+
+  function renderStoreVideoRows(rows){
+    const list=Array.isArray(rows) ? rows : [];
+    lastVideoSyncSignature=JSON.stringify(list.map(item=>[String(item?.id || ""),String(item?.video_url || ""),Number(item?.sort_order || 0)]));
     const box=$("#storeVideoList");
     if(!box) return;
-    box.innerHTML=rows.map((item,index)=>{
+    box.innerHTML=list.map((item,index)=>{
       const meta=youtubeAdminMeta(item.video_url);
       return `<article class="store-video-admin-row">
         ${meta ? `<a class="store-video-thumb" href="${escapeAttr(meta.watch)}" target="_blank" rel="noopener noreferrer" aria-label="영상 ${index+1} YouTube에서 보기"><img src="${escapeAttr(meta.thumbnail)}" alt="" loading="lazy" decoding="async"/></a>` : ""}
@@ -469,6 +481,41 @@
       </article>`;
     }).join("") || `<div class="timeline-item muted">등록된 영상이 없습니다.</div>`;
     $$("[data-delete-store-video]").forEach(button=>button.onclick=()=>deleteStoreVideo(button.dataset.deleteStoreVideo));
+  }
+
+  async function syncSharedStoreSettings({force=false}={}){
+    if(!currentStore || !storeSb || sharedSettingsSyncBusy || document.hidden) return;
+    sharedSettingsSyncBusy=true;
+    try{
+      const [seoResult,videoResult]=await Promise.all([
+        storeSb.rpc("biteboss_store_seo_settings",{p_store_id:currentStore.id}),
+        storeSb.rpc("biteboss_store_video",{p_store_id:currentStore.id})
+      ]);
+      if(!seoResult.error){
+        const seo=seoResult.data || {};
+        const sig=JSON.stringify([String(seo.custom_slug || ""),String(seo.slug || "")]);
+        if(force || sig!==lastSeoSyncSignature){
+          const input=$("#storeSeoForm")?.elements?.slug;
+          if(input && document.activeElement !== input) input.value=String(seo.custom_slug || "");
+          setText("#storeUrlPreview",storePublicUrl(String(seo.slug || "")));
+          lastSeoSyncSignature=sig;
+        }
+      }
+      if(!videoResult.error){
+        const rows=Array.isArray(videoResult.data?.videos) ? videoResult.data.videos : [];
+        const sig=JSON.stringify(rows.map(item=>[String(item?.id || ""),String(item?.video_url || ""),Number(item?.sort_order || 0)]));
+        if(force || sig!==lastVideoSyncSignature) renderStoreVideoRows(rows);
+      }
+    }catch(error){ console.warn("BiteBoss shared settings sync:",error); }
+    finally{ sharedSettingsSyncBusy=false; }
+  }
+
+  function startSharedSettingsSync(){
+    if(sharedSettingsSyncTimer!==null) return;
+    sharedSettingsSyncTimer=window.setInterval(()=>void syncSharedStoreSettings(),3000);
+    const refresh=()=>{ if(!document.hidden) void syncSharedStoreSettings({force:true}); };
+    document.addEventListener("visibilitychange",refresh);
+    window.addEventListener("focus",refresh);
   }
 
   async function saveStoreVideo(event){

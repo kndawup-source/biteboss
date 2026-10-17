@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "81.77";
+  const BITEBOSS_BUILD = "81.79";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -4935,7 +4935,7 @@
             remaining_seconds:Number(config.gps_dwell_seconds || 120)
           });
         }
-        renderStores();
+        renderBaseStoreList({ patch:true });
         return;
       }
 
@@ -5041,7 +5041,7 @@
         }else if(takeoverUi?.storeId===nearestId){
           syncTakeoverUi(nearest.store,{status:"hold",reason:"OUTSIDE",remaining_seconds:currentTakeoverVisualRemaining(),required_seconds:takeoverRequired});
         }
-        renderStores();
+        renderBaseStoreList({ patch:true });
         return;
       }
 
@@ -5063,7 +5063,7 @@
             remaining_seconds:currentTakeoverVisualRemaining()
           });
         }
-        renderStores();
+        renderBaseStoreList({ patch:true });
         return;
       }
 
@@ -5107,7 +5107,7 @@
         }else if(ownedByMe){
           syncOwnerReclaimPresence(nearest.store.id, blockedPresence);
         }
-        renderStores();
+        renderBaseStoreList({ patch:true });
         return;
       }
 
@@ -5171,7 +5171,7 @@
         return;
       }
 
-      renderStores();
+      renderBaseStoreList({ patch:true });
     }finally{
       presenceBusy = false;
     }

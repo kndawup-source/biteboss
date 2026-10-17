@@ -25,6 +25,10 @@
   let appConfig = {};
   const activationCodes = new Map();
   let editingStoreId = null;
+  let sharedStoreSettingsTimer = null;
+  let sharedStoreSettingsBusy = false;
+  let adminSeoSyncSignature = "";
+  let adminVideoSyncSignature = "";
   let editingStoreBundle = null;
   let adCampaigns = [];
   let partnerRequests = [];
@@ -54,6 +58,7 @@
     if(!adminSb) throw new Error("Supabase unavailable");
     await ensureAdminAuthSession();
     await restoreAdminSession();
+    startOpenStoreSharedSettingsSync();
   }
 
   async function ensureAdminAuthSession(){
@@ -1680,6 +1685,36 @@
     $("#adminStoreEditorBody")?.classList.remove("hidden");
   }
 
+  async function syncOpenStoreSharedSettings({force=false}={}){
+    if(!editingStoreId || !adminSb || sharedStoreSettingsBusy || document.hidden) return;
+    sharedStoreSettingsBusy=true;
+    try{
+      const [videoResult,seoResult]=await Promise.all([
+        adminSb.rpc("biteboss_admin_store_video",{p_store_id:editingStoreId}),
+        adminSb.rpc("biteboss_store_seo_settings",{p_store_id:editingStoreId})
+      ]);
+      if(!seoResult.error){
+        const seo=seoResult.data || {};
+        const sig=JSON.stringify([String(seo.custom_slug || ""),String(seo.slug || "")]);
+        if(force || sig!==adminSeoSyncSignature) renderAdminStoreSeo(seo);
+      }
+      if(!videoResult.error){
+        const rows=Array.isArray(videoResult.data?.videos) ? videoResult.data.videos : [];
+        const sig=JSON.stringify(rows.map(item=>[String(item?.id || ""),String(item?.video_url || ""),Number(item?.sort_order || 0)]));
+        if(force || sig!==adminVideoSyncSignature) renderAdminVideo({videos:rows});
+      }
+    }catch(error){ console.warn("BiteBoss admin shared settings sync:",error); }
+    finally{ sharedStoreSettingsBusy=false; }
+  }
+
+  function startOpenStoreSharedSettingsSync(){
+    if(sharedStoreSettingsTimer!==null) return;
+    sharedStoreSettingsTimer=window.setInterval(()=>void syncOpenStoreSharedSettings(),3000);
+    const refresh=()=>{ if(!document.hidden) void syncOpenStoreSharedSettings({force:true}); };
+    document.addEventListener("visibilitychange",refresh);
+    window.addEventListener("focus",refresh);
+  }
+
   async function reloadStoreEditor(){
     if(!editingStoreId) return;
     const [{ data, error }, videoResult, seoResult] = await Promise.all([
@@ -1851,7 +1886,9 @@
   }
   function renderAdminStoreSeo(seo){
     const input=$("#adminStoreSlug");
-    if(input) input.value=String(seo?.custom_slug || "");
+    const serverCustom=String(seo?.custom_slug || "");
+    adminSeoSyncSignature=JSON.stringify([serverCustom,String(seo?.slug || "")]);
+    if(input && document.activeElement !== input) input.value=serverCustom;
     const url=adminStorePublicUrl(String(seo?.slug || ""));
     if($("#adminStoreUrlPreview")) $("#adminStoreUrlPreview").textContent=url;
   }
@@ -1919,6 +1956,7 @@
 
   function renderAdminVideo(video){
     const rows=Array.isArray(video?.videos) ? video.videos : [];
+    adminVideoSyncSignature=JSON.stringify(rows.map(item=>[String(item?.id || ""),String(item?.video_url || ""),Number(item?.sort_order || 0)]));
     const input=$("#adminVideoUrl");
     if(input) input.value="";
     const box=$("#adminVideoList");
