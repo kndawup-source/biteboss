@@ -3,7 +3,7 @@ const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPA
 
 const esc = value => String(value ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const json = value => JSON.stringify(value).replace(/</g,"\\u003c");
-const slug = value => String(value || "").trim().normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu,"-").replace(/^-+|-+$/g,"").slice(0,80) || "store";
+const autoSlug = id => `store-${String(id || "").replace(/-/g,"").slice(0,8).toLowerCase()}`;
 
 async function rpc(name, body){
   if(!SUPABASE_ANON_KEY) throw new Error("SUPABASE_ANON_KEY_MISSING");
@@ -16,9 +16,10 @@ async function rpc(name, body){
   return response.json();
 }
 
-function page({store,photos=[],video={}}){
+function page({store,photos=[],video={},seo={}}){
   const name=String(store.name || "매장");
-  const canonical=`https://biteboss.kr/store/${encodeURIComponent(store.id)}/${encodeURIComponent(slug(name))}`;
+  const publicSlug=String(seo?.slug || autoSlug(store.id));
+  const canonical=`https://biteboss.kr/store/${encodeURIComponent(store.id)}/${encodeURIComponent(publicSlug)}`;
   const place=[store.city,store.district].filter(Boolean).join(" ");
   const description=[place,store.category,store.notice].filter(Boolean).join(" · ").slice(0,155) || `${name}의 BiteBoss 매장 정보입니다.`;
   const cover=(photos.find(p=>p?.is_cover) || photos[0] || {}).image_url || "";
@@ -52,11 +53,12 @@ export default async function handler(req,res){
     const detail=await rpc("biteboss_store_detail",{p_store_id:id});
     const store=detail?.store;
     if(!store || store.status!=="active" || store.partnership_status!=="partnered") return res.status(404).send("Not found");
-    const canonicalSlug=slug(store.name);
+    const seo=await rpc("biteboss_store_seo_settings",{p_store_id:id});
+    const canonicalSlug=String(seo?.slug || autoSlug(id));
     const requestedSlug=String(req.query?.slug || "");
     if(requestedSlug && requestedSlug!==canonicalSlug) return res.redirect(308,`/store/${encodeURIComponent(id)}/${encodeURIComponent(canonicalSlug)}`);
     res.setHeader("Cache-Control","public, s-maxage=300, stale-while-revalidate=86400");
-    res.status(200).send(page({store,photos:Array.isArray(detail.photos)?detail.photos:[]}));
+    res.status(200).send(page({store,photos:Array.isArray(detail.photos)?detail.photos:[],seo}));
   }catch(error){
     console.error(error);
     res.status(500).send("Store page unavailable");

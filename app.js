@@ -708,18 +708,15 @@
     profile:"/profile"
   });
 
-  function partnerStoreSlug(value){
-    const normalized=String(value || "").trim().normalize("NFKC").toLowerCase()
-      .replace(/[^\p{L}\p{N}]+/gu,"-")
-      .replace(/^-+|-+$/g,"")
-      .slice(0,80);
-    return normalized || "store";
+  function partnerStoreAutoSlug(storeId){
+    return `store-${String(storeId || "").replace(/-/g,"").slice(0,8).toLowerCase()}`;
   }
 
-  function partnerStorePath(store){
+  function partnerStorePath(store, seoSlug=""){
     const id=String(store?.id || "").trim();
     if(!id) return "";
-    return `/store/${encodeURIComponent(id)}/${encodeURIComponent(partnerStoreSlug(store?.name || "store"))}`;
+    const slug=String(seoSlug || store?.seo_slug || partnerStoreAutoSlug(id)).trim().toLowerCase();
+    return `/store/${encodeURIComponent(id)}/${encodeURIComponent(slug)}`;
   }
 
   function storeRouteFromPath(pathname=location.pathname){
@@ -2099,8 +2096,8 @@
     const details = [categoryLabel(store.category), place, distance, protectionSummary].filter(Boolean).join(" · ");
     const isPartner = String(store.partnership_status || "unclaimed") === "partnered";
     if(isPartner){
-      syncPartnerStoreUrl(store, options.historyMode || (options.fromRoute ? "replace" : "push"));
-      paintPartnerStoreSeoMeta(data);
+      syncPartnerStoreUrl({...store,seo_slug:data.seo?.slug || store.seo_slug}, options.historyMode || (options.fromRoute ? "replace" : "push"));
+      paintPartnerStoreSeoMeta({...data,store:{...store,seo_slug:data.seo?.slug || store.seo_slug}});
     }
     const presence = presenceState.get(String(store.id));
     const requiredSeconds = Math.max(30, Number(presence?.required_seconds || config.gps_dwell_seconds || 120));
@@ -2273,6 +2270,7 @@
       const orgPromise=sb.rpc("biteboss_store_organization_status",{p_store_id:storeId});
       const offerPromise=sb.rpc("biteboss_store_offer_access",{p_store_id:storeId});
       const videoPromise=sb.rpc("biteboss_store_video",{p_store_id:storeId});
+      const seoPromise=sb.rpc("biteboss_store_seo_settings",{p_store_id:storeId});
       const secondaryPromise=Promise.all([
         playerSession?.authenticated && options?.showStoreManagerCard!==false
           ? sb.rpc("biteboss_partner_request_status",{p_store_id:storeId})
@@ -2281,8 +2279,8 @@
         sb.rpc("biteboss_store_game_board_v631",{p_store_id:storeId}),
         sb.rpc("biteboss_store_history_v71",{p_store_id:storeId,p_limit:12})
       ]);
-      const [detailResult,statusResult,orgResult,offerResult,videoResult]=await Promise.all([
-        detailPromise,statusPromise,orgPromise,offerPromise,videoPromise
+      const [detailResult,statusResult,orgResult,offerResult,videoResult,seoResult]=await Promise.all([
+        detailPromise,statusPromise,orgPromise,offerPromise,videoPromise,seoPromise
       ]);
       if(detailResult.error) throw detailResult.error;
       if(!detailResult.data?.store) throw new Error("STORE_NOT_FOUND");
@@ -2296,6 +2294,7 @@
       data.organization=orgResult.error ? null : (orgResult.data || null);
       data.offerAccess=offerResult.error ? null : (offerResult.data || null);
       data.video=videoResult?.error ? null : (videoResult.data || null);
+      data.seo=seoResult?.error ? null : (seoResult.data || null);
       data.partnerRequest=null; data.publicGrowth=null; data.arena=null; data.history=[];
       const cachedReclaim=getCachedStoreReclaimState(storeId);
       data.reclaim=cachedReclaim?.data || deriveOptimisticStoreReclaimState([],String(data.game?.my_role||"visitor")==="boss");

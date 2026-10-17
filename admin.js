@@ -237,6 +237,8 @@
     $("#adminPhotoForm")?.addEventListener("submit", addAdminStorePhoto);
     $("#adminVideoForm")?.addEventListener("submit", saveAdminStoreVideo);
     $("#adminVideoDelete")?.addEventListener("click", deleteAdminStoreVideo);
+    $("#adminStoreSlugSave")?.addEventListener("click", saveAdminStoreSlug);
+    $("#adminStoreUrlCopy")?.addEventListener("click", copyAdminStoreUrl);
     bindAdminDateTimeControl("#adStartsAt", "#adStartsDate", "#adStartsTime");
     bindAdminDateTimeControl("#adEndsAt", "#adEndsDate", "#adEndsTime");
     $("#adminMenuForm")?.addEventListener("submit", saveAdminMenu);
@@ -1579,13 +1581,13 @@
     resetAdminOfferForm();
 
     try{
-      const [{ data, error }, videoResult] = await Promise.all([
+      const [{ data, error }, videoResult, seoResult] = await Promise.all([
         adminSb.rpc("biteboss_admin_store_detail", { p_store_id:storeId }),
         adminSb.rpc("biteboss_admin_store_video", { p_store_id:storeId })
       ]);
       if(error) throw error;
       if(!data?.ok) throw new Error(data?.error || "STORE_LOAD_FAILED");
-      editingStoreBundle = { ...data, video:videoResult.error ? null : (videoResult.data || null) };
+      editingStoreBundle = { ...data, video:videoResult.error ? null : (videoResult.data || null), seo:seoResult?.error ? null : (seoResult?.data || null) };
       renderAdminStoreEditor();
     }catch(error){
       console.error(error);
@@ -1671,6 +1673,7 @@
 
     renderAdminPhotos(bundle.photos || []);
     renderAdminVideo(bundle.video || null);
+    renderAdminStoreSeo(bundle.seo || null);
     renderAdminMenu(bundle.menu || []);
     renderAdminOffers(bundle.offers || []);
     renderAdminPartnerPromotion(store);
@@ -1680,13 +1683,14 @@
 
   async function reloadStoreEditor(){
     if(!editingStoreId) return;
-    const [{ data, error }, videoResult] = await Promise.all([
+    const [{ data, error }, videoResult, seoResult] = await Promise.all([
       adminSb.rpc("biteboss_admin_store_detail", { p_store_id:editingStoreId }),
-      adminSb.rpc("biteboss_admin_store_video", { p_store_id:editingStoreId })
+      adminSb.rpc("biteboss_admin_store_video", { p_store_id:editingStoreId }),
+      adminSb.rpc("biteboss_store_seo_settings", { p_store_id:editingStoreId })
     ]);
     if(error) throw error;
     if(!data?.ok) throw new Error(data?.error || "STORE_LOAD_FAILED");
-    editingStoreBundle = { ...data, video:videoResult.error ? null : (videoResult.data || null) };
+    editingStoreBundle = { ...data, video:videoResult.error ? null : (videoResult.data || null), seo:seoResult?.error ? null : (seoResult?.data || null) };
     renderAdminStoreEditor();
   }
 
@@ -1840,6 +1844,36 @@
     }finally{
       if(submit) submit.disabled = false;
     }
+  }
+
+  function adminStorePublicUrl(slug){
+    if(!editingStoreId || !slug) return "";
+    return `${location.origin}/store/${encodeURIComponent(editingStoreId)}/${encodeURIComponent(slug)}`;
+  }
+  function renderAdminStoreSeo(seo){
+    const input=$("#adminStoreSlug");
+    if(input) input.value=String(seo?.custom_slug || "");
+    const url=adminStorePublicUrl(String(seo?.slug || ""));
+    if($("#adminStoreUrlPreview")) $("#adminStoreUrlPreview").textContent=url;
+  }
+  async function saveAdminStoreSlug(){
+    if(!editingStoreId) return;
+    const slug=String($("#adminStoreSlug")?.value || "").trim().toLowerCase();
+    const status=$("#adminStoreSlugStatus"); setStatusText(status,"저장 중…");
+    const {data,error}=await adminSb.rpc("biteboss_admin_set_store_seo_slug",{p_store_id:editingStoreId,p_slug:slug});
+    if(error || !data?.ok){
+      const code=data?.error || "";
+      const message=code==="SLUG_TAKEN"?"이미 사용 중인 주소입니다.":code==="INVALID_SLUG"?"영문 소문자, 숫자, 하이픈만 입력하세요.":error?.message || code || "저장 실패";
+      return setStatusText(status,message);
+    }
+    setStatusText(status,slug ? "고유주소가 저장되었습니다." : "자동 주소로 설정되었습니다.");
+    await reloadStoreEditor();
+  }
+  async function copyAdminStoreUrl(){
+    const url=String($("#adminStoreUrlPreview")?.textContent || "").trim();
+    if(!url) return;
+    await navigator.clipboard.writeText(url);
+    setStatusText($("#adminStoreSlugStatus"),"주소를 복사했습니다.");
   }
 
   function renderAdminVideo(video){

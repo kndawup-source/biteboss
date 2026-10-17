@@ -226,6 +226,7 @@
   function bindForms(){
     $("#storeInfoForm")?.addEventListener("submit", saveStoreInfo);
     $("#storeVideoForm")?.addEventListener("submit", saveStoreVideo);
+    $("#storeSeoForm")?.addEventListener("submit", saveStoreSeo);
     $("#menuForm")?.addEventListener("submit", addMenu);
     $("#offerForm")?.addEventListener("submit", addOffer);
     $("#benefitPassForm")?.addEventListener("submit", redeemBenefitPass);
@@ -241,6 +242,7 @@
     });
     $("#clearBossBtn")?.addEventListener("click", releaseBoss);
     $("#storeVideoDelete")?.addEventListener("click", deleteStoreVideo);
+    $("#storeUrlCopy")?.addEventListener("click", copyStoreUrl);
     $("#copyQrBtn")?.addEventListener("click", copyQr);
     $("#rotateQrBtn")?.addEventListener("click", rotateQr);
 
@@ -267,7 +269,7 @@
 
     const [snapshotResult] = await Promise.all([
       storeSb.rpc("biteboss_store_snapshot", { p_store_id:currentStore.id }),
-      loadPhotos(), loadStoreVideo(), loadMenu(), loadOffers(), loadQr(), loadActivity()
+      loadPhotos(), loadStoreVideo(), loadStoreSeo(), loadMenu(), loadOffers(), loadQr(), loadActivity()
     ]);
 
     if(snapshotResult.error) throw snapshotResult.error;
@@ -375,6 +377,36 @@
     });
     if(error) return alert(error.message);
     await refreshStore();
+  }
+
+  function storePublicUrl(slug){
+    return currentStore?.id && slug ? `${location.origin}/store/${encodeURIComponent(currentStore.id)}/${encodeURIComponent(slug)}` : "";
+  }
+  async function loadStoreSeo(){
+    if(!currentStore) return;
+    const {data,error}=await storeSb.rpc("biteboss_store_seo_settings",{p_store_id:currentStore.id});
+    if(error) return console.warn("BiteBoss store SEO:",error);
+    const input=$("#storeSeoForm")?.elements?.slug;
+    if(input) input.value=String(data?.custom_slug || "");
+    setText("#storeUrlPreview",storePublicUrl(String(data?.slug || "")));
+  }
+  async function saveStoreSeo(event){
+    event.preventDefault(); if(!currentStore) return;
+    const slug=String(new FormData(event.currentTarget).get("slug") || "").trim().toLowerCase();
+    setText("#storeSeoStatus","저장 중…");
+    const {data,error}=await storeSb.rpc("biteboss_store_set_seo_slug",{p_store_id:currentStore.id,p_slug:slug});
+    if(error || !data?.ok){
+      const code=data?.error || "";
+      return setText("#storeSeoStatus",code==="SLUG_TAKEN"?"이미 사용 중인 주소입니다.":code==="INVALID_SLUG"?"영문 소문자, 숫자, 하이픈만 입력하세요.":error?.message || code || "저장 실패");
+    }
+    setText("#storeSeoStatus",slug ? "고유주소가 저장되었습니다." : "자동 주소로 설정되었습니다.");
+    await loadStoreSeo();
+  }
+  async function copyStoreUrl(){
+    const url=String($("#storeUrlPreview")?.textContent || "").trim();
+    if(!url) return;
+    await navigator.clipboard.writeText(url);
+    setText("#storeSeoStatus","주소를 복사했습니다.");
   }
 
   async function loadStoreVideo(){

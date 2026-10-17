@@ -521,6 +521,12 @@
 <div class="admin-form-actions wide"><button class="secondary-btn" type="submit">영상 저장</button><button class="text-btn danger-text" id="adminVideoDelete" type="button">영상 삭제</button></div>
 <p aria-live="polite" class="asset-status wide" id="adminVideoStatus"></p>
 </form>
+<div class="store-url-settings">
+  <label>매장 고유주소<input class="input" id="adminStoreSlug" type="text" inputmode="url" autocomplete="off" placeholder="예: minish-cheongdam"/></label>
+  <p class="asset-status" id="adminStoreUrlPreview"></p>
+  <div class="admin-form-actions"><button class="secondary-btn" id="adminStoreSlugSave" type="button">주소 저장</button><button class="text-btn" id="adminStoreUrlCopy" type="button">주소 복사</button></div>
+  <p class="asset-status" id="adminStoreSlugStatus">영문 소문자, 숫자, 하이픈만 사용할 수 있습니다. 비워두면 자동 주소를 사용합니다.</p>
+</div>
 </section>
 <section class="admin-edit-section">
 <div class="section-head"><h3>메뉴</h3></div>
