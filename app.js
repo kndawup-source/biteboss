@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.26";
+  const BITEBOSS_BUILD = "82.27";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -315,6 +315,9 @@
   const TAKEOVER_DISMISS_RESET_DISTANCE_M = 180;
   let modalScrollY = 0;
   let modalReturnFocus = null;
+  let benefitPassTimer = null;
+  let benefitPassReturnFocus = null;
+  let activeBenefitOfferId = "";
   let gamePulseLoadedAt = 0;
   let activeBanner = null;
   const presenceState = new Map();
@@ -766,6 +769,18 @@ await handleClaimParam();
     $("#modalClose")?.addEventListener("click", closeModal);
     $("#modal")?.addEventListener("click", event => {
       if(event.target.id === "modal") closeModal();
+    });
+    $("#benefitPassClose")?.addEventListener("click", closeBenefitPassScreen);
+    $("#benefitPassRetry")?.addEventListener("click", () => {
+      const offerId=activeBenefitOfferId;
+      closeBenefitPassScreen({restoreFocus:false});
+      if(offerId) void createBenefitPass(offerId);
+    });
+    document.addEventListener("keydown", event => {
+      if(event.key === "Escape" && !$("#benefitPassScreen")?.classList.contains("hidden")){
+        event.preventDefault();
+        closeBenefitPassScreen();
+      }
     });
 
     $("#scanBtn")?.addEventListener("click", scanPrompt);
@@ -4148,6 +4163,76 @@ await handleClaimParam();
     });
   }
 
+  function benefitRoleLabel(role){
+    return ({boss:"BOSS BENEFIT",crew:"BOSS CREW BENEFIT",visitor:"VISITOR BENEFIT"})[String(role || "visitor")] || "BENEFIT";
+  }
+
+  function closeBenefitPassScreen(options = {}){
+    benefitPassTimer = clearIntervalRef(benefitPassTimer);
+    activeBenefitOfferId = "";
+    const screen=$("#benefitPassScreen");
+    screen?.classList.add("hidden");
+    screen?.classList.remove("is-expired");
+    const retry=$("#benefitPassRetry");
+    retry?.classList.add("hidden");
+    if(options.restoreFocus === false) return;
+    const returnFocus=benefitPassReturnFocus;
+    benefitPassReturnFocus=null;
+    window.requestAnimationFrame(() => returnFocus?.focus?.({preventScroll:true}));
+  }
+
+  function openBenefitPassScreen(data, offerId){
+    const screen=$("#benefitPassScreen");
+    if(!screen) return;
+    benefitPassTimer = clearIntervalRef(benefitPassTimer);
+    benefitPassReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    activeBenefitOfferId=String(offerId || "");
+
+    setText("#benefitPassRole", benefitRoleLabel(data?.player_role));
+    setText("#benefitPassStore", data?.store_name || "Partner Store");
+    setText("#benefitPassTitle", data?.offer_title || "Benefit");
+    const description=String(data?.offer_description || data?.description || "").trim();
+    const descEl=$("#benefitPassDescription");
+    if(descEl){
+      descEl.textContent=description;
+      descEl.classList.toggle("hidden", !description);
+    }
+    const nickname=String(data?.player_nickname || profile?.nickname || "").trim();
+    const identity=[nickname, String(data?.player_role || "").toUpperCase()].filter(Boolean).join(" · ");
+    setText("#benefitPassIdentity", identity);
+    const token=String(data?.token || "").trim();
+    setText("#benefitPassCode", token ? `PASS ${token}` : "");
+
+    const expiresAt=new Date(data?.expires_at || "").getTime();
+    const retry=$("#benefitPassRetry");
+    const tick=()=>{
+      const now=new Date();
+      const clock=$("#benefitPassClock");
+      if(clock) clock.textContent=new Intl.DateTimeFormat("ko-KR",{hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false}).format(now);
+      const remaining=Number.isFinite(expiresAt) ? Math.max(0, expiresAt - Date.now()) : 0;
+      const totalSeconds=Math.ceil(remaining/1000);
+      const minutes=Math.floor(totalSeconds/60);
+      const seconds=totalSeconds%60;
+      const countdown=$("#benefitPassCountdown");
+      if(countdown) countdown.textContent=`${String(minutes).padStart(2,"0")}:${String(seconds).padStart(2,"0")}`;
+      const expired=remaining <= 0;
+      screen.classList.toggle("is-expired", expired);
+      retry?.classList.toggle("hidden", !expired);
+      if(expired){
+        setText("#benefitPassInstruction", "혜택 화면이 만료되었습니다.");
+        benefitPassTimer = clearIntervalRef(benefitPassTimer);
+      }else{
+        setText("#benefitPassInstruction", "직원에게 이 실시간 화면을 보여주세요.");
+      }
+    };
+
+    screen.classList.remove("hidden","is-expired");
+    retry?.classList.add("hidden");
+    tick();
+    benefitPassTimer=window.setInterval(tick,1000);
+    $("#benefitPassClose")?.focus?.({preventScroll:true});
+  }
+
   async function createBenefitPass(offerId){
     if(!offerId) return;
 
@@ -4165,28 +4250,16 @@ await handleClaimParam();
           ROLE_REQUIRED:data?.minimum_role === "boss"
             ? "현재 보스만 사용할 수 있는 혜택입니다."
             : "현재 크루 이상만 사용할 수 있는 혜택입니다."
-        })[data?.error] || "혜택 패스를 만들지 못했습니다.";
+        })[data?.error] || "혜택 화면을 열지 못했습니다.";
 
         toast(message);
         return;
       }
 
-      openModal("Benefit pass", `
-        <div class="benefit-pass">
-          <span>SHOW TO STORE STAFF</span>
-          <strong>${escapeHtml(data.token || "")}</strong>
-          <h4>${escapeHtml(data.offer_title || "Benefit")}</h4>
-          <p>${escapeHtml(data.store_name || "Partner Store")}</p>
-          <div class="benefit-pass-meta">
-            <span>${escapeHtml(String(data.player_role || "visitor").toUpperCase())}</span>
-            <span>${escapeHtml(formatRemaining(data.expires_at))} left</span>
-          </div>
-          <small>직원이 이 코드를 확인하면 1회 사용 처리됩니다. 코드는 5분 후 만료됩니다.</small>
-        </div>
-      `);
+      openBenefitPassScreen(data, offerId);
     }catch(error){
       console.warn("BiteBoss benefit pass:", error);
-      toast("혜택 패스를 만들지 못했습니다.");
+      toast("혜택 화면을 열지 못했습니다.");
     }
   }
 

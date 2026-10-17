@@ -93,7 +93,7 @@
       </section>
 
       <section class="today-actions">
-        <button class="primary-btn" data-open-store-page="offers" type="button">혜택 코드 확인</button>
+        <button class="primary-btn" data-open-store-page="offers" type="button">혜택 관리</button>
         <button class="secondary-btn" data-open-store-page="qr" type="button">QR 열기</button>
         <button class="text-btn" data-open-store-page="game" type="button">게임 상태 보기</button>
       </section>
@@ -305,19 +305,19 @@
     </section>
 
     <section class="store-admin-page" id="store-admin-offers">
-      <div class="store-admin-head"><div><span class="eyebrow">혜택</span><h2>혜택 관리</h2><p>혜택 등록과 현장 사용 확인을 한 곳에서 처리합니다.</p></div></div>
+      <div class="store-admin-head"><div><span class="eyebrow">혜택</span><h2>혜택 관리</h2><p>혜택을 등록하면 대상 사용자가 매장 상세에서 현장 인증 화면을 열 수 있습니다.</p></div></div>
       <form id="offerForm" class="store-form compact">
         <label>혜택 이름<input name="title" class="input" required /></label>
         <label>상태<select name="status" class="input"><option value="active">진행중</option><option value="draft">준비중</option><option value="ended">종료</option></select></label>
-        <label>혜택 대상<select name="minimum_role" class="input"><option value="visitor">모든 방문자</option><option value="crew">크루 + 보스</option><option value="boss">보스만</option></select></label>
+        <label>혜택 대상<select name="minimum_role" class="input"><option value="crew" selected>크루 + 보스</option><option value="boss">보스만</option><option value="visitor">모든 방문자</option></select></label>
         <label class="wide">설명<input name="description" class="input" /></label>
         <button class="primary-btn wide" type="submit">혜택 추가</button>
       </form>
 
       <section class="benefit-verify">
-        <div class="store-section-head"><h3>혜택 코드 확인</h3><span>1회 사용</span></div>
+        <div class="store-section-head"><h3>사용 코드 확인</h3><span>선택 사항</span></div>
         <form id="benefitPassForm" class="benefit-pass-form">
-          <input id="benefitPassToken" class="input" type="text" maxlength="8" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="8-digit code" />
+          <input id="benefitPassToken" class="input" type="text" maxlength="8" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="8자리 코드" />
           <button class="secondary-btn" type="submit">확인 및 사용 처리</button>
         </form>
         <div id="benefitPassResult" class="benefit-pass-result"></div>

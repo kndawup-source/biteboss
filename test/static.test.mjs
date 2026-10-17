@@ -428,3 +428,16 @@ test('82.26 keeps PRO store-manager features visible but disabled for PARTNER st
   assert.match(storeAdminCss, /cursor:not-allowed/);
   assert.match(storeAdminCss, /store-plan-pro \.pro-feature-head>b\{display:none\}/);
 });
+
+
+test('82.27 benefit redemption uses a live full-screen pass while keeping server role validation', () => {
+  const storeAdminHtml = read('store-admin.html');
+  assert.match(html, /id="benefitPassScreen" class="benefit-pass-screen hidden"/);
+  assert.match(html, /id="benefitPassClock"/);
+  assert.match(html, /id="benefitPassCountdown"/);
+  assert.match(app, /sb\.rpc\("biteboss_create_offer_pass"/);
+  assert.match(app, /openBenefitPassScreen\(data, offerId\)/);
+  assert.match(app, /ROLE_REQUIRED/);
+  assert.match(css, /\.benefit-pass-screen\{position:fixed;z-index:1800;inset:0/);
+  assert.match(storeAdminHtml, /<option value="crew" selected>크루 \+ 보스<\/option>/);
+});
