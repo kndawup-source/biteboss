@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.08";
+  const BITEBOSS_BUILD = "82.09";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1191,11 +1191,16 @@ await handleClaimParam();
     };
   }
 
+  function campaignImageForPlacement(campaign, placement){
+    if(placement === "store_list") return String(campaign?.store_list_image_url || "").trim();
+    return String(campaign?.image_url || "").trim();
+  }
+
   function activeCampaignFor(placement){
     const now=Date.now();
     const rows=Array.isArray(config.ad_public_campaigns) ? config.ad_public_campaigns : [];
     const eligible=rows.filter(item => {
-      if(!item?.id || !item?.image_url || !item.is_active) return false;
+      if(!item?.id || !campaignImageForPlacement(item,placement) || !item.is_active) return false;
       const start=item.starts_at ? new Date(item.starts_at).getTime() : 0;
       const end=item.ends_at ? new Date(item.ends_at).getTime() : Infinity;
       return start <= now && end > now && campaignMatchesPlacement(item,placement) && campaignMatchesRegion(item);
@@ -1213,7 +1218,7 @@ await handleClaimParam();
     const now=Date.now();
     const rows=Array.isArray(config.ad_public_campaigns) ? config.ad_public_campaigns : [];
     const eligible=rows.filter(item=>{
-      if(!item?.id || !item?.image_url || !item.is_active) return false;
+      if(!item?.id || !campaignImageForPlacement(item,"store_list") || !item.is_active) return false;
       const start=item.starts_at ? new Date(item.starts_at).getTime() : 0;
       const end=item.ends_at ? new Date(item.ends_at).getTime() : Infinity;
       return start <= now && end > now && campaignMatchesPlacement(item,"store_list") && campaignMatchesRegion(item);
@@ -1234,11 +1239,12 @@ await handleClaimParam();
   }
 
   function storeListAdMarkup(campaign){
-    if(!campaign?.id || !campaign?.image_url) return "";
+    const imageUrl=campaignImageForPlacement(campaign,"store_list");
+    if(!campaign?.id || !imageUrl) return "";
     const clickUrl=/^https?:\/\//i.test(String(campaign.click_url || "")) ? String(campaign.click_url) : "";
     const tag=clickUrl ? "a" : "div";
     const href=clickUrl ? ` href="${escapeAttr(clickUrl)}" target="_blank" rel="noopener noreferrer"` : "";
-    return `<${tag} class="store-list-ad" data-store-list-ad="${escapeAttr(campaign.id)}" data-store-list-ad-store="${escapeAttr(campaign.target_store_id || "")}"${href}><img src="${escapeAttr(campaign.image_url)}" alt="" loading="lazy" decoding="async" /></${tag}>`;
+    return `<${tag} class="store-list-ad" data-store-list-ad="${escapeAttr(campaign.id)}" data-store-list-ad-store="${escapeAttr(campaign.target_store_id || "")}"${href}><img src="${escapeAttr(imageUrl)}" alt="" loading="lazy" decoding="async" /></${tag}>`;
   }
 
   function bindStoreListAd(campaign){

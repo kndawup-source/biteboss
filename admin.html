@@ -342,7 +342,8 @@
 <label>광고주명<input class="input" id="adAdvertiserName" maxlength="120" required=""/></label>
 <label>캠페인명<input class="input" id="adCampaignName" maxlength="160" required=""/></label>
 <label class="wide">대상 매장<select class="input" id="adTargetStore"><option value="">브랜드/일반 광고 · 매장 지정 안 함</option></select><small class="field-help">매장을 지정하면 광고 이후 해당 매장의 방문·점령 전환을 집계합니다.</small></label>
-<label class="wide">배너 이미지<input accept="image/png,image/jpeg,image/webp" class="input" id="adImageFile" type="file"/></label>
+<label class="wide">홈 · 점령 대기 배너 이미지<input accept="image/png,image/jpeg,image/webp" class="input" id="adImageFile" type="file"/><small class="field-help">기존 광고 영역용 · 권장 1200×400 (3:1)</small></label>
+<label class="wide">매장 목록 배너 이미지<input accept="image/png,image/jpeg,image/webp" class="input" id="adStoreListImageFile" type="file"/><small class="field-help">매장 목록 전용 · 공지 배너 크기에 맞춰 별도로 등록합니다. 등록하지 않으면 매장 목록에는 노출되지 않습니다.</small></label>
 <label class="wide">클릭 URL<input class="input" id="adClickUrl" placeholder="https://" type="url"/></label>
 <label>시작일시<div class="admin-datetime-control"><input id="adStartsDatePicker" class="input admin-picker-input admin-date-part" type="date" aria-label="날짜 선택"><input id="adStartsTimePicker" class="input admin-picker-input admin-time-part" type="time" step="60" aria-label="시간 선택"></div><input aria-hidden="true" class="admin-native-datetime-value" id="adStartsAt" required="" tabindex="-1" type="datetime-local"/></label>
 <label>종료일시<div class="admin-datetime-control"><input id="adEndsDatePicker" class="input admin-picker-input admin-date-part" type="date" aria-label="날짜 선택"><input id="adEndsTimePicker" class="input admin-picker-input admin-time-part" type="time" step="60" aria-label="시간 선택"></div><input aria-hidden="true" class="admin-native-datetime-value" id="adEndsAt" tabindex="-1" type="datetime-local"/></label>
@@ -354,7 +355,7 @@
 <div class="admin-form-actions wide"><button class="primary-btn" type="submit">캠페인 저장</button><button class="text-btn hidden" id="adCampaignCancel" type="button">수정 취소</button></div>
 <p aria-live="polite" class="asset-status wide" id="adCampaignStatus"></p>
 </form>
-<div class="admin-ad-guide"><span>권장 비율 3:1 · 1200×400</span><span>같은 우선순위는 랜덤 노출됩니다. 매장 목록 광고는 15개 중 8번째 매장 뒤에 이미지로 표시됩니다.</span></div>
+<div class="admin-ad-guide"><span>홈·점령 대기 3:1 · 1200×400 / 매장 목록은 전용 이미지를 사용합니다.</span><span>같은 우선순위는 랜덤 노출됩니다. 매장 목록 전용 이미지가 없는 캠페인은 매장 목록에 노출하지 않습니다.</span></div>
 </details>
 </div></section>
 <section class="admin-page" id="admin-maintenance">
@@ -588,6 +589,6 @@
 </div>
 </section>
 </div>
-<script src="./admin.js?v=82.08"></script>
+<script src="./admin.js?v=82.09"></script>
 </body>
 </html>

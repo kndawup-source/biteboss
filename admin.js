@@ -2447,7 +2447,9 @@
       placement:["home","takeover","store_list","both","all"].includes(String(value.placement)) ? String(value.placement) : "both",
       target_type:String(value.target_type) === "region" ? "region" : "all",
       target_region:String(value.target_region || "").trim(),
-      target_store_id:String(value.target_store_id || "").trim()
+      target_store_id:String(value.target_store_id || "").trim(),
+      store_list_image_url:String(value.store_list_image_url || "").trim(),
+      store_list_storage_path:String(value.store_list_storage_path || "").trim()
     };
   }
 
@@ -2465,7 +2467,9 @@
       placement:String($("#adPlacement")?.value || "both"),
       target_type:String($("#adTargetType")?.value || "all"),
       target_region:String($("#adTargetRegion")?.value || "").trim(),
-      target_store_id:String($("#adTargetStore")?.value || "").trim()
+      target_store_id:String($("#adTargetStore")?.value || "").trim(),
+      store_list_image_url:String($("#adCampaignForm")?.dataset.storeListImageUrl || "").trim(),
+      store_list_storage_path:String($("#adCampaignForm")?.dataset.storeListStoragePath || "").trim()
     };
     const row={ key:"ad_campaign_settings", value:settings, updated_by:session.user.id, updated_at:new Date().toISOString() };
     const { error }=await adminSb.from("biteboss_app_config").upsert(row,{ onConflict:"key" });
@@ -2482,7 +2486,7 @@
         image_url:item.image_url || "", click_url:item.click_url || "", starts_at:item.starts_at || null,
         ends_at:item.ends_at || null, is_active:Boolean(item.is_active), sort_order:Number(item.sort_order || 0),
         placement:setting.placement, target_type:setting.target_type, target_region:setting.target_region,
-        target_store_id:setting.target_store_id
+        target_store_id:setting.target_store_id, store_list_image_url:setting.store_list_image_url
       };
     });
     const { error }=await adminSb.from("biteboss_app_config").upsert({
@@ -2625,9 +2629,14 @@
     $("#adTargetType").value=setting.target_type;
     $("#adTargetRegion").value=setting.target_region;
     if($("#adTargetStore")) $("#adTargetStore").value=setting.target_store_id || "";
+    const adForm=$("#adCampaignForm");
+    if(adForm){
+      adForm.dataset.storeListImageUrl=setting.store_list_image_url || "";
+      adForm.dataset.storeListStoragePath=setting.store_list_storage_path || "";
+    }
     syncAdTargetRegionField();
     $("#adCampaignCancel")?.classList.remove("hidden");
-    setStatusText($("#adCampaignStatus"), "새 이미지를 선택하지 않으면 기존 배너가 유지됩니다.");
+    setStatusText($("#adCampaignStatus"), "새 이미지를 선택하지 않으면 각 위치의 기존 배너가 유지됩니다.");
     $("#adCampaignForm")?.scrollIntoView({ behavior:"smooth", block:"start" });
   }
 
@@ -2641,6 +2650,10 @@
     if($("#adTargetType")) $("#adTargetType").value = "all";
     if($("#adTargetRegion")) $("#adTargetRegion").value = "";
     if($("#adTargetStore")) $("#adTargetStore").value = "";
+    if(form){
+      delete form.dataset.storeListImageUrl;
+      delete form.dataset.storeListStoragePath;
+    }
     syncAdTargetRegionField();
     $("#adCampaignCancel")?.classList.add("hidden");
     setStatusText($("#adCampaignStatus"), "");
@@ -2660,11 +2673,16 @@
     const id = String($("#adCampaignId")?.value || "").trim();
     const previous = id ? adCampaigns.find(item => String(item.id) === id) : null;
     const file = $("#adImageFile")?.files?.[0] || null;
+    const storeListFile = $("#adStoreListImageFile")?.files?.[0] || null;
     const startsRaw = String($("#adStartsAt")?.value || "").trim();
     const endsRaw = String($("#adEndsAt")?.value || "").trim();
     let imageUrl = previous?.image_url || "";
     let storagePath = previous?.storage_path || "";
     let newStoragePath = "";
+    const previousSetting=id ? campaignSetting(id) : {};
+    let storeListImageUrl=String(previousSetting.store_list_image_url || form?.dataset.storeListImageUrl || "");
+    let storeListStoragePath=String(previousSetting.store_list_storage_path || form?.dataset.storeListStoragePath || "");
+    let newStoreListStoragePath="";
 
     if(!file && !imageUrl){
       setStatusText(status, "배너 이미지를 선택하세요.");
@@ -2690,6 +2708,21 @@
         if(upload.error) throw upload.error;
         imageUrl = adminSb.storage.from("biteboss-assets").getPublicUrl(newStoragePath).data.publicUrl;
         storagePath = newStoragePath;
+      }
+
+      if(storeListFile){
+        const blob=await imageFileToJpegBlob(storeListFile,1800,360,0.9);
+        newStoreListStoragePath=`ads/store-list-${crypto.randomUUID()}.jpg`;
+        const upload=await adminSb.storage.from("biteboss-assets").upload(newStoreListStoragePath,blob,{
+          contentType:"image/jpeg", cacheControl:"86400", upsert:false
+        });
+        if(upload.error) throw upload.error;
+        storeListImageUrl=adminSb.storage.from("biteboss-assets").getPublicUrl(newStoreListStoragePath).data.publicUrl;
+        storeListStoragePath=newStoreListStoragePath;
+      }
+      if(form){
+        form.dataset.storeListImageUrl=storeListImageUrl;
+        form.dataset.storeListStoragePath=storeListStoragePath;
       }
 
       const { data, error } = await adminSb.rpc("biteboss_admin_upsert_campaign", {
@@ -2720,6 +2753,10 @@
         const removed = await adminSb.storage.from("biteboss-assets").remove([previous.storage_path]);
         if(removed.error) console.warn("Old ad asset cleanup:", removed.error);
       }
+      if(newStoreListStoragePath && previousSetting.store_list_storage_path && previousSetting.store_list_storage_path !== newStoreListStoragePath){
+        const removed=await adminSb.storage.from("biteboss-assets").remove([previousSetting.store_list_storage_path]);
+        if(removed.error) console.warn("Old store-list ad asset cleanup:",removed.error);
+      }
 
       resetAdCampaignForm();
       setStatusText(status, "캠페인이 저장되었습니다.");
@@ -2727,6 +2764,9 @@
     }catch(error){
       if(newStoragePath){
         try{ await adminSb.storage.from("biteboss-assets").remove([newStoragePath]); }catch{}
+      }
+      if(newStoreListStoragePath){
+        try{ await adminSb.storage.from("biteboss-assets").remove([newStoreListStoragePath]); }catch{}
       }
       setStatusText(status, `저장 실패 · ${error?.message || "다시 시도하세요."}`);
     }finally{
