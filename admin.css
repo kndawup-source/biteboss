@@ -463,16 +463,186 @@ body.admin-app{min-height:100dvh;background:#f1f1f3;color:#111}
 }
 
 
-/* 81.80 final normalization */
-.admin-app .admin-performance-inline,
-.admin-app .ops-recent,
-.admin-app .gameops-section,
-.admin-app .admin-ad-performance,
-.admin-app .admin-ad-campaigns-section,
-.admin-app .admin-ad-editor-section,
-.admin-app .admin-assets-section,
-.admin-app .admin-comments-card,
-.admin-app .admin-danger-zone{margin:0}
-.admin-app .analytics-kpis{margin:0 0 12px}
-.admin-app .gameops-summary{margin:0}
-.admin-app .admin-editor-danger{margin-top:4px}
+
+/* =========================================================
+   BiteBoss Admin 81.81 — complete canonical UI normalization
+   Covers static HTML + dynamically rendered admin.js classes.
+   ========================================================= */
+
+/* page rhythm */
+.admin-app .admin-page.active{display:block}
+.admin-app .admin-page-body{display:grid;gap:16px}
+.admin-app .admin-page-head{margin:0 0 24px}
+.admin-app .admin-page-head .eyebrow{display:block;margin-bottom:8px;color:#9a9aa0;font-size:9px;font-weight:850}
+.admin-app .admin-page-head h2{margin:0;font-size:28px;line-height:1.05;letter-spacing:-.045em}
+.admin-app .admin-page-head p{margin:8px 0 0;color:#8f8f96;font-size:10px;line-height:1.5}
+.admin-app .admin-section-card{margin:0!important;padding:20px;border:0;border-radius:18px;background:#fff;box-shadow:none}
+.admin-app .admin-section-title,.admin-app .section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin:0 0 16px}
+.admin-app .admin-section-title h3,.admin-app .section-head h3{margin:0;color:#111;font-size:13px;line-height:1.25;font-weight:900}
+.admin-app .admin-section-title p{margin:5px 0 0;color:#96969c;font-size:9px;line-height:1.45}
+.admin-app .section-head>span{flex:0 0 auto;color:#a0a0a6;font-size:9px;line-height:1.3}
+.admin-app .admin-count-chip{flex:0 0 auto;min-width:34px;height:28px;display:grid;place-items:center;padding:0 9px;border-radius:9px;background:#f4f4f5;color:#77777d;font-size:10px;font-weight:900}
+
+/* dashboard summary */
+.admin-app .ops-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0}
+.admin-app .ops-summary>div{min-width:0;min-height:86px;padding:15px;border:0;border-radius:15px;background:#fff}
+.admin-app .ops-summary span{display:block;color:#99999f;font-size:9px;font-weight:750}
+.admin-app .ops-summary strong{display:block;margin-top:9px;color:#111;font-size:23px;line-height:1;font-weight:950}
+
+/* analytics */
+.admin-app .analytics-toolbar{margin:0!important;padding:16px!important;border:0!important;border-radius:16px;background:#fff}
+.admin-app .analytics-presets{display:flex;gap:6px;overflow-x:auto}
+.admin-app .analytics-presets button{min-height:32px;padding:0 10px;border:0;border-radius:9px;background:#f3f3f4;color:#777;font-size:9px;font-weight:850;white-space:nowrap}
+.admin-app .analytics-presets button.active{background:#111;color:#fff}
+.admin-app .analytics-compare-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;padding-top:14px;border-top:1px solid #ededee}
+.admin-app .analytics-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:0}
+.admin-app .analytics-kpis article{min-width:0;min-height:88px;padding:14px;border:0;border-radius:15px;background:#fff}
+.admin-app .analytics-kpis span,.admin-app .analytics-kpis small{display:block;color:#99999f;font-size:8px}
+.admin-app .analytics-kpis strong{display:block;margin:8px 0 6px;color:#111;font-size:24px;line-height:1;font-weight:950}
+.admin-app .analytics-grid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(250px,.75fr);gap:10px;margin:0}
+.admin-app .analytics-panel{min-width:0;padding:18px;border:0;border-radius:16px;background:#fff;box-shadow:none}
+.admin-app .analytics-panel-wide{grid-row:span 2}
+.admin-app .analytics-partner-chart{min-height:150px}
+.admin-app .analytics-vbar-chart{height:260px}
+.admin-app .analytics-lift{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.admin-app .analytics-lift>div{padding:12px;border-radius:12px;background:#f6f6f7}
+
+/* recent activity — matches the actual <time><strong><span> DOM */
+.admin-app .ops-recent{padding:20px;border:0;border-radius:18px;background:#fff;box-shadow:none}
+.admin-app .admin-activity-list{display:grid}
+.admin-app .admin-activity-row{
+  display:grid;
+  grid-template-columns:64px minmax(120px,.65fr) minmax(0,1.35fr);
+  align-items:center;
+  gap:14px;
+  min-height:54px;
+  padding:11px 0;
+  border-bottom:1px solid #ededee;
+}
+.admin-app .admin-activity-row:last-child{border-bottom:0}
+.admin-app .admin-activity-row time{color:#a0a0a6;font-size:9px;white-space:nowrap}
+.admin-app .admin-activity-row>strong{min-width:0;color:#222;font-size:10px;font-weight:850;white-space:nowrap}
+.admin-app .admin-activity-row>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#222;font-size:10px;text-align:right}
+.admin-app .admin-activity-empty{padding:24px 0;color:#99999f;font-size:10px;text-align:center}
+
+/* store management */
+.admin-app .admin-store-toolbar{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;margin:0 0 14px}
+.admin-app .admin-store-toolbar>.input{min-height:42px}
+.admin-app .admin-store-filters{display:flex;align-items:center;gap:5px;min-width:0}
+.admin-app .admin-store-filters button{min-height:34px;padding:0 10px;border:0;border-radius:9px;background:#f2f2f4;color:#777;font:inherit;font-size:9px;font-weight:850;white-space:nowrap}
+.admin-app .admin-store-filters button.active{background:#111;color:#fff}
+.admin-app .admin-store-list{display:grid;gap:8px}
+.admin-app .admin-store-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:14px;padding:14px 15px;border:0;border-radius:15px;background:#f7f7f8;box-shadow:none}
+.admin-app .admin-store-summary{display:grid;grid-template-columns:46px minmax(0,1fr);align-items:center;gap:11px;min-width:0}
+.admin-app .admin-store-title-line{display:flex;align-items:center;gap:7px;min-width:0}
+.admin-app .admin-store-title-line strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.admin-app .admin-store-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:6px}
+.admin-app .admin-store-actions button{min-height:32px}
+.admin-app .admin-action-note{flex-basis:100%;margin-top:2px;color:#a0a0a6;font-size:8px;text-align:right}
+.admin-app .admin-create-store>summary{min-height:66px}
+
+/* collapsible cards */
+.admin-app .admin-collapsible{overflow:hidden;padding:0!important}
+.admin-app .admin-collapsible>summary{min-height:66px;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:0 20px;list-style:none;cursor:pointer}
+.admin-app .admin-collapsible>summary::-webkit-details-marker{display:none}
+.admin-app .admin-collapsible>summary::after{content:"+";color:#99999f;font-size:20px}
+.admin-app .admin-collapsible[open]>summary::after{content:"−"}
+.admin-app .admin-collapsible[open]>summary{border-bottom:1px solid #ededee}
+.admin-app .admin-collapse-summary>span{margin-left:auto;color:#99999f;font-size:9px}
+.admin-app .admin-collapsible>summary~.admin-form,.admin-app .admin-collapsible>summary~.admin-collapse-body{padding:20px}
+
+/* ad performance */
+.admin-app .admin-ad-period{width:120px;min-height:38px}
+.admin-app .admin-ad-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:0 0 12px}
+.admin-app .admin-ad-kpis article{min-width:0;min-height:92px;padding:14px;border-radius:14px;background:#f7f7f8}
+.admin-app .admin-ad-kpis span,.admin-app .admin-ad-kpis small{display:block;color:#99999f;font-size:8px;line-height:1.35}
+.admin-app .admin-ad-kpis strong{display:block;margin:8px 0 6px;color:#111;font-size:24px;line-height:1;font-weight:950;letter-spacing:-.04em}
+.admin-app .admin-ad-chart-panel{min-width:0;margin-top:4px;padding:16px;border-radius:14px;background:#f7f7f8}
+.admin-app .admin-ad-chart{min-width:0;height:230px}
+.admin-app .admin-ad-chart-bars{height:100%;display:flex;align-items:stretch;gap:6px;overflow-x:auto;padding-top:18px;border-bottom:1px solid #dddde0}
+.admin-app .admin-ad-chart-item{min-width:34px;flex:1 0 34px;display:grid;grid-template-rows:minmax(0,1fr) 30px;gap:5px;text-align:center}
+.admin-app .admin-ad-chart-columns{height:100%;display:flex;align-items:flex-end;justify-content:center;gap:2px}
+.admin-app .admin-ad-chart-columns i{display:block;width:5px;min-height:1px;background:#111}
+.admin-app .admin-ad-chart-item>span{overflow:hidden;color:#99999f;font-size:8px;line-height:1.15}
+.admin-app .admin-ad-funnel{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px}
+.admin-app .admin-ad-funnel>div{min-width:0;padding:13px;border-radius:13px;background:#f7f7f8}
+.admin-app .admin-ad-funnel span,.admin-app .admin-ad-funnel small{display:block;color:#99999f;font-size:8px}
+.admin-app .admin-ad-funnel strong{display:block;margin:6px 0 4px;font-size:18px;line-height:1;font-weight:950}
+
+/* forms and date/time */
+.admin-app .field-help{display:block;margin-top:5px;color:#9b9ba1;font-size:8px;line-height:1.4}
+.admin-app .admin-datetime-control{display:grid;grid-template-columns:minmax(0,1fr) 110px;gap:7px}
+.admin-app .admin-native-datetime-value{position:absolute!important;width:1px!important;height:1px!important;overflow:hidden!important;opacity:0!important;pointer-events:none!important}
+.admin-app .admin-small-btn{min-height:30px;padding:0 10px}
+.admin-app .x-btn{width:34px;height:34px;display:grid;place-items:center;border:0;border-radius:50%;background:#f3f3f4;color:#111;font-size:18px}
+.admin-app .default-profile-preview{width:64px;height:64px;border-radius:50%;object-fit:cover;background:#eee}
+.admin-app .store-day-toggles{display:flex;flex-wrap:wrap;gap:6px}
+.admin-app .store-day-toggle{display:flex!important;align-items:center!important;gap:5px!important;padding:8px 9px;border-radius:9px;background:#f4f4f5}
+.admin-app .store-day-toggle input{width:15px;height:15px}
+.admin-app .store-hours-all-day{display:flex!important;align-items:center!important;gap:7px!important}
+.admin-app .admin-compact-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+/* store editor / video / URL */
+.admin-app .admin-editor-panel{background:#f3f3f5}
+.admin-app #adminStoreEditorBody{display:grid;gap:0}
+.admin-app .admin-edit-section{margin:0 0 10px;padding:18px;border:0;border-radius:16px;background:#fff}
+.admin-app .admin-edit-section:last-child{margin-bottom:0}
+.admin-app #adminStoreUrlPreview{display:block;max-width:100%;overflow-wrap:anywhere;word-break:break-word}
+.admin-app .store-video-thumb-row{display:grid;grid-template-columns:84px minmax(0,1fr) auto;align-items:center;gap:10px;min-width:0}
+.admin-app .store-video-thumb-row .store-video-thumb{width:84px;max-width:100%;aspect-ratio:16/9}
+.admin-app .store-video-thumb-copy{min-width:0;overflow:hidden}
+.admin-app .store-video-thumb-copy p,.admin-app .store-video-thumb-copy span{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* common dynamic list controls */
+.admin-app .pagination-btn{min-width:34px;min-height:32px;border:0;border-radius:9px;background:#f2f2f4;font:inherit;font-size:9px;font-weight:850}
+.admin-app .pagination-btn.active{background:#111;color:#fff}
+.admin-app .pagination-status{color:#99999f;font-size:9px}
+.admin-app .timeline-item,.admin-app .muted{color:#99999f;font-size:9px}
+.admin-app .admin-action-btn{min-height:32px;padding:0 10px;border:0;border-radius:9px;background:#f2f2f4;font:inherit;font-size:9px;font-weight:850}
+.admin-app .admin-banner-toggle{display:flex;align-items:center;gap:7px}
+.admin-app .admin-banner-state{color:#777;font-size:9px;font-weight:800}
+
+/* responsive */
+@media(min-width:760px){
+  .admin-app .admin-layout{grid-template-columns:216px minmax(0,1fr)}
+  .admin-app .admin-main{width:100%;max-width:1240px;padding:40px 40px 72px}
+}
+@media(max-width:900px){
+  .admin-app .analytics-grid{grid-template-columns:1fr}
+  .admin-app .analytics-panel-wide{grid-row:auto}
+  .admin-app .admin-store-toolbar{grid-template-columns:1fr}
+  .admin-app .admin-store-filters{overflow-x:auto}
+}
+@media(max-width:759px){
+  .admin-app .admin-main{padding:22px 16px calc(44px + env(safe-area-inset-bottom))}
+  .admin-app .admin-page-body{gap:12px}
+  .admin-app .admin-page-head{margin-bottom:20px}
+  .admin-app .admin-page-head h2{font-size:24px}
+  .admin-app .admin-section-card{padding:16px}
+  .admin-app .ops-summary{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .admin-app .analytics-kpis,.admin-app .admin-ad-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .admin-app .admin-ad-kpis article:last-child{grid-column:1/-1}
+  .admin-app .admin-ad-funnel{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .admin-app .admin-activity-row{grid-template-columns:52px minmax(82px,.65fr) minmax(0,1fr);gap:8px}
+  .admin-app .admin-store-row{grid-template-columns:1fr}
+  .admin-app .admin-store-actions{justify-content:flex-start}
+  .admin-app .admin-action-note{text-align:left}
+  .admin-app .admin-collapsible{padding:0!important}
+  .admin-app .admin-collapsible>summary{min-height:60px;padding:0 16px}
+  .admin-app .admin-collapsible>summary~.admin-form,.admin-app .admin-collapsible>summary~.admin-collapse-body{padding:16px}
+  .admin-app .admin-editor-panel{border-radius:20px 20px 0 0}
+  .admin-app #adminStoreEditorBody{padding:0 12px 28px}
+  .admin-app .store-video-thumb-row{grid-template-columns:70px minmax(0,1fr) auto}
+  .admin-app .store-video-thumb-row .store-video-thumb{width:70px}
+}
+@media(max-width:430px){
+  .admin-app .admin-main{padding-left:14px;padding-right:14px}
+  .admin-app .admin-section-card{padding:15px}
+  .admin-app .ops-summary>div{min-height:78px;padding:13px}
+  .admin-app .analytics-kpis strong,.admin-app .admin-ad-kpis strong{font-size:21px}
+  .admin-app .admin-activity-row{grid-template-columns:46px minmax(70px,.7fr) minmax(0,1.3fr);gap:6px}
+  .admin-app .admin-activity-row time,.admin-app .admin-activity-row>strong,.admin-app .admin-activity-row>span{font-size:8px}
+  .admin-app .admin-datetime-control{grid-template-columns:1fr}
+  .admin-app .store-video-thumb-row{grid-template-columns:62px minmax(0,1fr) auto}
+  .admin-app .store-video-thumb-row .store-video-thumb{width:62px}
+}
