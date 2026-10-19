@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.47";
+  const BITEBOSS_BUILD = "82.48";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -5146,6 +5146,32 @@ await handleClaimParam();
     }
   }
 
+  function dismissVisibleTakeoverChoices(){
+    const body=$("#modalBody");
+    if(!body) return;
+    body.querySelectorAll("[data-takeover-choice]").forEach(button=>{
+      dismissTakeoverStore(String(button.dataset.takeoverChoice||"").trim());
+    });
+  }
+
+  function dismissNearbyTakeoverCandidates(pos, exceptStoreId=""){
+    if(!pos?.coords) return;
+    const excluded=String(exceptStoreId||"").trim();
+    const radius=Math.max(20,Number(config.gps_capture_radius_m||config.gps_radius_m||80));
+    stores.forEach(store=>{
+      const id=String(store?.id||"").trim();
+      if(!id || id===excluded || isMyBossStore(store)) return;
+      if(!Number.isFinite(Number(store.latitude)) || !Number.isFinite(Number(store.longitude))) return;
+      const distance=haversineMeters(
+        pos.coords.latitude,
+        pos.coords.longitude,
+        Number(store.latitude),
+        Number(store.longitude)
+      );
+      if(distance<=radius) dismissTakeoverStore(id);
+    });
+  }
+
   function closeTakeoverChoice(){
     takeoverChoiceOpen=false;
     closeModal();
@@ -5855,6 +5881,12 @@ await handleClaimParam();
         const outcomeStatus=String(data?.status || "");
         const outcome=String(data?.outcome || "");
         if(outcomeStatus === "claimed" || outcomeStatus === "boss_visit" || outcomeStatus === "boss_reclaim") markStoreOwnedLocally(nearest.store);
+        if(outcomeStatus === "claimed" || outcomeStatus === "boss_reclaim"){
+          // A completed capture must not immediately trigger another nearby-store
+          // chooser while the player is standing in the same place. Nearby
+          // candidates become available again after leaving their reset radius.
+          dismissNearbyTakeoverCandidates(pos, nearest.store.id);
+        }
         if(outcome === "boss_reclaim" || outcomeStatus === "boss_reclaim"){
           applyOptimisticReclaimCompletion(nearest.store.id, data?.reclaimed_at);
         }
@@ -10389,6 +10421,11 @@ await handleClaimParam();
   }
 
   function closeModal(options = {}){
+    // Closing the nearby-store chooser is an explicit dismissal. Keep every
+    // currently offered store suppressed until the user leaves the area so the
+    // chooser cannot reopen on the next GPS tick. Programmatic selection uses
+    // closeTakeoverChoice(), which clears takeoverChoiceOpen first.
+    if(takeoverChoiceOpen) dismissVisibleTakeoverChoices();
     stopScanner();
     destroyStoreDetailMap();
     storeReclaimTimer = clearIntervalRef(storeReclaimTimer);

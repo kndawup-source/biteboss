@@ -561,3 +561,12 @@ test('store detail photo gallery shows centered dots only for multiple photos', 
   assert.match(app, /aria-current/);
   assert.match(css, /\.store-detail-photo-dots\{[^}]*left:50%[^}]*bottom:10px/);
 });
+
+test('nearby takeover chooser respects explicit dismissal and post-capture suppression', () => {
+  assert.match(app, /function dismissVisibleTakeoverChoices\(\)/);
+  assert.match(app, /if\(takeoverChoiceOpen\) dismissVisibleTakeoverChoices\(\)/);
+  assert.match(app, /function dismissNearbyTakeoverCandidates\(pos, exceptStoreId=""\)/);
+  assert.match(app, /dismissNearbyTakeoverCandidates\(pos, nearest\.store\.id\)/);
+  const closeChoice = blockBetween(app, 'function closeTakeoverChoice()', 'function takeoverChoiceCard');
+  assert.match(closeChoice, /takeoverChoiceOpen=false;[\s\S]*closeModal\(\)/);
+});
