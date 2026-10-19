@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.49";
+  const BITEBOSS_BUILD = "82.50";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -351,22 +351,37 @@
 
 
   function resolveApiBaseUrl(){
-    // Browser/PWA builds must call their own deployment origin.
-    // publicAppUrl is for public/share URLs and must not force preview builds
-    // to call the production /api origin (which triggers CORS preflights).
+    const configured = String(cfg.apiBaseUrl || cfg.publicAppUrl || "").trim();
+    if(configured){
+      try{
+        const candidate = new URL(configured);
+        if(candidate.protocol === "https:" || candidate.protocol === "http:") return candidate;
+      }catch{}
+    }
     if(location.protocol === "https:" || location.protocol === "http:"){
       try{ return new URL(location.origin); }catch{}
     }
-
-    // Packaged native builds have no web /api origin, so use an explicitly
-    // configured HTTPS API origin. publicAppUrl remains a compatibility fallback.
-    const configured = String(cfg.apiBaseUrl || cfg.publicAppUrl || "").trim();
-    if(!configured) return null;
-    try{
-      const candidate = new URL(configured);
-      if(candidate.protocol === "https:" || candidate.protocol === "http:") return candidate;
-    }catch{}
     return null;
+  }
+
+  function resolveAutoImportApiBaseUrl(){
+    const configured = resolveApiBaseUrl();
+    if(!configured) return null;
+
+    // Auto-import mutates the shared store catalog. Browser previews must never
+    // call a different deployment origin (CORS) or their own preview /api route
+    // with potentially different environment settings. On non-canonical web
+    // origins we simply skip auto-import and keep showing the existing Supabase
+    // store catalog unchanged.
+    if(location.protocol === "https:" || location.protocol === "http:"){
+      try{
+        const publicOrigin = new URL(String(cfg.publicAppUrl || configured.toString())).origin;
+        if(location.origin !== publicOrigin) return null;
+      }catch{
+        return null;
+      }
+    }
+    return configured;
   }
 
   function syncRuntimeShell(){
@@ -1976,7 +1991,7 @@ await handleClaimParam();
       const timer = setTimeout(() => controller.abort(), RUNTIME.apiTimeoutMs);
 
       try{
-        const apiBase = resolveApiBaseUrl();
+        const apiBase = resolveAutoImportApiBaseUrl();
 
         // Native packaged origins cannot host /api routes.
         // Without a configured HTTPS API, only auto-import is skipped.
