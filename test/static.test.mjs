@@ -570,3 +570,15 @@ test('nearby takeover chooser respects explicit dismissal and post-capture suppr
   const closeChoice = blockBetween(app, 'function closeTakeoverChoice()', 'function takeoverChoiceCard');
   assert.match(closeChoice, /takeoverChoiceOpen=false;[\s\S]*closeModal\(\)/);
 });
+
+
+test('82.49 web API requests stay on the current deployment origin', () => {
+  const resolver = blockBetween(app, 'function resolveApiBaseUrl()', 'function syncRuntimeShell');
+  assert.match(resolver, /location\.protocol === "https:" \|\| location\.protocol === "http:"/);
+  assert.match(resolver, /new URL\(location\.origin\)/);
+  assert.match(resolver, /cfg\.apiBaseUrl \|\| cfg\.publicAppUrl/);
+  const nearby = blockBetween(app, 'async function syncNearbyAutoStores', 'function clampPage');
+  assert.match(nearby, /const apiBase = resolveApiBaseUrl\(\)/);
+  assert.match(nearby, /new URL\("\/api\/nearby-stores", apiBase\)/);
+  assert.doesNotMatch(nearby, /cfg\.apiBaseUrl \|\| cfg\.publicAppUrl/);
+});

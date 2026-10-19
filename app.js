@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.48";
+  const BITEBOSS_BUILD = "82.49";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -350,6 +350,25 @@
 
 
 
+  function resolveApiBaseUrl(){
+    // Browser/PWA builds must call their own deployment origin.
+    // publicAppUrl is for public/share URLs and must not force preview builds
+    // to call the production /api origin (which triggers CORS preflights).
+    if(location.protocol === "https:" || location.protocol === "http:"){
+      try{ return new URL(location.origin); }catch{}
+    }
+
+    // Packaged native builds have no web /api origin, so use an explicitly
+    // configured HTTPS API origin. publicAppUrl remains a compatibility fallback.
+    const configured = String(cfg.apiBaseUrl || cfg.publicAppUrl || "").trim();
+    if(!configured) return null;
+    try{
+      const candidate = new URL(configured);
+      if(candidate.protocol === "https:" || candidate.protocol === "http:") return candidate;
+    }catch{}
+    return null;
+  }
+
   function syncRuntimeShell(){
     let native = false;
     try{
@@ -427,13 +446,9 @@
     if(accessTelemetryGeoPromise) return accessTelemetryGeoPromise;
     accessTelemetryGeoPromise=(async()=>{
       try{
-        const configuredApiBase=String(cfg.apiBaseUrl || cfg.publicAppUrl || "").trim();
-        let endpoint="/api/access-context";
-        if(configuredApiBase){
-          endpoint=new URL("/api/access-context",configuredApiBase).toString();
-        }else if(location.protocol !== "https:" && location.protocol !== "http:"){
-          return {countryCode:"",regionCode:""};
-        }
+        const apiBase = resolveApiBaseUrl();
+        if(!apiBase) return {countryCode:"",regionCode:""};
+        const endpoint = new URL("/api/access-context", apiBase).toString();
         const response=await fetch(endpoint,{cache:"no-store",credentials:"same-origin"});
         if(!response.ok) return {countryCode:"",regionCode:""};
         const data=await response.json();
@@ -1961,17 +1976,7 @@ await handleClaimParam();
       const timer = setTimeout(() => controller.abort(), RUNTIME.apiTimeoutMs);
 
       try{
-        const configuredApiBase = String(cfg.apiBaseUrl || cfg.publicAppUrl || "").trim();
-        let apiBase = null;
-
-        try{
-          if(configuredApiBase){
-            const candidate = new URL(configuredApiBase);
-            if(candidate.protocol === "https:" || candidate.protocol === "http:") apiBase = candidate;
-          }else if(location.protocol === "https:" || location.protocol === "http:"){
-            apiBase = new URL(location.origin);
-          }
-        }catch{}
+        const apiBase = resolveApiBaseUrl();
 
         // Native packaged origins cannot host /api routes.
         // Without a configured HTTPS API, only auto-import is skipped.
