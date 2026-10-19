@@ -572,13 +572,12 @@ test('nearby takeover chooser respects explicit dismissal and post-capture suppr
 });
 
 
-test('82.49 web API requests stay on the current deployment origin', () => {
-  const resolver = blockBetween(app, 'function resolveApiBaseUrl()', 'function syncRuntimeShell');
-  assert.match(resolver, /location\.protocol === "https:" \|\| location\.protocol === "http:"/);
-  assert.match(resolver, /new URL\(location\.origin\)/);
-  assert.match(resolver, /cfg\.apiBaseUrl \|\| cfg\.publicAppUrl/);
+test('82.50 preview builds preserve the existing store catalog and skip auto-import', () => {
+  const resolver = blockBetween(app, 'function resolveAutoImportApiBaseUrl()', 'function syncRuntimeShell');
+  assert.match(resolver, /location\.origin !== publicOrigin/);
+  assert.match(resolver, /return null/);
   const nearby = blockBetween(app, 'async function syncNearbyAutoStores', 'function clampPage');
-  assert.match(nearby, /const apiBase = resolveApiBaseUrl\(\)/);
+  assert.match(nearby, /const apiBase = resolveAutoImportApiBaseUrl\(\)/);
+  assert.match(nearby, /if\(!apiBase\) return null/);
   assert.match(nearby, /new URL\("\/api\/nearby-stores", apiBase\)/);
-  assert.doesNotMatch(nearby, /cfg\.apiBaseUrl \|\| cfg\.publicAppUrl/);
 });
