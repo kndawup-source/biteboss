@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.51";
+  const BITEBOSS_BUILD = "82.52";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -5647,6 +5647,23 @@ await handleClaimParam();
 
   async function tickPresenceTracking(){
     if(presenceBusy || document.hidden || !window.sb) return;
+    presenceBusy = true;
+
+    // Global capture cooldown is authoritative for every automatic nearby-capture flow.
+    // Refresh it before choosing a target so app startup / resume cannot race ahead of
+    // the cooldown RPC and reopen either an owned-store reclaim or a new-store chooser.
+    await loadCaptureCooldownStatus();
+    if(captureCooldownActive()){
+      preferredTakeoverStoreId = "";
+      if(takeoverChoiceOpen){
+        takeoverChoiceOpen = false;
+        closeModal();
+      }
+      if(takeoverUi) closeTakeoverUi();
+      updateChallengeCommand(stores);
+      presenceBusy = false;
+      return;
+    }
 
     const candidates = stores.filter(store => {
       if(!store?.id) return false;
@@ -5662,13 +5679,14 @@ await handleClaimParam();
         new Date(protectionUntil).getTime() > Date.now()
       );
 
-      if(captureCooldownActive()) return ownedByMe;
       return ownedByMe || !protectedNow;
     });
 
-    if(!candidates.length) return;
+    if(!candidates.length){
+      presenceBusy = false;
+      return;
+    }
 
-    presenceBusy = true;
     try{
       const pos = await getPositionSafe(false);
       if(!pos) return;
