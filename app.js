@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.53";
+  const BITEBOSS_BUILD = "82.55";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -127,6 +127,8 @@
   }
   let homeSplashRequestId = 0;
   const HOME_SPLASH_CACHE_KEY = "biteboss:home-splash-url";
+
+  const NEARBY_STORE_FETCH_LIMIT = 30;
   const HOME_COPY_CACHE_KEY = "biteboss:home-copy-v1";
   const PARTNER_BANNERS_CACHE_KEY = "biteboss:partner-banners";
 
@@ -143,7 +145,6 @@
     gps_nearby_watch_max_accuracy_m:250,
     daily_store_limit:1,
     nearby_radius_m:3000,
-    nearby_limit:30,
     auto_store_import_enabled:true,
     auto_store_import_min_count:10,
     auto_store_import_radius_m:1000,
@@ -1868,7 +1869,7 @@ await handleClaimParam();
         p_lat:lastPosition.coords.latitude,
         p_lng:lastPosition.coords.longitude,
         p_radius_m:Number(config.nearby_radius_m || 3000),
-        p_limit:Number(config.nearby_limit || 30)
+        p_limit:NEARBY_STORE_FETCH_LIMIT
       });
     }else{
       result = await sb.rpc("biteboss_list_stores_v631", { p_limit:100 });
@@ -1919,7 +1920,7 @@ await handleClaimParam();
         p_lat:lastPosition.coords.latitude,
         p_lng:lastPosition.coords.longitude,
         p_radius_m:Number(config.nearby_radius_m || 3000),
-        p_limit:Number(config.nearby_limit || 30)
+        p_limit:NEARBY_STORE_FETCH_LIMIT
       });
 
       if(!refreshed.error){
@@ -4568,9 +4569,9 @@ await handleClaimParam();
       </div>
       ${items.length > PROFILE_ACTIVITY_ALL_PAGE_SIZE ? `
         <nav class="list-pagination profile-activity-pagination" aria-label="전체 활동 페이지">
-          <button type="button" data-profile-activity-page="prev" ${profileActivityAllPage<=1 ? "disabled" : ""}>이전</button>
-          <span>${profileActivityAllPage} / ${pageCount}</span>
-          <button type="button" data-profile-activity-page="next" ${profileActivityAllPage>=pageCount ? "disabled" : ""}>다음</button>
+          <button type="button" class="pagination-btn" data-profile-activity-page="prev" ${profileActivityAllPage<=1 ? "disabled" : ""} aria-label="이전 페이지">이전</button>
+          <span class="pagination-status" aria-live="polite"><b>${profileActivityAllPage}</b><span>/ ${pageCount}</span></span>
+          <button type="button" class="pagination-btn" data-profile-activity-page="next" ${profileActivityAllPage>=pageCount ? "disabled" : ""} aria-label="다음 페이지">다음</button>
         </nav>
       ` : ""}
     `;
