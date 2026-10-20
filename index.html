@@ -22,8 +22,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet" />
-  <link rel="manifest" href="/manifest.webmanifest?v=82.56" />
-  <link rel="stylesheet" href="/styles.css?v=82.56" />
+  <link rel="manifest" href="/manifest.webmanifest?v=82.57" />
+  <link rel="stylesheet" href="/styles.css?v=82.57" />
 </head>
 <body class="user-app home-active">
 <div id="app" class="app-shell">
@@ -229,6 +229,15 @@
       <span id="takeoverEyebrow" class="takeover-eyebrow">TAKING OVER</span>
       <strong id="takeoverStoreName" class="takeover-store-name">매장</strong>
     </div>
+    <aside id="takeoverAdSlot" class="takeover-ad-slot hidden" aria-label="점령 대기 광고">
+      <div class="takeover-ad-meta">
+        <span class="takeover-ad-brand"><span class="ad-store-profile"><img id="takeoverAdProfileImage" class="hidden" src="" alt=""/><span id="takeoverAdProfileFallback" class="ad-store-profile-fallback">B</span></span><span>AD</span></span>
+        <span id="takeoverAdAdvertiser">광고</span>
+      </div>
+      <a id="takeoverAdLink" class="takeover-ad-link" rel="sponsored noopener noreferrer">
+        <img id="takeoverAdImage" class="takeover-ad-image" src="" alt=""/>
+      </a>
+    </aside>
     <div class="takeover-count-wrap">
       <div class="takeover-count-meta" aria-hidden="true"><span>TIME REMAINING</span><span>SEC</span></div>
       <div id="takeoverCount" class="takeover-count">00:20</div>
@@ -275,6 +284,6 @@
   </div>
 </div>
 
-<script src="/bootstrap.js?v=82.56"></script>
+<script src="/bootstrap.js?v=82.57"></script>
 </body>
 </html>
