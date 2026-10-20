@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.68";
+  const BITEBOSS_BUILD = "82.69";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -5697,6 +5697,9 @@ await handleClaimParam();
       if(videoId && /^[A-Za-z0-9_-]{6,20}$/.test(videoId)){
         flushText();
         chunks.push(`<div class="news-youtube"><iframe src="https://www.youtube-nocookie.com/embed/${escapeAttr(videoId)}?playsinline=1&rel=0" title="YouTube video player" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div>`);
+      }else if(line===""){
+        flushText();
+        chunks.push('<span class="news-body-gap" aria-hidden="true"></span>');
       }else{
         textLines.push(line);
       }

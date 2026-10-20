@@ -40,6 +40,14 @@
       "destination": "/index.html"
     },
     {
+      "source": "/news/:slug",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/news",
+      "destination": "/index.html"
+    },
+    {
       "source": "/sitemap.xml",
       "destination": "/api/sitemap"
     },
