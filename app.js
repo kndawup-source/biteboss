@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.72";
+  const BITEBOSS_BUILD = "82.73";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -5782,7 +5782,7 @@ await handleClaimParam();
     const list=root.querySelector('[data-news-comment-list]');
     const pagination=root.querySelector('[data-news-comment-pagination]');
     if(list) list.innerHTML='<div class="app-state">한마디를 불러오는 중…</div>';
-    const {data,error}=await sb.rpc('biteboss_news_comments_v8272',{
+    const {data,error}=await sb.rpc('biteboss_news_comments_v8273',{
       p_post_id:postId,
       p_page:Math.max(1,Number(page || 1)),
       p_page_size:10
@@ -5841,21 +5841,21 @@ await handleClaimParam();
         if(next===null) return;
         const body=String(next).trim();
         if(!body || Array.from(body).length>120){ toast('한마디는 1~120자로 작성해 주세요.'); return; }
-        const {data,error}=await sb.rpc('biteboss_news_comment_update_v8272',{p_comment_id:id,p_body:body});
+        const {data,error}=await sb.rpc('biteboss_news_comment_update_v8273',{p_comment_id:id,p_body:body});
         if(error || !data?.ok){ toast('수정하지 못했습니다.'); return; }
         const state=newsCommentState.get(String(postId));
         await loadNewsComments(postId,state?.page || 1);
       });
       row.querySelector('[data-news-comment-delete]')?.addEventListener('click',async()=>{
         if(!confirm('이 한마디를 삭제할까요?')) return;
-        const {data,error}=await sb.rpc('biteboss_news_comment_delete_v8272',{p_comment_id:id});
+        const {data,error}=await sb.rpc('biteboss_news_comment_delete_v8273',{p_comment_id:id});
         if(error || !data?.ok){ toast('삭제하지 못했습니다.'); return; }
         const state=newsCommentState.get(String(postId));
         await loadNewsComments(postId,state?.page || 1);
       });
       row.querySelector('[data-news-comment-report]')?.addEventListener('click',async()=>{
         if(!playerSession?.authenticated){ openMemberLogin(); return; }
-        const {data,error}=await sb.rpc('biteboss_news_comment_report_v8272',{p_comment_id:id,p_reason:'user_report'});
+        const {data,error}=await sb.rpc('biteboss_news_comment_report_v8273',{p_comment_id:id,p_reason:'user_report'});
         if(error || !data?.ok){
           const code=String(data?.error || error?.message || '');
           toast(code.includes('ALREADY_REPORTED') ? '이미 신고한 한마디입니다.' : '신고하지 못했습니다.');
@@ -5880,7 +5880,7 @@ await handleClaimParam();
     try{
       const nickname=String(profile?.nickname || playerSession?.nickname || authUser?.user_metadata?.nickname || '사용자').trim().slice(0,40);
       const avatarUrl=String(profile?.avatar_url || authUser?.user_metadata?.avatar_url || '').trim().slice(0,500);
-      const {data,error}=await sb.rpc('biteboss_news_comment_create_v8272',{
+      const {data,error}=await sb.rpc('biteboss_news_comment_create_v8273',{
         p_post_id:postId,
         p_body:body,
         p_nickname:nickname,
@@ -5888,7 +5888,13 @@ await handleClaimParam();
       });
       if(error || !data?.ok){
         const code=String(data?.error || error?.message || '');
-        if(status) status.textContent=code.includes('COMMENT_COOLDOWN') ? '잠시 후 다시 작성해 주세요.' : '등록하지 못했습니다.';
+        if(status) status.textContent=code.includes('COMMENT_COOLDOWN')
+          ? '잠시 후 다시 작성해 주세요.'
+          : code.includes('MEMBER_LOGIN_REQUIRED') || code.includes('LOGIN_REQUIRED')
+            ? '로그인 정보를 다시 확인해 주세요.'
+            : code.includes('NEWS_POST_NOT_FOUND')
+              ? '게시글을 찾을 수 없습니다.'
+              : '등록하지 못했습니다.';
         return;
       }
       form.reset();
