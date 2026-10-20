@@ -15,7 +15,7 @@
           detectSessionInUrl:false,
           storageKey:"biteboss-admin-auth"
         },
-        global:{ headers:{ "x-client-info":"biteboss-admin-web/82.60" } }
+        global:{ headers:{ "x-client-info":"biteboss-admin-web/82.68" } }
       })
     : null;
 
@@ -375,6 +375,7 @@
     $("#newsForm")?.addEventListener("submit", saveNewsPost);
     $("#newsNewBtn")?.addEventListener("click", resetNewsForm);
     $("#newsCancelBtn")?.addEventListener("click", resetNewsForm);
+    $("#newsUrlCopyBtn")?.addEventListener("click", copyNewsPublicUrl);
     $("#newsDeleteBtn")?.addEventListener("click", deleteNewsPost);
     $("#adCampaignForm")?.addEventListener("submit", saveAdCampaign);
     $("#adCreativeForm")?.addEventListener("submit", saveAdCreative);
@@ -1894,6 +1895,7 @@
   function newsPosts(){
     return newsAdminPosts.map(item=>({
       id:String(item?.id || "").trim(),
+      slug:String(item?.slug || "").trim(),
       category:NEWS_CATEGORIES.has(String(item?.category || "").toUpperCase()) ? String(item.category).toUpperCase() : "NOTICE",
       title:String(item?.title || "").trim(),
       summary:String(item?.summary || "").trim(),
@@ -1951,6 +1953,7 @@
     if($("#newsPublished")) $("#newsPublished").value="true";
     if($("#newsPinned")) $("#newsPinned").value="false";
     if($("#newsTitle")) $("#newsTitle").value="";
+    if($("#newsPublicUrl")) $("#newsPublicUrl").value="";
     if($("#newsSummary")) $("#newsSummary").value="";
     if($("#newsImageUrl")) $("#newsImageUrl").value="";
     if($("#newsBody")) $("#newsBody").value="";
@@ -1967,12 +1970,20 @@
     if($("#newsPublished")) $("#newsPublished").value=String(post.published);
     if($("#newsPinned")) $("#newsPinned").value=String(post.pinned);
     if($("#newsTitle")) $("#newsTitle").value=post.title;
+    if($("#newsPublicUrl")) $("#newsPublicUrl").value=post.slug ? `${location.origin}/news/${encodeURIComponent(post.slug)}` : "";
     if($("#newsSummary")) $("#newsSummary").value=post.summary;
     if($("#newsImageUrl")) $("#newsImageUrl").value=post.image_url;
     if($("#newsBody")) $("#newsBody").value=post.body;
     setText("#newsEditorTitle","게시글 수정");
     $("#newsDeleteBtn")?.classList.remove("hidden");
     $("#newsForm")?.scrollIntoView?.({behavior:"smooth",block:"start"});
+  }
+
+  async function copyNewsPublicUrl(){
+    const value=String($("#newsPublicUrl")?.value || "").trim();
+    if(!value){ setStatusText($("#newsStatus"),"게시글을 먼저 저장해 주세요."); return; }
+    try{ await navigator.clipboard.writeText(value); setStatusText($("#newsStatus"),"고유주소를 복사했습니다."); }
+    catch{ setStatusText($("#newsStatus"),"주소를 복사하지 못했습니다."); }
   }
 
   async function saveNewsPost(event){
@@ -1993,7 +2004,7 @@
     if(button) button.disabled=true;
     setStatusText(status,"저장 중…");
     try{
-      const {data,error}=await adminRpc("biteboss_admin_news_upsert_v8260",{p_post:{
+      const {data,error}=await adminRpc("biteboss_admin_news_upsert_v8265",{p_post:{
         id:currentId || null,
         category:NEWS_CATEGORIES.has(category) ? category : "NOTICE",
         title,summary,image_url:imageUrl,body,

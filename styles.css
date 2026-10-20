@@ -146,6 +146,7 @@ body.user-app #page-home{position:fixed;inset:0;height:auto;min-height:0;padding
 .boss-avatar img,.boss-focus-avatar img{
   width:100%;height:100%;object-fit:cover;border-radius:50%;
 }
+.profile-photo-btn img,.boss-avatar,.my-rank-avatar,.rank-avatar,.player-profile-avatar,.store-comment-avatar,.organization-member-avatar{backface-visibility:hidden;transform:translateZ(0)}
 .store-avatar-fallback,.boss-avatar-fallback{
   display:grid;place-items:center;background:#e0e0e2;color:#111;line-height:1;
 }
@@ -543,65 +544,57 @@ body.biteboss-info-page{min-height:100dvh;background:var(--bg);color:#111}.info-
 
 
 
-/* 82.62 — news as a native app page */
+/* News */
 .news-page{padding-bottom:calc(92px + env(safe-area-inset-bottom))}
-.news-page-head{margin-bottom:18px}
-.news-promo{margin-bottom:16px}
-.news-list-view,.news-detail{min-width:0}
-.news-filters{display:flex;gap:6px;overflow-x:auto;margin:0 0 14px;padding:0 0 2px;scrollbar-width:none}
-.news-filters::-webkit-scrollbar{display:none}
-.news-filters button{flex:0 0 auto;min-height:34px;padding:0 11px;border:0;border-radius:10px;background:#ededf0;color:#7f7f86;font:inherit;font-size:9px;font-weight:840}
-.news-filters button.active{background:#111;color:#fff}
-.news-list{display:grid;gap:12px}
-.news-list-card{width:100%;min-width:0;overflow:hidden;padding:0;border:0;border-radius:16px;background:#fff;color:inherit;text-align:left;font:inherit;box-shadow:0 8px 22px rgba(0,0,0,.025)}
-.news-list-visual{display:block;width:100%;aspect-ratio:16/7;overflow:hidden;background:#ececef}
-.news-list-visual img{display:block;width:100%;height:100%;object-fit:cover}
-.news-list-copy{position:relative;display:block;min-width:0;padding:16px 42px 16px 16px}
-.news-list-copy small{display:block;color:#96969c;font-size:8px;font-weight:860;letter-spacing:.06em}
-.news-list-copy strong{display:block;margin-top:6px;color:#111;font-size:15px;line-height:1.28;font-weight:860;letter-spacing:-.025em;overflow-wrap:anywhere}
-.news-list-copy p{margin:6px 0 0;color:#8f8f96;font-size:10px;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.news-list-copy i{position:absolute;right:16px;top:50%;transform:translateY(-50%);color:#aaaab0;font-size:22px;font-style:normal;font-weight:400}
-.news-list-card:active{transform:scale(.997)}
-.news-empty{padding:44px 0;color:#99999f;font-size:10px;text-align:center}
-.news-detail{padding-bottom:6px}
-.news-inline-back{min-height:32px;margin:0 0 12px;padding:0;border:0;background:transparent;color:#77777d;font:inherit;font-size:9px;font-weight:820}
-.news-article{padding:18px 16px;border-radius:16px;background:#fff;box-shadow:0 8px 22px rgba(0,0,0,.025)}
-.news-article header{padding:0 0 18px}
-.news-article header small{color:#96969c;font-size:8px;font-weight:860;letter-spacing:.06em}
-.news-article h2{margin:7px 0 0;color:#111;font-size:24px;line-height:1.12;font-weight:900;letter-spacing:-.045em;word-break:keep-all}
-.news-article header p{margin:9px 0 0;color:#8f8f96;font-size:10px;line-height:1.55}
-.news-cover{display:block;width:100%;max-height:520px;object-fit:cover;margin:0 0 22px;border-radius:12px;background:#ececef}
-.news-body{color:#333338;font-size:12px;line-height:1.8;word-break:keep-all;overflow-wrap:anywhere}
-@media(max-width:430px){
-  .news-page{padding-left:16px;padding-right:16px}
-  .news-list-copy{padding:15px 40px 15px 15px}
-  .news-list-copy strong{font-size:14px}
-  .news-article{padding:16px 15px}
-  .news-article h2{font-size:22px}
-}
-
-/* 82.64 — news feed, native app hierarchy */
 .news-page-head{margin-bottom:14px}
+.news-page-head .page-kicker{display:block;margin-bottom:5px}
 .news-page-head h2{margin-top:0}
+.news-page-head p{max-width:520px}
 .news-promo{margin-bottom:14px}
-.news-filters{gap:18px;margin:0 0 12px;padding:0 1px 8px;border-bottom:1px solid #e8e8ea}
-.news-filters button{min-height:28px;padding:0;border:0;border-radius:0;background:transparent;color:#a0a0a6;font-size:8px;font-weight:850;letter-spacing:.035em}
-.news-filters button.active{background:transparent;color:#111}
-.news-list{gap:10px}
-.news-list-card{border:1px solid rgba(17,17,19,.035);border-radius:16px;background:#fff;box-shadow:none}
-.news-list-visual{aspect-ratio:3/2}
-.news-list-copy{padding:15px 38px 15px 15px}
+.news-list-view,.news-detail{min-width:0}
+.news-featured{margin:0 0 16px}
+.news-featured-card{display:block;overflow:hidden;border:1px solid rgba(17,17,19,.04);border-radius:18px;background:#111;color:#fff;text-decoration:none}
+.news-featured-visual{display:block;width:100%;aspect-ratio:16/9;overflow:hidden;background:#202024}
+.news-featured-visual img{display:block;width:100%;height:100%;object-fit:cover}
+.news-featured-copy{display:block;padding:17px 17px 18px}
+.news-featured-label{display:block;margin-bottom:9px;color:#a9a9af;font-size:8px;font-weight:900;letter-spacing:.11em}
+.news-featured-card .news-list-meta{margin-bottom:9px}
+.news-featured-card .news-list-meta small,.news-featured-card .news-list-meta time{color:#a9a9af}
+.news-featured-copy>strong{display:block;color:#fff;font-size:22px;line-height:1.15;font-weight:900;letter-spacing:-.04em;word-break:keep-all;overflow-wrap:anywhere}
+.news-featured-copy>p{margin:8px 0 0;color:#bdbdc3;font-size:10px;line-height:1.55;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.news-featured-more{display:flex;align-items:center;justify-content:flex-end;gap:5px;margin-top:16px;color:#d7d7db;font-size:9px;font-weight:850}
+.news-featured-more i{font-size:17px;font-style:normal;font-weight:400;line-height:1}
+.news-featured-card:active{transform:scale(.997)}
+.news-filters{display:flex;gap:18px;overflow-x:auto;margin:0 0 12px;padding:0 1px 8px;border-bottom:1px solid #e8e8ea;scrollbar-width:none}
+.news-filters::-webkit-scrollbar{display:none}
+.news-filters button{flex:0 0 auto;min-height:28px;padding:0;border:0;border-radius:0;background:transparent;color:#a0a0a6;font:inherit;font-size:8px;font-weight:850;letter-spacing:.035em}
+.news-filters button.active{color:#111}
+.news-list{display:grid;gap:10px}
+.news-list-card{width:100%;min-width:0;overflow:hidden;padding:0;border:1px solid rgba(17,17,19,.035);border-radius:16px;background:#fff;color:inherit;text-align:left;text-decoration:none;font:inherit;box-shadow:none}
+.news-list-card:active{transform:scale(.997)}
+.news-list-visual{display:block;width:100%;aspect-ratio:3/2;overflow:hidden;background:#ececef}
+.news-list-visual img{display:block;width:100%;height:100%;object-fit:cover}
+.news-list-copy{position:relative;display:block;min-width:0;padding:15px 38px 15px 15px}
 .news-list-meta,.news-article-meta{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0}
 .news-list-meta small,.news-list-meta time,.news-article-meta small,.news-article-meta time{color:#9a9aa0;font-size:8px;font-weight:830;line-height:1.2;letter-spacing:.035em;font-style:normal}
 .news-list-meta time,.news-article-meta time{font-weight:700;letter-spacing:0;white-space:nowrap}
-.news-list-copy strong{margin-top:7px;font-size:14px;line-height:1.3}
-.news-list-copy p{margin-top:5px;font-size:9px;line-height:1.5}
-.news-list-copy i{right:14px;color:#b0b0b5;font-size:19px}
-.news-article{padding:17px 15px;border:1px solid rgba(17,17,19,.035);border-radius:16px;box-shadow:none}
-.news-article header{padding-bottom:16px}
-.news-article h2{margin-top:8px;font-size:23px}
-.news-cover{margin-bottom:20px;border-radius:10px}
-.news-body{font-size:11px;line-height:1.82}
+.news-list-copy strong{display:block;margin-top:7px;color:#111;font-size:14px;line-height:1.3;font-weight:860;letter-spacing:-.025em;overflow-wrap:anywhere}
+.news-list-copy p{margin:5px 0 0;color:#8f8f96;font-size:9px;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.news-list-copy i{position:absolute;right:14px;top:50%;transform:translateY(-50%);color:#b0b0b5;font-size:19px;font-style:normal;font-weight:400}
+.news-empty{padding:44px 0;color:#99999f;font-size:10px;text-align:center}
+.news-empty.is-after-featured{padding-top:24px}
+.news-detail{padding-bottom:6px}
+.news-inline-back{min-height:32px;margin:0 0 12px;padding:0;border:0;background:transparent;color:#77777d;font:inherit;font-size:9px;font-weight:820}
+.news-article{padding:17px 15px;border:1px solid rgba(17,17,19,.035);border-radius:16px;background:#fff;box-shadow:none}
+.news-article header{padding:0 0 16px}
+.news-article h2{margin:8px 0 0;color:#111;font-size:23px;line-height:1.12;font-weight:900;letter-spacing:-.045em;word-break:keep-all}
+.news-article header p{margin:9px 0 0;color:#8f8f96;font-size:10px;line-height:1.55}
+.news-cover{display:block;width:100%;max-height:520px;object-fit:cover;margin:0 0 20px;border-radius:10px;background:#ececef}
+.news-body{color:#333338;font-size:11px;line-height:1.82;word-break:keep-all;overflow-wrap:anywhere}
+.news-body-text{white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere}
+.news-body-text + .news-youtube,.news-youtube + .news-body-text,.news-youtube + .news-youtube{margin-top:18px}
+.news-youtube{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;border-radius:12px;background:#111}
+.news-youtube iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block}
 .news-related{margin-top:18px;padding:16px 15px;border:1px solid rgba(17,17,19,.035);border-radius:16px;background:#fff}
 .news-related-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:4px}
 .news-related-head h3{margin:0;color:#111;font-size:12px;font-weight:860;letter-spacing:-.02em}
@@ -617,6 +610,10 @@ body.biteboss-info-page{min-height:100dvh;background:var(--bg);color:#111}.info-
 .news-list-card.is-related:not(:has(.news-list-visual)){grid-template-columns:minmax(0,1fr)}
 .news-list-card.is-related:not(:has(.news-list-visual)) .news-list-copy{padding-left:0}
 @media(max-width:430px){
+  .news-page{padding-left:16px;padding-right:16px}
+  .news-featured{margin-bottom:14px}
+  .news-featured-copy{padding:15px 15px 16px}
+  .news-featured-copy>strong{font-size:20px}
   .news-filters{gap:16px}
   .news-list-copy{padding:14px 36px 14px 14px}
   .news-article{padding:16px 14px}

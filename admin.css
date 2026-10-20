@@ -853,4 +853,17 @@ body.admin-app{min-height:100dvh;background:#f1f1f3;color:#111}
 .role-hidden{display:none!important}
 
 
-.admin-app .admin-news-list{display:grid;gap:8px}.admin-app .admin-news-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:14px 15px;border:1px solid rgba(17,17,19,.035);border-radius:15px;background:var(--admin-soft)}.admin-app .admin-news-copy{min-width:0}.admin-app .admin-news-copy>span{display:block;color:#99999f;font-size:8px;font-weight:900;letter-spacing:.04em}.admin-app .admin-news-copy>strong{display:block;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;font-weight:900}.admin-app .admin-news-copy>p{margin:4px 0 0;color:#8f8f96;font-size:8px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}@media(max-width:560px){.admin-app .admin-news-row{grid-template-columns:1fr}.admin-app .admin-news-row>.text-btn{justify-self:end}}
+/* News management */
+.admin-app .admin-news-list{display:grid;gap:8px}
+.admin-app .admin-news-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:14px 15px;border:1px solid rgba(17,17,19,.035);border-radius:15px;background:var(--admin-soft)}
+.admin-app .admin-news-copy{min-width:0}
+.admin-app .admin-news-copy>span{display:block;color:#99999f;font-size:8px;font-weight:900;letter-spacing:.04em}
+.admin-app .admin-news-copy>strong{display:block;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;font-weight:900}
+.admin-app .admin-news-copy>p{margin:4px 0 0;color:#8f8f96;font-size:8px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.admin-app .admin-news-url-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
+.admin-app .admin-news-url-row .text-btn{min-height:38px;white-space:nowrap}
+@media(max-width:560px){
+  .admin-app .admin-news-row{grid-template-columns:1fr}
+  .admin-app .admin-news-row>.text-btn,.admin-app .admin-news-url-row .text-btn{justify-self:end}
+  .admin-app .admin-news-url-row{grid-template-columns:1fr}
+}

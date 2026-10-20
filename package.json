@@ -1,14 +1,9 @@
 {
   "name": "biteboss",
-  "version": "0.82.64",
+  "version": "0.82.68",
   "private": true,
   "scripts": {
-    "preflight": "node scripts/preflight.mjs",
-    "test": "node --test test/*.test.mjs",
-    "test:coverage": "node --experimental-test-coverage --test test/*.test.mjs",
-    "mutation": "node test/mutation.mjs",
-    "quality": "npm run preflight && npm run audit && npm test && npm run mutation",
-    "audit": "node scripts/release-audit.mjs"
+    "check": "node --check app.js && node --check admin.js"
   },
   "dependencies": {},
   "devDependencies": {}

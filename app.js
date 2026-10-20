@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.64";
+  const BITEBOSS_BUILD = "82.68";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -606,6 +606,11 @@
     // Only config is critical for the first location/store query.
     await loadConfig();
     await loadPublicNews();
+    const initialNewsRoute=newsRouteFromPath(location.pathname);
+    if(initialNewsRoute){
+      if(initialNewsRoute.slug) openNewsPost(initialNewsRoute.slug,{historyMode:"replace"});
+      else showNewsList({historyMode:"replace"});
+    }
     void Promise.allSettled([
       loadMyOrganization(),
       loadGameActivity(),
@@ -787,6 +792,12 @@ await handleClaimParam();
     document.addEventListener("touchmove", blockHomeViewportScroll, { passive:false });
     document.addEventListener("wheel", blockHomeViewportScroll, { passive:false });
     window.addEventListener("popstate", async () => {
+      const newsRoute=newsRouteFromPath(location.pathname);
+      if(newsRoute){
+        if(newsRoute.slug) openNewsPost(newsRoute.slug,{historyMode:"replace"});
+        else showNewsList({historyMode:"replace"});
+        return;
+      }
       const storeRoute=storeRouteFromPath(location.pathname);
       if(storeRoute){
         const resolvedStoreRoute=await resolveStoreRoute(storeRoute);
@@ -838,6 +849,8 @@ await handleClaimParam();
       if(filter){ renderNewsList(filter.dataset.newsFilter || "ALL"); return; }
       const post=event.target.closest("[data-news-open]");
       if(post){
+        if(post.tagName==="A" && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button!==0)) return;
+        event.preventDefault();
         newsListScrollY=window.scrollY || window.pageYOffset || 0;
         openNewsPost(post.dataset.newsOpen);
       }
@@ -1031,6 +1044,41 @@ await handleClaimParam();
       || (Array.isArray(data?.photos) ? data.photos[0] : null);
     if(cover?.image_url) document.querySelector('meta[property="og:image"]')?.setAttribute("content",String(cover.image_url));
     document.querySelector('link[rel="canonical"]')?.setAttribute("href",`${location.origin}${partnerStorePath(store)}`);
+  }
+
+  function newsRouteFromPath(pathname=location.pathname){
+    const path=String(pathname || "").replace(/\/+$/, "") || "/";
+    if(path==="/news") return {slug:""};
+    const match=path.match(/^\/news\/([^/?#]+)$/);
+    if(!match) return null;
+    try{ return {slug:decodeURIComponent(match[1]).trim()}; }catch{ return null; }
+  }
+
+  function newsPostPath(post){
+    const slug=String(post?.slug || "").trim();
+    return slug ? `/news/${encodeURIComponent(slug)}` : "/news";
+  }
+
+  function syncNewsUrl(post=null, historyMode="push"){
+    const path=post ? newsPostPath(post) : "/news";
+    const current=`${location.pathname}${location.search || ""}`;
+    const next=`${path}${location.search || ""}`;
+    if(current===next) return;
+    const method=historyMode==="replace" ? "replaceState" : "pushState";
+    history[method]({...(history.state || {}),bitebossNewsSlug:String(post?.slug || "")},"",next);
+  }
+
+  function paintNewsSeoMeta(post=null){
+    const title=post?.title ? `${post.title} | BiteBoss` : "소식 | BiteBoss";
+    const description=post?.summary || "BiteBoss의 공지와 이벤트, 업데이트를 전합니다.";
+    const canonical=post ? `${location.origin}${newsPostPath(post)}` : `${location.origin}/news`;
+    document.title=title;
+    document.querySelector('meta[name="description"]')?.setAttribute("content",description.slice(0,155));
+    document.querySelector('meta[property="og:title"]')?.setAttribute("content",title);
+    document.querySelector('meta[property="og:description"]')?.setAttribute("content",description.slice(0,155));
+    document.querySelector('meta[property="og:url"]')?.setAttribute("content",canonical);
+    if(post?.image_url) document.querySelector('meta[property="og:image"]')?.setAttribute("content",post.image_url);
+    document.querySelector('link[rel="canonical"]')?.setAttribute("href",canonical);
   }
 
   function primaryTabFromPath(pathname = location.pathname){
@@ -2476,12 +2524,12 @@ await handleClaimParam();
     const url = customUrl || defaultUrl;
     const name = String(nickname || "보스").trim();
     if(url){
+      // User avatars are small and repeatedly reused across ranking/profile/activity views.
+      // Preload every avatar once and avoid lazy-load flashes when lists rerender or scroll.
+      preloadOccupiedAvatar(url);
       const criticalAvatar = !customUrl || /(?:arena-boss-avatar|boss-focus-avatar|my-rank-avatar)/.test(String(className));
-      if(criticalAvatar) preloadOccupiedAvatar(url);
-      const loading = criticalAvatar
-        ? `loading="eager" fetchpriority="high"`
-        : `loading="lazy"`;
-      return `<img class="${escapeAttr(className)}" src="${escapeAttr(url)}" alt="${escapeAttr(name)} 프로필" ${loading} decoding="${customUrl ? "async" : "sync"}" />`;
+      const priority = criticalAvatar ? ` fetchpriority="high"` : "";
+      return `<img class="${escapeAttr(className)}" src="${escapeAttr(url)}" alt="${escapeAttr(name)} 프로필" loading="eager"${priority} decoding="async" />`;
     }
     return `<span class="${escapeAttr(className)} boss-avatar-fallback" aria-hidden="true"></span>`;
   }
@@ -5536,11 +5584,14 @@ await handleClaimParam();
   function closeNewsScreen(){
     activeNewsPostId="";
     openTab(previousNewsTab || "home", {historyMode:"replace"});
+    resetPublicSeoMeta();
   }
 
-  function showNewsList({restoreScroll=false}={}){
+  function showNewsList({restoreScroll=false,historyMode="push"}={}){
     activeNewsPostId="";
     openNewsScreen({scrollTop:!restoreScroll});
+    syncNewsUrl(null,historyMode);
+    paintNewsSeoMeta(null);
     $("#newsDetail")?.classList.add("hidden");
     $("#newsListView")?.classList.remove("hidden");
     renderNewsList(activeNewsCategory);
@@ -5551,13 +5602,47 @@ await handleClaimParam();
 
   function renderNewsList(category="ALL"){
     activeNewsCategory=String(category || "ALL").toUpperCase();
-    const posts=publicNewsPosts().filter(post=>activeNewsCategory==="ALL" || post.category===activeNewsCategory);
+    const allPosts=publicNewsPosts();
+    const filtered=allPosts.filter(post=>activeNewsCategory==="ALL" || post.category===activeNewsCategory);
+    const featured=[...allPosts].sort((a,b)=>{
+      const aTime=new Date(a.updated_at || a.created_at || 0).getTime() || 0;
+      const bTime=new Date(b.updated_at || b.created_at || 0).getTime() || 0;
+      return bTime-aTime;
+    })[0] || null;
+    const featuredBox=$("#newsFeatured");
+    if(featuredBox){
+      featuredBox.innerHTML=featured ? newsFeaturedMarkup(featured) : "";
+      featuredBox.classList.toggle("hidden",!featured);
+    }
+    const feed=filtered.filter(post=>!featured || post.id!==featured.id);
     const list=$("#newsList");
     if(list){
-      list.innerHTML=posts.length ? posts.map(post=>newsCardMarkup(post)).join("") : `<div class="news-empty">등록된 소식이 없습니다.</div>`;
+      if(feed.length){
+        list.innerHTML=feed.map(post=>newsCardMarkup(post)).join("");
+      }else if(filtered.length && featured && filtered[0]?.id===featured.id){
+        list.innerHTML=`<div class="news-empty is-after-featured">선택한 카테고리의 다른 소식이 없습니다.</div>`;
+      }else{
+        list.innerHTML=`<div class="news-empty">등록된 소식이 없습니다.</div>`;
+      }
     }
-    $$('[data-news-filter]',$("#newsScreen")).forEach(button=>button.classList.toggle("active",button.dataset.newsFilter===activeNewsCategory));
+    $$('[data-news-filter]',$('#newsScreen')).forEach(button=>button.classList.toggle("active",button.dataset.newsFilter===activeNewsCategory));
   }
+
+  function newsFeaturedMarkup(post){
+    const date=newsDate(post.updated_at || post.created_at);
+    return `
+      <a class="news-featured-card" href="${escapeAttr(newsPostPath(post))}" data-news-open="${escapeAttr(post.slug || post.id)}">
+        ${post.image_url ? `<span class="news-featured-visual"><img src="${escapeAttr(post.image_url)}" alt="" decoding="async" fetchpriority="high"/></span>` : ""}
+        <span class="news-featured-copy">
+          <span class="news-featured-label">LATEST</span>
+          <span class="news-list-meta"><small>${escapeHtml(post.category)}</small>${date ? `<time>${escapeHtml(date)}</time>` : ""}</span>
+          <strong>${escapeHtml(post.title)}</strong>
+          ${post.summary ? `<p>${escapeHtml(post.summary)}</p>` : ""}
+          <span class="news-featured-more">읽기 <i aria-hidden="true">›</i></span>
+        </span>
+      </a>`;
+  }
+
 
 
   function newsDate(value){
@@ -5570,7 +5655,7 @@ await handleClaimParam();
   function newsCardMarkup(post,{compact=false}={}){
     const date=newsDate(post.updated_at || post.created_at);
     return `
-      <button class="news-list-card${compact ? " is-related" : ""}" type="button" data-news-open="${escapeAttr(post.id)}">
+      <a class="news-list-card${compact ? " is-related" : ""}" href="${escapeAttr(newsPostPath(post))}" data-news-open="${escapeAttr(post.slug || post.id)}">
         ${post.image_url ? `<span class="news-list-visual"><img src="${escapeAttr(post.image_url)}" alt="" loading="lazy"/></span>` : ""}
         <span class="news-list-copy">
           <span class="news-list-meta"><small>${escapeHtml(post.category)}${post.pinned ? " · PIN" : ""}</small>${date ? `<time>${escapeHtml(date)}</time>` : ""}</span>
@@ -5578,14 +5663,56 @@ await handleClaimParam();
           ${post.summary ? `<p>${escapeHtml(post.summary)}</p>` : ""}
           <i aria-hidden="true">›</i>
         </span>
-      </button>`;
+      </a>`;
   }
 
-  function openNewsPost(id){
-    const post=publicNewsPosts().find(item=>item.id===String(id || ""));
-    if(!post){ showNewsList(); return; }
+  function youtubeEmbedId(rawUrl){
+    const raw=String(rawUrl || "").trim();
+    if(!raw) return "";
+    try{
+      const url=new URL(raw);
+      const host=url.hostname.replace(/^www\./i,"").toLowerCase();
+      if(host==="youtu.be") return String(url.pathname.split("/").filter(Boolean)[0] || "").trim();
+      if(host==="youtube.com" || host==="m.youtube.com" || host==="music.youtube.com"){
+        if(url.pathname==="/watch") return String(url.searchParams.get("v") || "").trim();
+        const parts=url.pathname.split("/").filter(Boolean);
+        if(["shorts","embed","live"].includes(parts[0])) return String(parts[1] || "").trim();
+      }
+    }catch{}
+    return "";
+  }
+
+  function newsBodyMarkup(body){
+    const lines=String(body || "").replace(/\r\n?/g,"\n").split("\n");
+    const chunks=[];
+    let textLines=[];
+    const flushText=()=>{
+      if(!textLines.length) return;
+      chunks.push(`<div class="news-body-text">${escapeHtml(textLines.join("\n"))}</div>`);
+      textLines=[];
+    };
+    for(const line of lines){
+      const trimmed=line.trim();
+      const videoId=/^https?:\/\//i.test(trimmed) ? youtubeEmbedId(trimmed) : "";
+      if(videoId && /^[A-Za-z0-9_-]{6,20}$/.test(videoId)){
+        flushText();
+        chunks.push(`<div class="news-youtube"><iframe src="https://www.youtube-nocookie.com/embed/${escapeAttr(videoId)}?playsinline=1&rel=0" title="YouTube video player" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div>`);
+      }else{
+        textLines.push(line);
+      }
+    }
+    flushText();
+    return chunks.join("");
+  }
+
+  function openNewsPost(identifier,{historyMode="push"}={}){
+    const key=String(identifier || "").trim();
+    const post=publicNewsPosts().find(item=>item.id===key || item.slug===key);
+    if(!post){ showNewsList({historyMode}); return; }
     activeNewsPostId=post.id;
     openNewsScreen();
+    syncNewsUrl(post,historyMode);
+    paintNewsSeoMeta(post);
     $("#newsListView")?.classList.add("hidden");
     const detail=$("#newsDetail");
     if(detail){
@@ -5601,7 +5728,7 @@ await handleClaimParam();
             ${post.summary ? `<p>${escapeHtml(post.summary)}</p>` : ""}
           </header>
           ${post.image_url ? `<img class="news-cover" src="${escapeAttr(post.image_url)}" alt=""/>` : ""}
-          <div class="news-body">${escapeHtml(post.body).replace(/\n/g,"<br>")}</div>
+          <div class="news-body">${newsBodyMarkup(post.body)}</div>
         </article>
         ${related.length ? `<section class="news-related" aria-label="다른 소식"><div class="news-related-head"><h3>다른 소식</h3><button type="button" data-news-list>전체보기</button></div><div class="news-related-list">${related.map(item=>newsCardMarkup(item,{compact:true})).join("")}</div></section>` : ""}`;
       $$('[data-news-list]',detail).forEach(button=>button.addEventListener('click',()=>showNewsList({restoreScroll:true})));
@@ -5610,7 +5737,7 @@ await handleClaimParam();
 
   async function loadPublicNews(){
     const {data,error}=await sb.from("biteboss_news_posts")
-      .select("id,category,title,summary,image_url,body,pinned,created_at,updated_at")
+      .select("id,slug,category,title,summary,image_url,body,pinned,created_at,updated_at")
       .eq("published",true)
       .order("pinned",{ascending:false})
       .order("updated_at",{ascending:false});
@@ -5626,6 +5753,7 @@ await handleClaimParam();
     const allowed=new Set(["NOTICE","EVENT","UPDATE","PEOPLE"]);
     return newsPublicPosts.map(item=>({
       id:String(item?.id || "").trim(),
+      slug:String(item?.slug || "").trim(),
       category:allowed.has(String(item?.category || "").toUpperCase()) ? String(item.category).toUpperCase() : "NOTICE",
       title:String(item?.title || "").trim(),
       summary:String(item?.summary || "").trim(),
@@ -7706,7 +7834,7 @@ await handleClaimParam();
           </div>
           <label class="profile-image-picker" for="profilePhotoInput">
             <span class="profile-image-picker-preview">
-              ${avatarUrl ? `<img src="${escapeAttr(avatarUrl)}" alt="" loading="lazy" decoding="async" />` : `<span aria-hidden="true"></span>`}
+              ${avatarUrl ? `<img src="${escapeAttr(avatarUrl)}" alt="" loading="eager" decoding="async" />` : `<span aria-hidden="true"></span>`}
             </span>
             <span class="profile-image-picker-copy">
               <strong>이미지 선택</strong>
@@ -9819,24 +9947,70 @@ await handleClaimParam();
     $("#profileCommentPagination")?.classList.add("hidden");
   }
 
+  const stableProfileImageRequests = new Map();
+  const stableProfileImageTokens = new WeakMap();
+
+  function preloadStableProfileImage(url){
+    const src=String(url || "").trim();
+    if(!src) return Promise.resolve(false);
+    if(stableProfileImageRequests.has(src)) return stableProfileImageRequests.get(src);
+    const request=new Promise(resolve=>{
+      const probe=new Image();
+      probe.decoding="async";
+      probe.onload=()=>resolve(true);
+      probe.onerror=()=>resolve(false);
+      probe.src=src;
+      if(probe.complete && probe.naturalWidth>0) resolve(true);
+    });
+    stableProfileImageRequests.set(src,request);
+    return request;
+  }
+
   function renderProfilePhoto(imageSelector, fallbackSelector, url){
     const image = $(imageSelector);
     const fallback = $(fallbackSelector);
     const customUrl = String(url || "").trim();
     const resolvedUrl = customUrl || defaultProfileImageUrl();
-    const hasPhoto = Boolean(resolvedUrl);
-    if(image){
-      if(hasPhoto){
-        image.decoding = customUrl ? "async" : "sync";
-        image.fetchPriority = customUrl ? "auto" : "high";
-        if(image.getAttribute("src") !== resolvedUrl) image.src = resolvedUrl;
-        image.classList.remove("hidden");
-      }else{
-        image.removeAttribute("src");
-        image.classList.add("hidden");
-      }
+    if(!image) return;
+
+    if(!resolvedUrl){
+      stableProfileImageTokens.delete(image);
+      image.removeAttribute("src");
+      image.classList.add("hidden");
+      fallback?.classList.remove("hidden");
+      return;
     }
-    fallback?.classList.toggle("hidden", hasPhoto);
+
+    const current=String(image.getAttribute("src") || "").trim();
+    if(current===resolvedUrl && image.complete && image.naturalWidth>0){
+      image.classList.remove("hidden");
+      fallback?.classList.add("hidden");
+      return;
+    }
+
+    // Keep the already-rendered avatar visible until the replacement is decoded.
+    // This prevents the image/fallback from alternating during async profile refreshes.
+    const token=Symbol("profile-image");
+    stableProfileImageTokens.set(image,token);
+    if(!current){
+      image.classList.add("hidden");
+      fallback?.classList.remove("hidden");
+    }
+    void preloadStableProfileImage(resolvedUrl).then(ok=>{
+      if(stableProfileImageTokens.get(image)!==token) return;
+      if(!ok){
+        if(!current){
+          image.classList.add("hidden");
+          fallback?.classList.remove("hidden");
+        }
+        return;
+      }
+      if(image.getAttribute("src")!==resolvedUrl) image.src=resolvedUrl;
+      image.decoding="async";
+      image.fetchPriority=customUrl ? "auto" : "high";
+      image.classList.remove("hidden");
+      fallback?.classList.add("hidden");
+    });
   }
 
 
