@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.57";
+  const BITEBOSS_BUILD = "82.58";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -2890,9 +2890,12 @@ await handleClaimParam();
       const index=part.indexOf("=");
       if(index>0) meta[part.slice(0,index).trim()]=part.slice(index+1).trim();
     });
+    const breakMatch=String(meta.break || "").match(/^(\d{2}:\d{2})-(\d{2}:\d{2})$/);
     return {
       open:match ? match[1] : "",
       close:match ? match[2] : "",
+      breakStart:breakMatch ? breakMatch[1] : "",
+      breakEnd:breakMatch ? breakMatch[2] : "",
       open24:meta.open24==="1",
       closedDays:String(meta.closed || "").split(",").filter(day=>STORE_DAY_ORDER.includes(day))
     };
@@ -2904,24 +2907,38 @@ await handleClaimParam();
     const closedToday=hours.closedDays.includes(dayKey);
     const closedLabel=hours.closedDays.map(day=>STORE_DAY_LABELS[day]).join("·");
     const schedule=hours.open24 ? "24시간 영업" : (hours.open && hours.close ? `${hours.open}–${hours.close}` : "");
+    const breakSchedule=hours.breakStart && hours.breakEnd ? `${hours.breakStart}–${hours.breakEnd}` : "";
+    const current=now.getHours()*60+now.getMinutes();
+    const toMinutes=value=>{
+      const [h,m]=String(value || "").split(":").map(Number);
+      return Number.isFinite(h) && Number.isFinite(m) ? h*60+m : NaN;
+    };
+    const inRange=(value,start,end)=> end<=start ? value>=start || value<end : value>=start && value<end;
     let status="";
+    let openNow=false;
     if(closedToday){
       status="오늘 휴무";
     }else if(hours.open24){
       status="24시간 영업";
+      openNow=true;
     }else if(hours.open && hours.close){
-      const current=now.getHours()*60+now.getMinutes();
-      const [oh,om]=hours.open.split(":").map(Number);
-      const [ch,cm]=hours.close.split(":").map(Number);
-      const start=oh*60+om;
-      const end=ch*60+cm;
+      const start=toMinutes(hours.open);
+      const end=toMinutes(hours.close);
+      openNow=inRange(current,start,end);
       if(end<=start){
-        status=current>=start || current<end ? `영업 중 · ${hours.close} 종료` : `영업 전 · ${hours.open} 시작`;
+        status=openNow ? `영업 중 · ${hours.close} 종료` : `영업 전 · ${hours.open} 시작`;
       }else{
-        status=current<start ? `영업 전 · ${hours.open} 시작` : current<end ? `영업 중 · ${hours.close} 종료` : "영업 종료";
+        status=current<start ? `영업 전 · ${hours.open} 시작` : openNow ? `영업 중 · ${hours.close} 종료` : "영업 종료";
       }
     }
-    return { ...hours, schedule, closedLabel, closedToday, status };
+    if(openNow && breakSchedule){
+      const breakStart=toMinutes(hours.breakStart);
+      const breakEnd=toMinutes(hours.breakEnd);
+      if(Number.isFinite(breakStart) && Number.isFinite(breakEnd) && inRange(current,breakStart,breakEnd)){
+        status=`브레이크 타임 · ${hours.breakEnd} 재개`;
+      }
+    }
+    return { ...hours, schedule, breakSchedule, closedLabel, closedToday, status };
   }
 
   function youtubeVideoMeta(value){
@@ -3254,6 +3271,7 @@ await handleClaimParam();
         <h4>매장 정보</h4>
         ${businessInfo.status ? `<div><span>오늘</span><strong>${escapeHtml(businessInfo.status)}</strong></div>` : ""}
         ${businessInfo.schedule ? `<div><span>영업시간</span><strong>${escapeHtml(businessInfo.schedule)}</strong></div>` : ""}
+        ${businessInfo.breakSchedule ? `<div><span>브레이크 타임</span><strong>${escapeHtml(businessInfo.breakSchedule)}</strong></div>` : ""}
         ${businessInfo.closedLabel ? `<div><span>정기휴무</span><strong>${escapeHtml(businessInfo.closedLabel)}요일</strong></div>` : ""}
         ${store.phone ? `<div><span>전화</span><strong>${escapeHtml(store.phone)}</strong></div>` : ""}
         ${socialHtml}

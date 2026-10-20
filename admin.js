@@ -15,7 +15,7 @@
           detectSessionInUrl:false,
           storageKey:"biteboss-admin-auth"
         },
-        global:{ headers:{ "x-client-info":"biteboss-admin-web/82.57" } }
+        global:{ headers:{ "x-client-info":"biteboss-admin-web/82.58" } }
       })
     : null;
 
@@ -1972,9 +1972,12 @@
       const index = part.indexOf("=");
       return index > 0 ? [part.slice(0,index).trim(), part.slice(index+1).trim()] : ["", ""];
     }).filter(([key]) => key));
+    const breakMatch = String(meta.break || "").match(/^(\d{2}:\d{2})-(\d{2}:\d{2})$/);
     return {
       open:match ? match[1] : "",
       close:match ? match[2] : "",
+      breakStart:breakMatch ? breakMatch[1] : "",
+      breakEnd:breakMatch ? breakMatch[2] : "",
       open24:meta.open24 === "1",
       closedDays:String(meta.closed || "").split(",").filter(day => STORE_DAY_KEYS.includes(day))
     };
@@ -1984,16 +1987,25 @@
     const open24 = String(form.get("open_24h") || "") === "1";
     const open = String(form.get("hours_open") || "").trim();
     const close = String(form.get("hours_close") || "").trim();
+    const breakStart = String(form.get("break_start") || "").trim();
+    const breakEnd = String(form.get("break_end") || "").trim();
     const closedDays = form.getAll("closed_days").map(String).filter(day => STORE_DAY_KEYS.includes(day));
     const timePart = open24 ? "00:00 - 00:00" : (open && close ? `${open} - ${close}` : "");
-    if(!timePart && !closedDays.length) return "";
-    return [timePart, `open24=${open24 ? "1" : "0"}`, `closed=${closedDays.join(",")}`].filter(Boolean).join("|");
+    if(!timePart && !closedDays.length && !(breakStart && breakEnd)) return "";
+    return [
+      timePart,
+      `open24=${open24 ? "1" : "0"}`,
+      `closed=${closedDays.join(",")}`,
+      breakStart && breakEnd ? `break=${breakStart}-${breakEnd}` : ""
+    ].filter(Boolean).join("|");
   }
 
   function applyStoreHoursForm(form, value){
     const hours = parseStoreHours(value);
     if(form.elements.hours_open) form.elements.hours_open.value = hours.open;
     if(form.elements.hours_close) form.elements.hours_close.value = hours.close;
+    if(form.elements.break_start) form.elements.break_start.value = hours.breakStart;
+    if(form.elements.break_end) form.elements.break_end.value = hours.breakEnd;
     if(form.elements.hours) form.elements.hours.value = value || "";
     const open24 = form.elements.open_24h;
     if(open24) open24.checked = hours.open24;
@@ -2260,6 +2272,10 @@
     const status = $("#adminStoreEditStatus");
     if(!String(form.get("name") || "").trim()) return setStatusText(status, "매장명을 입력하세요.");
     if(!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) return setStatusText(status, "위도/경도를 확인하세요.");
+    const breakStart = String(form.get("break_start") || "").trim();
+    const breakEnd = String(form.get("break_end") || "").trim();
+    if(Boolean(breakStart) !== Boolean(breakEnd)) return setStatusText(status, "브레이크 타임 시작과 종료를 모두 입력하세요.");
+    if(breakStart && breakEnd && breakStart === breakEnd) return setStatusText(status, "브레이크 타임 시작과 종료 시간을 다르게 입력하세요.");
     const submit = formEl.querySelector('button[type="submit"]');
     if(submit) submit.disabled = true;
     setStatusText(status, "저장 중…");
