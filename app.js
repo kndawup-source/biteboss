@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.75";
+  const BITEBOSS_BUILD = "82.76";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -813,7 +813,11 @@ await handleClaimParam();
     });
 
     $$(".nav-btn,[data-tab]").forEach(btn => {
-      btn.addEventListener("click", () => openTab(btn.dataset.tab));
+      btn.addEventListener("click", () => {
+        const tab=btn.dataset.tab;
+        if(tab==="news") showNewsList({historyMode:"push"});
+        else openTab(tab);
+      });
     });
 
     $("#modalClose")?.addEventListener("click", closeModal);
@@ -1108,6 +1112,7 @@ await handleClaimParam();
     // Each primary tab is a top-level screen. Never inherit scroll position from the previous screen.
     window.scrollTo({ top:0, left:0, behavior:"auto" });
 
+    $("#newsScreen")?.classList.remove("active");
     $$(".page").forEach(page => page.classList.remove("active"));
     $(`#page-${tab}`)?.classList.add("active");
     $$(".nav-btn").forEach(btn => btn.classList.toggle("active", btn.dataset.tab === tab));
@@ -5572,11 +5577,11 @@ await handleClaimParam();
   function openNewsScreen({scrollTop=true}={}){
     const screen=$("#newsScreen");
     if(!screen) return;
-    const activeNav=$$(".nav-btn").find(btn=>btn.classList.contains("active"));
+    const activeNav=$$(".nav-btn").find(btn=>btn.classList.contains("active") && btn.dataset.tab!=="news");
     if(activeNav?.dataset?.tab) previousNewsTab=activeNav.dataset.tab;
     setHomeViewportLocked(false);
     $$(".page").forEach(page=>page.classList.remove("active"));
-    $$(".nav-btn").forEach(btn=>btn.classList.remove("active"));
+    $$(".nav-btn").forEach(btn=>btn.classList.toggle("active",btn.dataset.tab==="news"));
     screen.classList.add("active");
     if(scrollTop) window.scrollTo({top:0,left:0,behavior:"auto"});
     renderNewsPromo();
