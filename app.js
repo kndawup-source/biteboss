@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.69";
+  const BITEBOSS_BUILD = "82.71";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -5628,17 +5628,47 @@ await handleClaimParam();
     $$('[data-news-filter]',$('#newsScreen')).forEach(button=>button.classList.toggle("active",button.dataset.newsFilter===activeNewsCategory));
   }
 
+  function newsBodyImageUrl(rawUrl){
+    const raw=String(rawUrl || "").trim();
+    if(!/^https?:\/\//i.test(raw)) return "";
+    try{
+      const url=new URL(raw);
+      const path=url.pathname.toLowerCase();
+      if(/\.(?:avif|gif|jpe?g|png|webp)(?:$|\?)/i.test(raw) || path.includes("/storage/v1/object/public/") || path.includes("/storage/v1/render/image/public/")) return url.href;
+    }catch{}
+    return "";
+  }
+
+  function newsBodyMedia(post){
+    if(post?.image_url) return {type:"image",url:String(post.image_url).trim()};
+    const lines=String(post?.body || "").replace(/\r\n?/g,"\n").split("\n");
+    for(const line of lines){
+      const raw=line.trim();
+      if(!/^https?:\/\//i.test(raw)) continue;
+      const imageUrl=newsBodyImageUrl(raw);
+      if(imageUrl) return {type:"image",url:imageUrl};
+      const videoId=youtubeEmbedId(raw);
+      if(videoId && /^[A-Za-z0-9_-]{6,20}$/.test(videoId)) return {type:"youtube",url:`https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,videoId};
+    }
+    return null;
+  }
+
+  function newsThumbnailMarkup(post,className,priority="lazy"){
+    const media=newsBodyMedia(post);
+    if(!media?.url) return "";
+    return `<span class="${escapeAttr(className)}${media.type==="youtube" ? " is-youtube" : ""}"><img src="${escapeAttr(media.url)}" alt="" loading="${priority}" decoding="async"${priority==="eager" ? ' fetchpriority="high"' : ""}/>${media.type==="youtube" ? '<span class="news-media-play" aria-hidden="true">▶</span>' : ""}</span>`;
+  }
+
   function newsFeaturedMarkup(post){
     const date=newsDate(post.updated_at || post.created_at);
     return `
       <a class="news-featured-card" href="${escapeAttr(newsPostPath(post))}" data-news-open="${escapeAttr(post.slug || post.id)}">
-        ${post.image_url ? `<span class="news-featured-visual"><img src="${escapeAttr(post.image_url)}" alt="" decoding="async" fetchpriority="high"/></span>` : ""}
+        ${newsThumbnailMarkup(post,"news-featured-visual","eager")}
         <span class="news-featured-copy">
           <span class="news-featured-label">LATEST</span>
           <span class="news-list-meta"><small>${escapeHtml(post.category)}</small>${date ? `<time>${escapeHtml(date)}</time>` : ""}</span>
           <strong>${escapeHtml(post.title)}</strong>
           ${post.summary ? `<p>${escapeHtml(post.summary)}</p>` : ""}
-          <span class="news-featured-more">읽기 <i aria-hidden="true">›</i></span>
         </span>
       </a>`;
   }
@@ -5656,7 +5686,7 @@ await handleClaimParam();
     const date=newsDate(post.updated_at || post.created_at);
     return `
       <a class="news-list-card${compact ? " is-related" : ""}" href="${escapeAttr(newsPostPath(post))}" data-news-open="${escapeAttr(post.slug || post.id)}">
-        ${post.image_url ? `<span class="news-list-visual"><img src="${escapeAttr(post.image_url)}" alt="" loading="lazy"/></span>` : ""}
+        ${newsThumbnailMarkup(post,"news-list-visual")}
         <span class="news-list-copy">
           <span class="news-list-meta"><small>${escapeHtml(post.category)}${post.pinned ? " · PIN" : ""}</small>${date ? `<time>${escapeHtml(date)}</time>` : ""}</span>
           <strong>${escapeHtml(post.title)}</strong>
@@ -5693,8 +5723,12 @@ await handleClaimParam();
     };
     for(const line of lines){
       const trimmed=line.trim();
-      const videoId=/^https?:\/\//i.test(trimmed) ? youtubeEmbedId(trimmed) : "";
-      if(videoId && /^[A-Za-z0-9_-]{6,20}$/.test(videoId)){
+      const imageUrl=/^https?:\/\//i.test(trimmed) ? newsBodyImageUrl(trimmed) : "";
+      const videoId=!imageUrl && /^https?:\/\//i.test(trimmed) ? youtubeEmbedId(trimmed) : "";
+      if(imageUrl){
+        flushText();
+        chunks.push(`<img class="news-body-image" src="${escapeAttr(imageUrl)}" alt="" loading="lazy" decoding="async"/>`);
+      }else if(videoId && /^[A-Za-z0-9_-]{6,20}$/.test(videoId)){
         flushText();
         chunks.push(`<div class="news-youtube"><iframe src="https://www.youtube-nocookie.com/embed/${escapeAttr(videoId)}?playsinline=1&rel=0" title="YouTube video player" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div>`);
       }else if(line===""){

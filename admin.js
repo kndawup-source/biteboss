@@ -376,6 +376,8 @@
     $("#newsNewBtn")?.addEventListener("click", resetNewsForm);
     $("#newsCancelBtn")?.addEventListener("click", resetNewsForm);
     $("#newsUrlCopyBtn")?.addEventListener("click", copyNewsPublicUrl);
+    $("#newsSlugSaveBtn")?.addEventListener("click", saveNewsSlug);
+    $("#newsSlugRandomBtn")?.addEventListener("click", regenerateNewsSlug);
     $("#newsDeleteBtn")?.addEventListener("click", deleteNewsPost);
     $("#adCampaignForm")?.addEventListener("submit", saveAdCampaign);
     $("#adCreativeForm")?.addEventListener("submit", saveAdCreative);
@@ -1953,6 +1955,7 @@
     if($("#newsPublished")) $("#newsPublished").value="true";
     if($("#newsPinned")) $("#newsPinned").value="false";
     if($("#newsTitle")) $("#newsTitle").value="";
+    if($("#newsSlug")) $("#newsSlug").value="";
     if($("#newsPublicUrl")) $("#newsPublicUrl").value="";
     if($("#newsSummary")) $("#newsSummary").value="";
     if($("#newsImageUrl")) $("#newsImageUrl").value="";
@@ -1970,6 +1973,7 @@
     if($("#newsPublished")) $("#newsPublished").value=String(post.published);
     if($("#newsPinned")) $("#newsPinned").value=String(post.pinned);
     if($("#newsTitle")) $("#newsTitle").value=post.title;
+    if($("#newsSlug")) $("#newsSlug").value=post.slug || "";
     if($("#newsPublicUrl")) $("#newsPublicUrl").value=post.slug ? `${location.origin}/news/${encodeURIComponent(post.slug)}` : "";
     if($("#newsSummary")) $("#newsSummary").value=post.summary;
     if($("#newsImageUrl")) $("#newsImageUrl").value=post.image_url;
@@ -1984,6 +1988,53 @@
     if(!value){ setStatusText($("#newsStatus"),"게시글을 먼저 저장해 주세요."); return; }
     try{ await navigator.clipboard.writeText(value); setStatusText($("#newsStatus"),"고유주소를 복사했습니다."); }
     catch{ setStatusText($("#newsStatus"),"주소를 복사하지 못했습니다."); }
+  }
+
+  function validateNewsSlug(value){
+    const slug=String(value || "").trim().toLowerCase();
+    if(!/^[a-z0-9][a-z0-9-]{2,62}[a-z0-9]$/.test(slug)) return "";
+    return slug;
+  }
+
+  async function saveNewsSlug(){
+    const id=String($("#newsPostId")?.value || "").trim();
+    if(!id){ setStatusText($("#newsStatus"),"게시글을 먼저 저장해 주세요."); return; }
+    const slug=validateNewsSlug($("#newsSlug")?.value);
+    if(!slug){ setStatusText($("#newsStatus"),"슬러그는 4~64자의 영문 소문자, 숫자, 하이픈만 사용할 수 있습니다."); return; }
+    const button=$("#newsSlugSaveBtn");
+    if(button) button.disabled=true;
+    setStatusText($("#newsStatus"),"슬러그 저장 중…");
+    try{
+      const {data,error}=await adminRpc("biteboss_admin_news_set_slug_v8270",{p_id:id,p_slug:slug});
+      if(error) throw error;
+      const saved=String(data?.slug || slug);
+      if($("#newsSlug")) $("#newsSlug").value=saved;
+      if($("#newsPublicUrl")) $("#newsPublicUrl").value=`${location.origin}/news/${encodeURIComponent(saved)}`;
+      await loadNewsAdmin({render:false});
+      setStatusText($("#newsStatus"),"슬러그가 저장되었습니다.");
+    }catch(error){
+      console.warn(error);
+      const code=String(error?.message || error?.details || "");
+      setStatusText($("#newsStatus"),code.includes("NEWS_SLUG_TAKEN")?"이미 사용 중인 슬러그입니다.":"슬러그 저장에 실패했습니다.");
+    }finally{ if(button) button.disabled=false; }
+  }
+
+  async function regenerateNewsSlug(){
+    const id=String($("#newsPostId")?.value || "").trim();
+    if(!id){ setStatusText($("#newsStatus"),"게시글을 먼저 저장해 주세요."); return; }
+    const button=$("#newsSlugRandomBtn");
+    if(button) button.disabled=true;
+    setStatusText($("#newsStatus"),"랜덤 슬러그 생성 중…");
+    try{
+      const {data,error}=await adminRpc("biteboss_admin_news_randomize_slug_v8270",{p_id:id});
+      if(error) throw error;
+      const slug=String(data?.slug || "");
+      if($("#newsSlug")) $("#newsSlug").value=slug;
+      if($("#newsPublicUrl")) $("#newsPublicUrl").value=slug ? `${location.origin}/news/${encodeURIComponent(slug)}` : "";
+      await loadNewsAdmin({render:false});
+      setStatusText($("#newsStatus"),"랜덤 슬러그가 생성되었습니다.");
+    }catch(error){ console.warn(error); setStatusText($("#newsStatus"),"랜덤 슬러그 생성에 실패했습니다."); }
+    finally{ if(button) button.disabled=false; }
   }
 
   async function saveNewsPost(event){
@@ -2004,7 +2055,7 @@
     if(button) button.disabled=true;
     setStatusText(status,"저장 중…");
     try{
-      const {data,error}=await adminRpc("biteboss_admin_news_upsert_v8265",{p_post:{
+      const {data,error}=await adminRpc("biteboss_admin_news_upsert_v8270",{p_post:{
         id:currentId || null,
         category:NEWS_CATEGORIES.has(category) ? category : "NOTICE",
         title,summary,image_url:imageUrl,body,

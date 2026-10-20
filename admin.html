@@ -473,7 +473,8 @@
 <label>공개 상태<select class="input" id="newsPublished"><option value="true">공개</option><option value="false">비공개</option></select></label>
 <label>상단 고정<select class="input" id="newsPinned"><option value="false">일반</option><option value="true">고정</option></select></label>
 <label class="wide">제목<input class="input" id="newsTitle" maxlength="100" required placeholder="제목"/></label>
-<label class="wide">고유주소<div class="admin-news-url-row"><input class="input" id="newsPublicUrl" type="text" readonly placeholder="저장하면 자동 생성됩니다."/><button class="text-btn" id="newsUrlCopyBtn" type="button">주소 복사</button></div><small class="field-help">게시글 최초 저장 시 생성되며 제목을 수정해도 주소는 유지됩니다.</small></label>
+<label class="wide">슬러그<div class="admin-news-url-row"><input class="input" id="newsSlug" type="text" inputmode="url" autocomplete="off" maxlength="64" placeholder="예: a7f3c91d2e4b"/><button class="secondary-btn admin-small-btn" id="newsSlugSaveBtn" type="button">슬러그 저장</button><button class="text-btn" id="newsSlugRandomBtn" type="button">랜덤 재생성</button></div><small class="field-help">새 글은 랜덤 슬러그가 자동 생성됩니다. 필요할 때만 영문 소문자, 숫자, 하이픈으로 직접 변경합니다.</small></label>
+<label class="wide">고유주소<div class="admin-news-url-row"><input class="input" id="newsPublicUrl" type="text" readonly placeholder="저장하면 자동 생성됩니다."/><button class="text-btn" id="newsUrlCopyBtn" type="button">주소 복사</button></div></label>
 <label class="wide">요약<input class="input" id="newsSummary" maxlength="180" placeholder="목록에 표시할 짧은 설명"/></label>
 <label class="wide">대표 이미지 URL<input class="input" id="newsImageUrl" inputmode="url" maxlength="500" placeholder="https://..."/></label>
 <label class="wide">본문<textarea class="input" id="newsBody" rows="10" maxlength="12000" required placeholder="내용을 입력하세요."></textarea></label>
