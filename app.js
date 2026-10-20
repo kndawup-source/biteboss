@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.60";
+  const BITEBOSS_BUILD = "82.61";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -5622,7 +5622,7 @@ await handleClaimParam();
     }
     return linkUrl
       ? `<a class="game-pulse-item is-guide is-linked" href="${escapeAttr(linkUrl)}" data-guide-link="${escapeAttr(linkUrl)}" aria-label="${escapeAttr(`${title} 링크 열기`)}">${content}</a>`
-      : `<div class="game-pulse-item is-guide" role="note">${content}</div>`;
+      : `<button class="game-pulse-item is-guide is-linked" type="button" data-news-list aria-label="${escapeAttr(`${title} 소식 목록 열기`)}">${content}</button>`;
   }
 
   function shouldShowFirstCaptureGuide(){
@@ -5634,6 +5634,7 @@ await handleClaimParam();
 
   function bindGamePulseStoreLinks(box){
     $$('[data-news-post]',box).forEach(button=>button.addEventListener('click',()=>openNewsPost(button.dataset.newsPost)));
+    $$('[data-news-list]',box).forEach(button=>button.addEventListener('click',showNewsList));
     $$('[data-guide-link]',box).forEach(link => link.addEventListener('click',event=>{
       const url=String(link.dataset.guideLink || link.getAttribute('href') || '').trim();
       if(!/^https?:\/\//i.test(url)){
