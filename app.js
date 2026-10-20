@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.62";
+  const BITEBOSS_BUILD = "82.64";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -833,12 +833,14 @@ await handleClaimParam();
       }
     });
 
-    $("#newsMore")?.addEventListener("click", showNewsList);
     $("#newsScreen")?.addEventListener("click", event=>{
       const filter=event.target.closest("[data-news-filter]");
       if(filter){ renderNewsList(filter.dataset.newsFilter || "ALL"); return; }
       const post=event.target.closest("[data-news-open]");
-      if(post) openNewsPost(post.dataset.newsOpen);
+      if(post){
+        newsListScrollY=window.scrollY || window.pageYOffset || 0;
+        openNewsPost(post.dataset.newsOpen);
+      }
     });
     $("#scanBtn")?.addEventListener("click", scanPrompt);
     $("#storeSearch")?.addEventListener("input", () => {
@@ -5516,16 +5518,18 @@ await handleClaimParam();
   let activeNewsPostId="";
   let activeNewsCategory="ALL";
   let previousNewsTab="home";
+  let newsListScrollY=0;
 
-  function openNewsScreen(){
+  function openNewsScreen({scrollTop=true}={}){
     const screen=$("#newsScreen");
     if(!screen) return;
     const activeNav=$$(".nav-btn").find(btn=>btn.classList.contains("active"));
     if(activeNav?.dataset?.tab) previousNewsTab=activeNav.dataset.tab;
     setHomeViewportLocked(false);
     $$(".page").forEach(page=>page.classList.remove("active"));
+    $$(".nav-btn").forEach(btn=>btn.classList.remove("active"));
     screen.classList.add("active");
-    window.scrollTo({top:0,left:0,behavior:"auto"});
+    if(scrollTop) window.scrollTo({top:0,left:0,behavior:"auto"});
     renderNewsPromo();
   }
 
@@ -5534,12 +5538,15 @@ await handleClaimParam();
     openTab(previousNewsTab || "home", {historyMode:"replace"});
   }
 
-  function showNewsList(){
+  function showNewsList({restoreScroll=false}={}){
     activeNewsPostId="";
-    openNewsScreen();
+    openNewsScreen({scrollTop:!restoreScroll});
     $("#newsDetail")?.classList.add("hidden");
     $("#newsListView")?.classList.remove("hidden");
     renderNewsList(activeNewsCategory);
+    if(restoreScroll){
+      requestAnimationFrame(()=>window.scrollTo({top:Math.max(0,newsListScrollY),left:0,behavior:"auto"}));
+    }
   }
 
   function renderNewsList(category="ALL"){
@@ -5547,13 +5554,31 @@ await handleClaimParam();
     const posts=publicNewsPosts().filter(post=>activeNewsCategory==="ALL" || post.category===activeNewsCategory);
     const list=$("#newsList");
     if(list){
-      list.innerHTML=posts.length ? posts.map(post=>`
-        <button class="news-list-card" type="button" data-news-open="${escapeAttr(post.id)}">
-          ${post.image_url ? `<span class="news-list-visual"><img src="${escapeAttr(post.image_url)}" alt="" loading="lazy"/></span>` : ""}
-          <span class="news-list-copy"><small>${escapeHtml(post.category)}${post.pinned ? " · PIN" : ""}</small><strong>${escapeHtml(post.title)}</strong>${post.summary ? `<p>${escapeHtml(post.summary)}</p>` : ""}<i aria-hidden="true">›</i></span>
-        </button>`).join("") : `<div class="news-empty">등록된 소식이 없습니다.</div>`;
+      list.innerHTML=posts.length ? posts.map(post=>newsCardMarkup(post)).join("") : `<div class="news-empty">등록된 소식이 없습니다.</div>`;
     }
     $$('[data-news-filter]',$("#newsScreen")).forEach(button=>button.classList.toggle("active",button.dataset.newsFilter===activeNewsCategory));
+  }
+
+
+  function newsDate(value){
+    if(!value) return "";
+    const date=new Date(value);
+    if(!Number.isFinite(date.getTime())) return "";
+    try{ return new Intl.DateTimeFormat("ko-KR",{year:"numeric",month:"2-digit",day:"2-digit"}).format(date).replace(/\. /g,".").replace(/\.$/,""); }catch{ return ""; }
+  }
+
+  function newsCardMarkup(post,{compact=false}={}){
+    const date=newsDate(post.updated_at || post.created_at);
+    return `
+      <button class="news-list-card${compact ? " is-related" : ""}" type="button" data-news-open="${escapeAttr(post.id)}">
+        ${post.image_url ? `<span class="news-list-visual"><img src="${escapeAttr(post.image_url)}" alt="" loading="lazy"/></span>` : ""}
+        <span class="news-list-copy">
+          <span class="news-list-meta"><small>${escapeHtml(post.category)}${post.pinned ? " · PIN" : ""}</small>${date ? `<time>${escapeHtml(date)}</time>` : ""}</span>
+          <strong>${escapeHtml(post.title)}</strong>
+          ${post.summary ? `<p>${escapeHtml(post.summary)}</p>` : ""}
+          <i aria-hidden="true">›</i>
+        </span>
+      </button>`;
   }
 
   function openNewsPost(id){
@@ -5564,17 +5589,22 @@ await handleClaimParam();
     $("#newsListView")?.classList.add("hidden");
     const detail=$("#newsDetail");
     if(detail){
+      const related=publicNewsPosts().filter(item=>item.id!==post.id).slice(0,3);
+      const date=newsDate(post.updated_at || post.created_at);
       detail.classList.remove("hidden");
       detail.innerHTML=`
         <article class="news-article">
           <button class="news-inline-back" type="button" data-news-list aria-label="소식 목록으로">← 소식 목록</button>
-          <header><small>${escapeHtml(post.category)}</small><h2>${escapeHtml(post.title)}</h2>${post.summary ? `<p>${escapeHtml(post.summary)}</p>` : ""}</header>
+          <header>
+            <span class="news-article-meta"><small>${escapeHtml(post.category)}</small>${date ? `<time>${escapeHtml(date)}</time>` : ""}</span>
+            <h2>${escapeHtml(post.title)}</h2>
+            ${post.summary ? `<p>${escapeHtml(post.summary)}</p>` : ""}
+          </header>
           ${post.image_url ? `<img class="news-cover" src="${escapeAttr(post.image_url)}" alt=""/>` : ""}
           <div class="news-body">${escapeHtml(post.body).replace(/\n/g,"<br>")}</div>
-          <button id="newsMore" class="news-more-btn" type="button">소식 더보기</button>
-        </article>`;
-      $("#newsMore")?.addEventListener("click",showNewsList);
-      $$('[data-news-list]',detail).forEach(button=>button.addEventListener('click',showNewsList));
+        </article>
+        ${related.length ? `<section class="news-related" aria-label="다른 소식"><div class="news-related-head"><h3>다른 소식</h3><button type="button" data-news-list>전체보기</button></div><div class="news-related-list">${related.map(item=>newsCardMarkup(item,{compact:true})).join("")}</div></section>` : ""}`;
+      $$('[data-news-list]',detail).forEach(button=>button.addEventListener('click',()=>showNewsList({restoreScroll:true})));
     }
   }
 
