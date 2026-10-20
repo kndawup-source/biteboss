@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.73";
+  const BITEBOSS_BUILD = "82.74";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -5692,6 +5692,20 @@ await handleClaimParam();
       </a>`;
   }
 
+  function newsRelatedPosts(post,limit=3){
+    const currentId=String(post?.id || "");
+    const category=String(post?.category || "").toUpperCase();
+    const byLatest=(a,b)=>{
+      const aTime=new Date(a.updated_at || a.created_at || 0).getTime() || 0;
+      const bTime=new Date(b.updated_at || b.created_at || 0).getTime() || 0;
+      return bTime-aTime;
+    };
+    const candidates=publicNewsPosts().filter(item=>String(item.id)!==currentId);
+    const sameCategory=candidates.filter(item=>item.category===category).sort(byLatest);
+    const latest=candidates.filter(item=>item.category!==category).sort(byLatest);
+    return [...sameCategory,...latest].slice(0,Math.max(0,Number(limit || 0)));
+  }
+
   function youtubeEmbedId(rawUrl){
     const raw=String(rawUrl || "").trim();
     if(!raw) return "";
@@ -5918,7 +5932,7 @@ await handleClaimParam();
     $("#newsListView")?.classList.add("hidden");
     const detail=$("#newsDetail");
     if(detail){
-      const related=publicNewsPosts().filter(item=>item.id!==post.id).slice(0,3);
+      const related=newsRelatedPosts(post,3);
       const date=newsDate(post.updated_at || post.created_at);
       detail.classList.remove("hidden");
       detail.innerHTML=`
