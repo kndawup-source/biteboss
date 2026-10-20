@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.52";
+  const BITEBOSS_BUILD = "82.53";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -143,7 +143,7 @@
     gps_nearby_watch_max_accuracy_m:250,
     daily_store_limit:1,
     nearby_radius_m:3000,
-    nearby_limit:20,
+    nearby_limit:30,
     auto_store_import_enabled:true,
     auto_store_import_min_count:10,
     auto_store_import_radius_m:1000,
@@ -1868,7 +1868,7 @@ await handleClaimParam();
         p_lat:lastPosition.coords.latitude,
         p_lng:lastPosition.coords.longitude,
         p_radius_m:Number(config.nearby_radius_m || 3000),
-        p_limit:Number(config.nearby_limit || 20)
+        p_limit:Number(config.nearby_limit || 30)
       });
     }else{
       result = await sb.rpc("biteboss_list_stores_v631", { p_limit:100 });
@@ -1919,7 +1919,7 @@ await handleClaimParam();
         p_lat:lastPosition.coords.latitude,
         p_lng:lastPosition.coords.longitude,
         p_radius_m:Number(config.nearby_radius_m || 3000),
-        p_limit:Number(config.nearby_limit || 20)
+        p_limit:Number(config.nearby_limit || 30)
       });
 
       if(!refreshed.error){
