@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.74";
+  const BITEBOSS_BUILD = "82.75";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -5604,12 +5604,8 @@ await handleClaimParam();
   function renderNewsList(category="ALL"){
     activeNewsCategory=String(category || "ALL").toUpperCase();
     const allPosts=publicNewsPosts();
+    const featured=allPosts.find(post=>post.featured) || null;
     const filtered=allPosts.filter(post=>activeNewsCategory==="ALL" || post.category===activeNewsCategory);
-    const featured=[...filtered].sort((a,b)=>{
-      const aTime=new Date(a.updated_at || a.created_at || 0).getTime() || 0;
-      const bTime=new Date(b.updated_at || b.created_at || 0).getTime() || 0;
-      return bTime-aTime;
-    })[0] || null;
     const featuredBox=$("#newsFeatured");
     if(featuredBox){
       featuredBox.innerHTML=featured ? newsFeaturedMarkup(featured) : "";
@@ -5661,7 +5657,7 @@ await handleClaimParam();
       <a class="news-featured-card" href="${escapeAttr(newsPostPath(post))}" data-news-open="${escapeAttr(post.slug || post.id)}">
         ${newsThumbnailMarkup(post,"news-featured-visual","eager")}
         <span class="news-featured-copy">
-          <span class="news-featured-label">LATEST</span>
+          <span class="news-featured-label">FEATURED</span>
           <span class="news-list-meta"><small>${escapeHtml(post.category)}</small>${date ? `<time>${escapeHtml(date)}</time>` : ""}</span>
           <strong>${escapeHtml(post.title)}</strong>
           ${post.summary ? `<p>${escapeHtml(post.summary)}</p>` : ""}
@@ -5955,7 +5951,7 @@ await handleClaimParam();
 
   async function loadPublicNews(){
     const {data,error}=await sb.from("biteboss_news_posts")
-      .select("id,slug,category,title,summary,image_url,body,pinned,created_at,updated_at")
+      .select("id,slug,category,title,summary,image_url,body,pinned,featured,created_at,updated_at")
       .eq("published",true)
       .order("pinned",{ascending:false})
       .order("updated_at",{ascending:false});
@@ -5979,6 +5975,7 @@ await handleClaimParam();
       body:String(item?.body || ""),
       published:true,
       pinned:item?.pinned === true,
+      featured:item?.featured === true,
       created_at:String(item?.created_at || ""),
       updated_at:String(item?.updated_at || "")
     })).filter(item=>item.id && item.title);
@@ -6041,20 +6038,17 @@ await handleClaimParam();
   function renderNewsPromo(){
     const box=$("#newsPromo");
     if(!box) return;
-    const items=[];
-    if(shouldShowFirstCaptureGuide()) items.push(firstCaptureGuideMarkup());
     const banner=currentPartnerBanner();
     const partnerMarkup=partnerBannerMarkup(banner);
-    if(partnerMarkup) items.push(partnerMarkup);
-    if(!items.length){
+    if(!partnerMarkup){
       box.innerHTML="";
       box.classList.add("hidden");
       return;
     }
-    box.innerHTML=items.join("");
+    box.innerHTML=partnerMarkup;
     box.classList.remove("hidden");
     bindGamePulseStoreLinks(box);
-    if(banner) void hydratePartnerBannerPhoto(banner);
+    void hydratePartnerBannerPhoto(banner);
   }
 
   function paintImmediatePartnerBanner(){

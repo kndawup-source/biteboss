@@ -8,7 +8,7 @@
 <meta content="yes" name="mobile-web-app-capable"/>
 <title>BiteBoss Admin</title>
 <link href="./styles.css?v=82.20" rel="stylesheet"/>
-<link href="./admin.css?v=82.68" rel="stylesheet"/>
+<link href="./admin.css?v=82.75" rel="stylesheet"/>
 <script src="./app-config.js?v=82.20"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -462,7 +462,7 @@
 <div class="admin-page-head"><div><span class="eyebrow">설정</span><h2>소식</h2><p>공지 배너에서 연결할 공지·이벤트·업데이트·PEOPLE 콘텐츠를 관리합니다.</p></div></div>
 <div class="admin-page-body">
 <section class="admin-section-card">
-<div class="admin-section-title admin-section-title-row"><div><h3>게시글</h3><p>공개된 글은 사용자 앱의 소식 목록과 공지 배너 연결에 사용됩니다.</p></div><button class="secondary-btn admin-small-btn" id="newsNewBtn" type="button">새 글</button></div>
+<div class="admin-section-title admin-section-title-row"><div><h3>게시글</h3><p>공개된 글은 사용자 앱의 소식 목록에 표시됩니다. 히어로 카드는 한 게시글만 지정할 수 있습니다.</p></div><button class="secondary-btn admin-small-btn" id="newsNewBtn" type="button">새 글</button></div>
 <div class="admin-news-list" id="newsAdminList"></div>
 </section>
 <section class="admin-section-card">
@@ -472,6 +472,7 @@
 <label>카테고리<select class="input" id="newsCategory"><option value="NOTICE">NOTICE</option><option value="EVENT">EVENT</option><option value="UPDATE">UPDATE</option><option value="PEOPLE">PEOPLE</option></select></label>
 <label>공개 상태<select class="input" id="newsPublished"><option value="true">공개</option><option value="false">비공개</option></select></label>
 <label>상단 고정<select class="input" id="newsPinned"><option value="false">일반</option><option value="true">고정</option></select></label>
+<label>히어로 카드<select class="input" id="newsFeatured"><option value="false">일반 게시글</option><option value="true">히어로로 지정</option></select><small class="field-help">히어로는 전체 소식에서 한 게시글만 지정됩니다.</small></label>
 <label class="wide">제목<input class="input" id="newsTitle" maxlength="100" required placeholder="제목"/></label>
 <label class="wide">슬러그<div class="admin-news-url-row"><input class="input" id="newsSlug" type="text" inputmode="url" autocomplete="off" maxlength="64" placeholder="예: a7f3c91d2e4b"/><button class="secondary-btn admin-small-btn" id="newsSlugSaveBtn" type="button">슬러그 저장</button><button class="text-btn" id="newsSlugRandomBtn" type="button">랜덤 재생성</button></div><small class="field-help">새 글은 랜덤 슬러그가 자동 생성됩니다. 필요할 때만 영문 소문자, 숫자, 하이픈으로 직접 변경합니다.</small></label>
 <label class="wide">고유주소<div class="admin-news-url-row"><input class="input" id="newsPublicUrl" type="text" readonly placeholder="저장하면 자동 생성됩니다."/><button class="text-btn" id="newsUrlCopyBtn" type="button">주소 복사</button></div></label>
@@ -717,6 +718,6 @@
 </div>
 </section>
 </div>
-<script src="./admin.js?v=82.68"></script>
+<script src="./admin.js?v=82.75"></script>
 </body>
 </html>

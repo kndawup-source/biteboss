@@ -15,7 +15,7 @@
           detectSessionInUrl:false,
           storageKey:"biteboss-admin-auth"
         },
-        global:{ headers:{ "x-client-info":"biteboss-admin-web/82.68" } }
+        global:{ headers:{ "x-client-info":"biteboss-admin-web/82.75" } }
       })
     : null;
 
@@ -1905,13 +1905,14 @@
       body:String(item?.body || ""),
       published:item?.published !== false,
       pinned:item?.pinned === true,
+      featured:item?.featured === true,
       created_at:String(item?.created_at || ""),
       updated_at:String(item?.updated_at || "")
     })).filter(item=>item.id && item.title);
   }
 
   function sortedNewsPosts(){
-    return newsPosts().sort((a,b)=>Number(b.pinned)-Number(a.pinned) || Date.parse(b.updated_at || b.created_at || 0)-Date.parse(a.updated_at || a.created_at || 0));
+    return newsPosts().sort((a,b)=>Number(b.featured)-Number(a.featured) || Number(b.pinned)-Number(a.pinned) || Date.parse(b.updated_at || b.created_at || 0)-Date.parse(a.updated_at || a.created_at || 0));
   }
 
   async function loadNewsAdmin({render=true}={}){
@@ -1942,7 +1943,7 @@
     const posts=sortedNewsPosts();
     list.innerHTML=posts.length ? posts.map(post=>`
       <article class="admin-news-row" data-news-id="${escapeAttr(post.id)}">
-        <div class="admin-news-copy"><span>${escapeHtml(post.category)}${post.pinned ? " · PIN" : ""}${post.published ? "" : " · 비공개"}</span><strong>${escapeHtml(post.title)}</strong>${post.summary ? `<p>${escapeHtml(post.summary)}</p>` : ""}</div>
+        <div class="admin-news-copy"><span>${escapeHtml(post.category)}${post.featured ? " · HERO" : ""}${post.pinned ? " · PIN" : ""}${post.published ? "" : " · 비공개"}</span><strong>${escapeHtml(post.title)}</strong>${post.summary ? `<p>${escapeHtml(post.summary)}</p>` : ""}</div>
         <button class="text-btn" type="button" data-news-edit="${escapeAttr(post.id)}">수정</button>
       </article>`).join("") : `<div class="admin-empty">등록된 게시글이 없습니다.</div>`;
     list.querySelectorAll("[data-news-edit]").forEach(button=>button.addEventListener("click",()=>editNewsPost(button.dataset.newsEdit)));
@@ -1954,6 +1955,7 @@
     if($("#newsCategory")) $("#newsCategory").value="NOTICE";
     if($("#newsPublished")) $("#newsPublished").value="true";
     if($("#newsPinned")) $("#newsPinned").value="false";
+    if($("#newsFeatured")) $("#newsFeatured").value="false";
     if($("#newsTitle")) $("#newsTitle").value="";
     if($("#newsSlug")) $("#newsSlug").value="";
     if($("#newsPublicUrl")) $("#newsPublicUrl").value="";
@@ -1972,6 +1974,7 @@
     if($("#newsCategory")) $("#newsCategory").value=post.category;
     if($("#newsPublished")) $("#newsPublished").value=String(post.published);
     if($("#newsPinned")) $("#newsPinned").value=String(post.pinned);
+    if($("#newsFeatured")) $("#newsFeatured").value=String(post.featured);
     if($("#newsTitle")) $("#newsTitle").value=post.title;
     if($("#newsSlug")) $("#newsSlug").value=post.slug || "";
     if($("#newsPublicUrl")) $("#newsPublicUrl").value=post.slug ? `${location.origin}/news/${encodeURIComponent(post.slug)}` : "";
@@ -2047,7 +2050,10 @@
     const summary=String($("#newsSummary")?.value || "").trim().slice(0,180);
     const imageUrl=String($("#newsImageUrl")?.value || "").trim().slice(0,500);
     const body=String($("#newsBody")?.value || "").trim().slice(0,12000);
+    const published=$("#newsPublished")?.value !== "false";
+    const featured=$("#newsFeatured")?.value === "true";
     if(!title || !body){ setStatusText(status,"제목과 본문을 입력해 주세요."); return; }
+    if(featured && !published){ setStatusText(status,"히어로 게시글은 공개 상태여야 합니다."); return; }
     if(imageUrl){
       try{ const u=new URL(imageUrl); if(!["http:","https:"].includes(u.protocol)) throw 0; }
       catch{ setStatusText(status,"대표 이미지는 http:// 또는 https:// 주소로 입력해 주세요."); return; }
@@ -2055,12 +2061,13 @@
     if(button) button.disabled=true;
     setStatusText(status,"저장 중…");
     try{
-      const {data,error}=await adminRpc("biteboss_admin_news_upsert_v8270",{p_post:{
+      const {data,error}=await adminRpc("biteboss_admin_news_upsert_v8275",{p_post:{
         id:currentId || null,
         category:NEWS_CATEGORIES.has(category) ? category : "NOTICE",
         title,summary,image_url:imageUrl,body,
-        published:$("#newsPublished")?.value !== "false",
-        pinned:$("#newsPinned")?.value === "true"
+        published,
+        pinned:$("#newsPinned")?.value === "true",
+        featured
       }});
       if(error) throw error;
       const id=String(data?.id || data?.post?.id || currentId || "");

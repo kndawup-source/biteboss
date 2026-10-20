@@ -550,9 +550,9 @@ body.biteboss-info-page{min-height:100dvh;background:var(--bg);color:#111}.info-
 .news-page-head .page-kicker{display:block;margin-bottom:5px}
 .news-page-head h2{margin-top:0}
 .news-page-head p{max-width:520px}
-.news-promo{margin-bottom:14px}
+.news-promo{margin:0 0 14px}
 .news-list-view,.news-detail{min-width:0}
-.news-featured{margin:0 0 16px}
+.news-featured{margin:0 0 14px}
 .news-featured-card{display:block;overflow:hidden;border:1px solid rgba(17,17,19,.04);border-radius:18px;background:#111;color:#fff;text-decoration:none}
 .news-featured-visual{display:block;width:100%;aspect-ratio:16/9;overflow:hidden;background:#202024}
 .news-featured-visual{position:relative}
