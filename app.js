@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.55";
+  const BITEBOSS_BUILD = "82.56";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -2790,14 +2790,8 @@ await handleClaimParam();
   function applyOwnerReclaimState(reclaim = {}){
     const card = $(".owner-store-reclaim");
     if(!card) return;
-    // The global capture cooldown takes precedence over reclaim presentation.
-    // Keep background state fresh, but never expose a reclaim timer until the
-    // player-wide capture cooldown has ended.
-    if(captureCooldownActive()){
-      card.classList.add("hidden");
-      storeReclaimTimer = clearIntervalRef(storeReclaimTimer);
-      return;
-    }
+    // Reclaim timing is store-specific information and stays visible even
+    // while the player-wide capture cooldown blocks new capture actions.
     card.classList.remove("hidden");
     const label = card.querySelector("span");
     const value = card.querySelector("strong");
@@ -2829,8 +2823,8 @@ await handleClaimParam();
     const card = $(".owner-store-reclaim");
     if(!card) return;
     if(captureCooldownActive()){
-      card.classList.add("hidden");
-      storeReclaimTimer = clearIntervalRef(storeReclaimTimer);
+      card.classList.remove("hidden");
+      startOwnerReclaimCountdown();
       return;
     }
     card.classList.remove("hidden");
@@ -3358,7 +3352,7 @@ await handleClaimParam();
                 ? `다음 약화 ${escapeHtml(formatRemaining(nextDefenseAt))}`
                 : "점령 유지 중")}</small>
           </article>
-          ${globalCaptureCooldownNow ? "" : (reclaimAvailableAt ? `<article class="owner-store-reclaim">
+          ${reclaimAvailableAt ? `<article class="owner-store-reclaim">
             <span>재점령 가능까지</span>
             <strong id="ownerReclaimCountdown" data-reclaim-at="${escapeAttr(reclaimAvailableAt)}">${escapeHtml(formatOwnStoreReclaim(reclaimAvailableAt))}</strong>
             <small>${reclaim?.eligible ? "재방문 시 자동 재점령" : "시간 종료 후 재방문 시 자동 재점령"}</small>
@@ -3366,7 +3360,7 @@ await handleClaimParam();
             <span>재점령</span>
             <strong>—</strong>
             <small>재점령 시간은 자동으로 갱신됩니다.</small>
-          </article>`)}
+          </article>`}
         </div>
       </section>
     ` : "";
