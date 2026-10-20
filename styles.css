@@ -557,7 +557,6 @@ body.biteboss-info-page{min-height:100dvh;background:var(--bg);color:#111}.info-
 .news-featured-visual{display:block;width:100%;aspect-ratio:16/9;overflow:hidden;background:#202024}
 .news-featured-visual{position:relative}
 .news-featured-visual img{display:block;width:100%;height:100%;object-fit:cover}
-.news-media-play{position:absolute;left:50%;top:50%;display:grid;place-items:center;width:42px;height:42px;transform:translate(-50%,-50%);border-radius:50%;background:rgba(0,0,0,.72);color:#fff;font-size:14px;line-height:1;padding-left:2px}
 .news-featured-copy{display:block;padding:17px 17px 18px}
 .news-featured-label{display:block;margin-bottom:9px;color:#a9a9af;font-size:8px;font-weight:900;letter-spacing:.11em}
 .news-featured-card .news-list-meta{margin-bottom:9px}
@@ -565,7 +564,7 @@ body.biteboss-info-page{min-height:100dvh;background:var(--bg);color:#111}.info-
 .news-featured-copy>strong{display:block;color:#fff;font-size:22px;line-height:1.15;font-weight:900;letter-spacing:-.04em;word-break:keep-all;overflow-wrap:anywhere}
 .news-featured-copy>p{margin:8px 0 0;color:#bdbdc3;font-size:10px;line-height:1.55;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .news-featured-card:active{transform:scale(.997)}
-.news-filters{display:flex;gap:18px;overflow-x:auto;margin:0 0 12px;padding:0 1px 8px;border-bottom:1px solid #e8e8ea;scrollbar-width:none}
+.news-filters{display:flex;gap:18px;overflow-x:auto;margin:0 0 14px;padding:0 1px 8px;border-bottom:1px solid #e8e8ea;scrollbar-width:none}
 .news-filters::-webkit-scrollbar{display:none}
 .news-filters button{flex:0 0 auto;min-height:28px;padding:0;border:0;border-radius:0;background:transparent;color:#a0a0a6;font:inherit;font-size:8px;font-weight:850;letter-spacing:.035em}
 .news-filters button.active{color:#111}
@@ -620,3 +619,6 @@ body.biteboss-info-page{min-height:100dvh;background:var(--bg);color:#111}.info-
   .news-article{padding:16px 14px}
   .news-article h2{font-size:21px}
 }
+
+.news-comments{margin-top:14px;padding-top:12px}
+.news-comments + .news-related{margin-top:18px}

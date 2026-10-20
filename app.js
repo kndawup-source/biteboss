@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.71";
+  const BITEBOSS_BUILD = "82.72";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -260,6 +260,7 @@
   let organizationMembers = [];
   let playerSession = null;
   const storeCommentState = new Map();
+  const newsCommentState = new Map();
   let stores = [];
   let lastPosition = null;
   let nearbyWatchId = null;
@@ -5604,7 +5605,7 @@ await handleClaimParam();
     activeNewsCategory=String(category || "ALL").toUpperCase();
     const allPosts=publicNewsPosts();
     const filtered=allPosts.filter(post=>activeNewsCategory==="ALL" || post.category===activeNewsCategory);
-    const featured=[...allPosts].sort((a,b)=>{
+    const featured=[...filtered].sort((a,b)=>{
       const aTime=new Date(a.updated_at || a.created_at || 0).getTime() || 0;
       const bTime=new Date(b.updated_at || b.created_at || 0).getTime() || 0;
       return bTime-aTime;
@@ -5614,16 +5615,11 @@ await handleClaimParam();
       featuredBox.innerHTML=featured ? newsFeaturedMarkup(featured) : "";
       featuredBox.classList.toggle("hidden",!featured);
     }
-    const feed=filtered.filter(post=>!featured || post.id!==featured.id);
     const list=$("#newsList");
     if(list){
-      if(feed.length){
-        list.innerHTML=feed.map(post=>newsCardMarkup(post)).join("");
-      }else if(filtered.length && featured && filtered[0]?.id===featured.id){
-        list.innerHTML=`<div class="news-empty is-after-featured">선택한 카테고리의 다른 소식이 없습니다.</div>`;
-      }else{
-        list.innerHTML=`<div class="news-empty">등록된 소식이 없습니다.</div>`;
-      }
+      list.innerHTML=filtered.length
+        ? filtered.map(post=>newsCardMarkup(post)).join("")
+        : `<div class="news-empty">등록된 소식이 없습니다.</div>`;
     }
     $$('[data-news-filter]',$('#newsScreen')).forEach(button=>button.classList.toggle("active",button.dataset.newsFilter===activeNewsCategory));
   }
@@ -5656,7 +5652,7 @@ await handleClaimParam();
   function newsThumbnailMarkup(post,className,priority="lazy"){
     const media=newsBodyMedia(post);
     if(!media?.url) return "";
-    return `<span class="${escapeAttr(className)}${media.type==="youtube" ? " is-youtube" : ""}"><img src="${escapeAttr(media.url)}" alt="" loading="${priority}" decoding="async"${priority==="eager" ? ' fetchpriority="high"' : ""}/>${media.type==="youtube" ? '<span class="news-media-play" aria-hidden="true">▶</span>' : ""}</span>`;
+    return `<span class="${escapeAttr(className)}"><img src="${escapeAttr(media.url)}" alt="" loading="${priority}" decoding="async"${priority==="eager" ? ' fetchpriority="high"' : ""}/></span>`;
   }
 
   function newsFeaturedMarkup(post){
@@ -5742,6 +5738,169 @@ await handleClaimParam();
     return chunks.join("");
   }
 
+  function newsCommentsMarkup(postId){
+    return `<section class="store-comments news-comments" data-news-comments="${escapeAttr(postId)}" aria-label="게시글 댓글">
+      ${playerSession?.authenticated ? `
+        <form class="store-comment-form" data-news-comment-form="${escapeAttr(postId)}">
+          <div class="store-comment-input-row">
+            <span class="store-comment-input-viewport">
+              <input class="store-comment-input" name="body" type="text" maxlength="120" autocomplete="off" placeholder="한마디 남겨보세요" aria-label="댓글 입력" />
+            </span>
+            <button class="store-comment-submit" type="submit">등록</button>
+          </div>
+          <div class="store-comment-form-meta">
+            <span data-news-comment-status aria-live="polite"></span>
+            <span><b data-news-comment-length>0</b>/120</span>
+          </div>
+        </form>
+      ` : `<button class="store-comment-login" data-news-comment-login type="button">로그인하고 한마디 남기기</button>`}
+      <div class="store-comment-list" data-news-comment-list>
+        <div class="app-state">한마디를 불러오는 중…</div>
+      </div>
+      <nav class="list-pagination store-comment-pagination hidden" data-news-comment-pagination aria-label="댓글 페이지"></nav>
+    </section>`;
+  }
+
+  function bindNewsComments(postId){
+    const root=$(`[data-news-comments="${cssEscape(postId)}"]`);
+    if(!root) return;
+    const input=root.querySelector('.store-comment-input');
+    const length=root.querySelector('[data-news-comment-length]');
+    if(input && length){
+      const syncLength=()=>{ length.textContent=String(Array.from(input.value || '').length); };
+      input.addEventListener('input',syncLength);
+      syncLength();
+    }
+    root.querySelector('[data-news-comment-login]')?.addEventListener('click',()=>openMemberLogin());
+    root.querySelector('[data-news-comment-form]')?.addEventListener('submit',event=>submitNewsComment(event,postId));
+    void loadNewsComments(postId,1);
+  }
+
+  async function loadNewsComments(postId,page=1){
+    const root=$(`[data-news-comments="${cssEscape(postId)}"]`);
+    if(!root) return;
+    const list=root.querySelector('[data-news-comment-list]');
+    const pagination=root.querySelector('[data-news-comment-pagination]');
+    if(list) list.innerHTML='<div class="app-state">한마디를 불러오는 중…</div>';
+    const {data,error}=await sb.rpc('biteboss_news_comments_v8272',{
+      p_post_id:postId,
+      p_page:Math.max(1,Number(page || 1)),
+      p_page_size:10
+    });
+    if(error){
+      console.warn('BiteBoss news comments:',error);
+      if(list) setRetryState(list,'한마디를 불러오지 못했습니다.',()=>loadNewsComments(postId,page));
+      return;
+    }
+    const payload=data && typeof data==='object' ? data : {};
+    const items=Array.isArray(payload.items) ? payload.items : [];
+    const total=Math.max(0,Number(payload.total || 0));
+    const safePage=Math.max(1,Number(payload.page || page || 1));
+    newsCommentState.set(String(postId),{page:safePage,total});
+    if(list){
+      list.innerHTML=items.length
+        ? items.map(comment=>newsCommentMarkup(comment)).join('')
+        : '<div class="store-comment-empty">아직 한마디가 없습니다.</div>';
+    }
+    bindNewsCommentRows(root,postId);
+    renderPagination(pagination,safePage,total,10,next=>loadNewsComments(postId,next));
+  }
+
+  function newsCommentMarkup(comment){
+    const nickname=String(comment.nickname || '사용자');
+    const time=formatCommentTime(comment.created_at);
+    const edited=comment.edited_at ? ' · 수정됨' : '';
+    return `<article class="store-comment-row ${comment.is_pinned ? 'is-pinned' : ''}" data-news-comment-id="${escapeAttr(comment.id)}">
+      <button class="store-comment-profile" type="button" data-player-profile="${escapeAttr(comment.user_id || '')}" aria-label="${escapeAttr(nickname)} 프로필">
+        ${bossAvatarMarkup(comment.avatar_url || '',nickname,'store-comment-avatar')}
+      </button>
+      <div class="store-comment-copy">
+        <div class="store-comment-topline">
+          <div class="store-comment-identity">
+            <button type="button" class="store-comment-name" data-player-profile="${escapeAttr(comment.user_id || '')}">${escapeHtml(nickname)}</button>
+            ${comment.is_pinned ? '<span class="store-comment-pinned" role="img" aria-label="고정 댓글" title="고정 댓글">📌</span>' : ''}
+            <time>${escapeHtml(time + edited)}</time>
+          </div>
+          <div class="store-comment-actions">
+            ${comment.is_mine ? '<button type="button" data-news-comment-edit>수정</button><button type="button" data-news-comment-delete>삭제</button>' : '<button type="button" data-news-comment-report>신고</button>'}
+          </div>
+        </div>
+        ${commentVisibleBody(comment.body || '') ? `<p>${escapeHtml(commentVisibleBody(comment.body || ''))}</p>` : ''}
+        ${commentYoutubeEmbed(comment.body || '')}
+      </div>
+    </article>`;
+  }
+
+  function bindNewsCommentRows(root,postId){
+    root.querySelectorAll('[data-news-comment-id]').forEach(row=>{
+      const id=String(row.dataset.newsCommentId || '');
+      row.querySelector('[data-news-comment-edit]')?.addEventListener('click',async()=>{
+        const bodyEl=row.querySelector('.store-comment-copy p');
+        const current=String(bodyEl?.textContent || '');
+        const next=prompt('한마디 수정',current);
+        if(next===null) return;
+        const body=String(next).trim();
+        if(!body || Array.from(body).length>120){ toast('한마디는 1~120자로 작성해 주세요.'); return; }
+        const {data,error}=await sb.rpc('biteboss_news_comment_update_v8272',{p_comment_id:id,p_body:body});
+        if(error || !data?.ok){ toast('수정하지 못했습니다.'); return; }
+        const state=newsCommentState.get(String(postId));
+        await loadNewsComments(postId,state?.page || 1);
+      });
+      row.querySelector('[data-news-comment-delete]')?.addEventListener('click',async()=>{
+        if(!confirm('이 한마디를 삭제할까요?')) return;
+        const {data,error}=await sb.rpc('biteboss_news_comment_delete_v8272',{p_comment_id:id});
+        if(error || !data?.ok){ toast('삭제하지 못했습니다.'); return; }
+        const state=newsCommentState.get(String(postId));
+        await loadNewsComments(postId,state?.page || 1);
+      });
+      row.querySelector('[data-news-comment-report]')?.addEventListener('click',async()=>{
+        if(!playerSession?.authenticated){ openMemberLogin(); return; }
+        const {data,error}=await sb.rpc('biteboss_news_comment_report_v8272',{p_comment_id:id,p_reason:'user_report'});
+        if(error || !data?.ok){
+          const code=String(data?.error || error?.message || '');
+          toast(code.includes('ALREADY_REPORTED') ? '이미 신고한 한마디입니다.' : '신고하지 못했습니다.');
+          return;
+        }
+        toast('신고가 접수되었습니다.');
+      });
+    });
+  }
+
+  async function submitNewsComment(event,postId){
+    event.preventDefault();
+    if(!playerSession?.authenticated){ openMemberLogin(); return; }
+    const form=event.currentTarget;
+    const input=form.elements.body;
+    const button=form.querySelector('button[type="submit"]');
+    const status=form.querySelector('[data-news-comment-status]');
+    const body=String(input?.value || '').trim();
+    if(!body || Array.from(body).length>120){ if(status) status.textContent='1~120자로 작성해 주세요.'; return; }
+    if(button) button.disabled=true;
+    if(status) status.textContent='등록 중…';
+    try{
+      const nickname=String(profile?.nickname || playerSession?.nickname || authUser?.user_metadata?.nickname || '사용자').trim().slice(0,40);
+      const avatarUrl=String(profile?.avatar_url || authUser?.user_metadata?.avatar_url || '').trim().slice(0,500);
+      const {data,error}=await sb.rpc('biteboss_news_comment_create_v8272',{
+        p_post_id:postId,
+        p_body:body,
+        p_nickname:nickname,
+        p_avatar_url:avatarUrl
+      });
+      if(error || !data?.ok){
+        const code=String(data?.error || error?.message || '');
+        if(status) status.textContent=code.includes('COMMENT_COOLDOWN') ? '잠시 후 다시 작성해 주세요.' : '등록하지 못했습니다.';
+        return;
+      }
+      form.reset();
+      const length=form.querySelector('[data-news-comment-length]');
+      if(length) length.textContent='0';
+      if(status) status.textContent='';
+      await loadNewsComments(postId,1);
+    }finally{
+      if(button) button.disabled=false;
+    }
+  }
+
   function openNewsPost(identifier,{historyMode="push"}={}){
     const key=String(identifier || "").trim();
     const post=publicNewsPosts().find(item=>item.id===key || item.slug===key);
@@ -5767,8 +5926,10 @@ await handleClaimParam();
           ${post.image_url ? `<img class="news-cover" src="${escapeAttr(post.image_url)}" alt=""/>` : ""}
           <div class="news-body">${newsBodyMarkup(post.body)}</div>
         </article>
+        ${newsCommentsMarkup(post.id)}
         ${related.length ? `<section class="news-related" aria-label="다른 소식"><div class="news-related-head"><h3>다른 소식</h3><button type="button" data-news-list>전체보기</button></div><div class="news-related-list">${related.map(item=>newsCardMarkup(item,{compact:true})).join("")}</div></section>` : ""}`;
       $$('[data-news-list]',detail).forEach(button=>button.addEventListener('click',()=>showNewsList({restoreScroll:true})));
+      bindNewsComments(post.id);
     }
   }
 
