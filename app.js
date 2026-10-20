@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.59";
+  const BITEBOSS_BUILD = "82.60";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -160,6 +160,8 @@
     first_capture_guide_icon:"💡",
     first_capture_guide_title:"첫 점령 가이드",
     first_capture_guide_body:"가까운 미점령 매장부터 시작해 보세요.",
+    first_capture_guide_link_mode:"none",
+    first_capture_guide_post_id:"",
     first_capture_guide_link_url:"",
     partner_banners:[],
     store_plans:[],
@@ -230,6 +232,8 @@
   });
   config.default_profile_image_url = readCachedDefaultProfileImage();
   void preloadDefaultProfileImage(config.default_profile_image_url);
+
+  let newsPublicPosts = [];
 
   const RUNTIME = Object.freeze({
     foregroundRefreshMinMs:30000,
@@ -601,6 +605,7 @@
 
     // Only config is critical for the first location/store query.
     await loadConfig();
+    await loadPublicNews();
     void Promise.allSettled([
       loadMyOrganization(),
       loadGameActivity(),
@@ -816,12 +821,27 @@ await handleClaimParam();
       }
     });
     document.addEventListener("keydown", event => {
-      if(event.key === "Escape" && !$("#benefitPassScreen")?.classList.contains("hidden")){
+      if(event.key !== "Escape") return;
+      if(!$("#newsScreen")?.classList.contains("hidden")){
+        event.preventDefault();
+        closeNewsScreen();
+        return;
+      }
+      if(!$("#benefitPassScreen")?.classList.contains("hidden")){
         event.preventDefault();
         closeBenefitPassScreen();
       }
     });
 
+    $("#newsClose")?.addEventListener("click", closeNewsScreen);
+    $("#newsBack")?.addEventListener("click", showNewsList);
+    $("#newsMore")?.addEventListener("click", showNewsList);
+    $("#newsScreen")?.addEventListener("click", event=>{
+      const filter=event.target.closest("[data-news-filter]");
+      if(filter){ renderNewsList(filter.dataset.newsFilter || "ALL"); return; }
+      const post=event.target.closest("[data-news-open]");
+      if(post) openNewsPost(post.dataset.newsOpen);
+    });
     $("#scanBtn")?.addEventListener("click", scanPrompt);
     $("#storeSearch")?.addEventListener("input", () => {
       clearTimeout(storeSearchTimer);
@@ -937,7 +957,7 @@ await handleClaimParam();
 
   function blockHomeViewportScroll(event){
     if(!document.body.classList.contains("home-active")) return;
-    if(event.target?.closest?.(".modal-card")) return;
+    if(event.target?.closest?.(".modal-card,.news-screen")) return;
     event.preventDefault();
   }
 
@@ -5495,19 +5515,111 @@ await handleClaimParam();
     return request;
   }
 
+  let activeNewsPostId="";
+  let activeNewsCategory="ALL";
+
+  function openNewsScreen(){
+    const screen=$("#newsScreen");
+    if(!screen) return;
+    screen.classList.remove("hidden");
+    document.body.classList.add("news-open");
+  }
+
+  function closeNewsScreen(){
+    $("#newsScreen")?.classList.add("hidden");
+    document.body.classList.remove("news-open");
+    activeNewsPostId="";
+  }
+
+  function showNewsList(){
+    activeNewsPostId="";
+    openNewsScreen();
+    $("#newsBack")?.classList.add("hidden");
+    $("#newsDetail")?.classList.add("hidden");
+    $("#newsListView")?.classList.remove("hidden");
+    renderNewsList(activeNewsCategory);
+  }
+
+  function renderNewsList(category="ALL"){
+    activeNewsCategory=String(category || "ALL").toUpperCase();
+    const posts=publicNewsPosts().filter(post=>activeNewsCategory==="ALL" || post.category===activeNewsCategory);
+    const list=$("#newsList");
+    if(list){
+      list.innerHTML=posts.length ? posts.map(post=>`
+        <button class="news-list-row" type="button" data-news-open="${escapeAttr(post.id)}">
+          ${post.image_url ? `<img src="${escapeAttr(post.image_url)}" alt="" loading="lazy"/>` : ""}
+          <span class="news-list-copy"><small>${escapeHtml(post.category)}${post.pinned ? " · PIN" : ""}</small><strong>${escapeHtml(post.title)}</strong>${post.summary ? `<p>${escapeHtml(post.summary)}</p>` : ""}</span>
+        </button>`).join("") : `<div class="news-empty">등록된 소식이 없습니다.</div>`;
+    }
+    $$('[data-news-filter]',$("#newsScreen")).forEach(button=>button.classList.toggle("active",button.dataset.newsFilter===activeNewsCategory));
+  }
+
+  function openNewsPost(id){
+    const post=publicNewsPosts().find(item=>item.id===String(id || ""));
+    if(!post){ showNewsList(); return; }
+    activeNewsPostId=post.id;
+    openNewsScreen();
+    $("#newsBack")?.classList.remove("hidden");
+    $("#newsListView")?.classList.add("hidden");
+    const detail=$("#newsDetail");
+    if(detail){
+      detail.classList.remove("hidden");
+      detail.innerHTML=`
+        <article class="news-article">
+          <header><small>${escapeHtml(post.category)}</small><h2>${escapeHtml(post.title)}</h2>${post.summary ? `<p>${escapeHtml(post.summary)}</p>` : ""}</header>
+          ${post.image_url ? `<img class="news-cover" src="${escapeAttr(post.image_url)}" alt=""/>` : ""}
+          <div class="news-body">${escapeHtml(post.body).replace(/\n/g,"<br>")}</div>
+          <button id="newsMore" class="news-more-btn" type="button">소식 더보기</button>
+        </article>`;
+      $("#newsMore")?.addEventListener("click",showNewsList);
+    }
+  }
+
+  async function loadPublicNews(){
+    const {data,error}=await sb.from("biteboss_news_posts")
+      .select("id,category,title,summary,image_url,body,pinned,created_at,updated_at")
+      .eq("published",true)
+      .order("pinned",{ascending:false})
+      .order("updated_at",{ascending:false});
+    if(error){
+      console.warn("BiteBoss news:",error);
+      newsPublicPosts=[];
+      return;
+    }
+    newsPublicPosts=Array.isArray(data) ? data : [];
+  }
+
+  function publicNewsPosts(){
+    const allowed=new Set(["NOTICE","EVENT","UPDATE","PEOPLE"]);
+    return newsPublicPosts.map(item=>({
+      id:String(item?.id || "").trim(),
+      category:allowed.has(String(item?.category || "").toUpperCase()) ? String(item.category).toUpperCase() : "NOTICE",
+      title:String(item?.title || "").trim(),
+      summary:String(item?.summary || "").trim(),
+      image_url:String(item?.image_url || "").trim(),
+      body:String(item?.body || ""),
+      published:true,
+      pinned:item?.pinned === true,
+      created_at:String(item?.created_at || ""),
+      updated_at:String(item?.updated_at || "")
+    })).filter(item=>item.id && item.title);
+  }
+
   function firstCaptureGuideMarkup(){
     const icon=String(config.first_capture_guide_icon ?? "💡").trim().slice(0,8);
     const title=String(config.first_capture_guide_title ?? "첫 점령 가이드").trim();
     const body=String(config.first_capture_guide_body ?? "가까운 미점령 매장부터 시작해 보세요.").trim();
-    const rawLink=String(config.first_capture_guide_link_url ?? "").trim();
+    const content=`${icon ? `<span class="guide-bulb" aria-hidden="true">${escapeHtml(icon)}</span>` : ""}<strong>${escapeHtml(title)}</strong>${body ? `<small>${escapeHtml(body)}</small>` : ""}`;
+    const mode=String(config.first_capture_guide_link_mode || (config.first_capture_guide_post_id ? "internal" : (config.first_capture_guide_link_url ? "external" : "none"))).trim();
+    const postId=String(config.first_capture_guide_post_id || "").trim();
+    if(mode==="internal" && publicNewsPosts().some(post=>post.id===postId)){
+      return `<button class="game-pulse-item is-guide is-linked" type="button" data-news-post="${escapeAttr(postId)}" aria-label="${escapeAttr(`${title} 소식 열기`)}">${content}</button>`;
+    }
+    const rawLink=mode==="external" ? String(config.first_capture_guide_link_url ?? "").trim() : "";
     let linkUrl="";
     if(rawLink){
-      try{
-        const parsed=new URL(rawLink);
-        if(["http:","https:"].includes(parsed.protocol)) linkUrl=parsed.href;
-      }catch{}
+      try{ const parsed=new URL(rawLink); if(["http:","https:"].includes(parsed.protocol)) linkUrl=parsed.href; }catch{}
     }
-    const content=`${icon ? `<span class="guide-bulb" aria-hidden="true">${escapeHtml(icon)}</span>` : ""}<strong>${escapeHtml(title)}</strong>${body ? `<small>${escapeHtml(body)}</small>` : ""}`;
     return linkUrl
       ? `<a class="game-pulse-item is-guide is-linked" href="${escapeAttr(linkUrl)}" data-guide-link="${escapeAttr(linkUrl)}" aria-label="${escapeAttr(`${title} 링크 열기`)}">${content}</a>`
       : `<div class="game-pulse-item is-guide" role="note">${content}</div>`;
@@ -5521,6 +5633,7 @@ await handleClaimParam();
 
 
   function bindGamePulseStoreLinks(box){
+    $$('[data-news-post]',box).forEach(button=>button.addEventListener('click',()=>openNewsPost(button.dataset.newsPost)));
     $$('[data-guide-link]',box).forEach(link => link.addEventListener('click',event=>{
       const url=String(link.dataset.guideLink || link.getAttribute('href') || '').trim();
       if(!/^https?:\/\//i.test(url)){

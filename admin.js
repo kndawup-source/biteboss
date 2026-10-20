@@ -15,7 +15,7 @@
           detectSessionInUrl:false,
           storageKey:"biteboss-admin-auth"
         },
-        global:{ headers:{ "x-client-info":"biteboss-admin-web/82.59" } }
+        global:{ headers:{ "x-client-info":"biteboss-admin-web/82.60" } }
       })
     : null;
 
@@ -35,7 +35,10 @@
     "biteboss_admin_delete_campaign_v8239",
     "biteboss_admin_ad_analytics_v8217",
     "biteboss_admin_ad_creative_analytics_v8217",
-    "biteboss_admin_ad_performance_detail_v8243"
+    "biteboss_admin_ad_performance_detail_v8243",
+    "biteboss_admin_news_list_v8260",
+    "biteboss_admin_news_upsert_v8260",
+    "biteboss_admin_news_delete_v8260"
   ]);
 
   async function adminRpc(name, args){
@@ -54,6 +57,7 @@
   let stores = [];
   const storePlanMap = new Map();
   let appConfig = {};
+  let newsAdminPosts = [];
   const activationCodes = new Map();
   let editingStoreId = null;
   let sharedStoreSettingsTimer = null;
@@ -186,7 +190,7 @@
     overview:["dashboard","ad-performance"],
     stores:["stores","partner-requests","comments","qr"],
     game:["gameops","rules","users"],
-    settings:["assets","ads","maintenance"]
+    settings:["assets","ads","news","maintenance"]
   };
 
   const AD_MANAGER_ROLES = new Set(["ad_manager","ads","advertising","advertising_manager"]);
@@ -367,6 +371,11 @@
     $("#defaultProfileForm")?.addEventListener("submit", saveDefaultProfileImage);
     $("#homeCopyForm")?.addEventListener("submit", saveHomeCopy);
     $("#firstCaptureGuideForm")?.addEventListener("submit", saveFirstCaptureGuide);
+    $("#firstCaptureGuideLinkMode")?.addEventListener("change", syncFirstCaptureGuideLinkFields);
+    $("#newsForm")?.addEventListener("submit", saveNewsPost);
+    $("#newsNewBtn")?.addEventListener("click", resetNewsForm);
+    $("#newsCancelBtn")?.addEventListener("click", resetNewsForm);
+    $("#newsDeleteBtn")?.addEventListener("click", deleteNewsPost);
     $("#adCampaignForm")?.addEventListener("submit", saveAdCampaign);
     $("#adCreativeForm")?.addEventListener("submit", saveAdCreative);
     $("#adCreativeCancel")?.addEventListener("click", resetAdCreativeForm);
@@ -476,6 +485,7 @@
     if(page === "gameops") await loadGameOps();
     if(page === "assets") await loadAssets();
     if(page === "ads") await loadAds();
+    if(page === "news") { await loadConfig(); await loadNewsAdmin(); }
     if(page === "ad-performance") await loadAds();
     if(page === "partner-requests") await loadPartnerRequests();
     if(page === "comments") await loadAdminComments();
@@ -1741,6 +1751,12 @@
     if($("#firstCaptureGuideTitle")) $("#firstCaptureGuideTitle").value = String(appConfig.first_capture_guide_title ?? "첫 점령 가이드");
     if($("#firstCaptureGuideBody")) $("#firstCaptureGuideBody").value = String(appConfig.first_capture_guide_body ?? "가까운 미점령 매장부터 시작해 보세요.");
     if($("#firstCaptureGuideLinkUrl")) $("#firstCaptureGuideLinkUrl").value = String(appConfig.first_capture_guide_link_url ?? "");
+    if(!newsAdminPosts.length) await loadNewsAdmin({render:false});
+    const savedPostId=String(appConfig.first_capture_guide_post_id ?? "").trim();
+    const savedMode=String(appConfig.first_capture_guide_link_mode ?? (savedPostId ? "internal" : (appConfig.first_capture_guide_link_url ? "external" : "none"))).trim();
+    if($("#firstCaptureGuideLinkMode")) $("#firstCaptureGuideLinkMode").value=["none","internal","external"].includes(savedMode)?savedMode:"none";
+    hydrateNoticePostOptions(savedPostId);
+    syncFirstCaptureGuideLinkFields();
 
     const copyPreview = $("#homeCopyPreview");
     if(copyPreview){
@@ -1872,6 +1888,147 @@
   }
 
 
+
+  const NEWS_CATEGORIES = new Set(["NOTICE","EVENT","UPDATE","PEOPLE"]);
+
+  function newsPosts(){
+    return newsAdminPosts.map(item=>({
+      id:String(item?.id || "").trim(),
+      category:NEWS_CATEGORIES.has(String(item?.category || "").toUpperCase()) ? String(item.category).toUpperCase() : "NOTICE",
+      title:String(item?.title || "").trim(),
+      summary:String(item?.summary || "").trim(),
+      image_url:String(item?.image_url || "").trim(),
+      body:String(item?.body || ""),
+      published:item?.published !== false,
+      pinned:item?.pinned === true,
+      created_at:String(item?.created_at || ""),
+      updated_at:String(item?.updated_at || "")
+    })).filter(item=>item.id && item.title);
+  }
+
+  function sortedNewsPosts(){
+    return newsPosts().sort((a,b)=>Number(b.pinned)-Number(a.pinned) || Date.parse(b.updated_at || b.created_at || 0)-Date.parse(a.updated_at || a.created_at || 0));
+  }
+
+  async function loadNewsAdmin({render=true}={}){
+    const {data,error}=await adminRpc("biteboss_admin_news_list_v8260",{});
+    if(error){ console.warn(error); if(render) setStatusText($("#newsStatus"),"소식을 불러오지 못했습니다."); return; }
+    newsAdminPosts=Array.isArray(data) ? data : (Array.isArray(data?.posts) ? data.posts : []);
+    if(render) renderNewsAdmin();
+    else hydrateNoticePostOptions(String(appConfig.first_capture_guide_post_id || ""));
+  }
+
+  function hydrateNoticePostOptions(selectedId=""){
+    const select=$("#firstCaptureGuidePostId");
+    if(!select) return;
+    const posts=sortedNewsPosts().filter(post=>post.published);
+    select.innerHTML=`<option value="">게시글을 선택하세요</option>${posts.map(post=>`<option value="${escapeAttr(post.id)}">${escapeHtml(post.category)} · ${escapeHtml(post.title)}</option>`).join("")}`;
+    if(selectedId && posts.some(post=>post.id===selectedId)) select.value=selectedId;
+  }
+
+  function syncFirstCaptureGuideLinkFields(){
+    const mode=String($("#firstCaptureGuideLinkMode")?.value || "none");
+    $("#firstCaptureGuidePostField")?.classList.toggle("hidden",mode!=="internal");
+    $("#firstCaptureGuideUrlField")?.classList.toggle("hidden",mode!=="external");
+  }
+
+  function renderNewsAdmin(){
+    const list=$("#newsAdminList");
+    if(!list) return;
+    const posts=sortedNewsPosts();
+    list.innerHTML=posts.length ? posts.map(post=>`
+      <article class="admin-news-row" data-news-id="${escapeAttr(post.id)}">
+        <div class="admin-news-copy"><span>${escapeHtml(post.category)}${post.pinned ? " · PIN" : ""}${post.published ? "" : " · 비공개"}</span><strong>${escapeHtml(post.title)}</strong>${post.summary ? `<p>${escapeHtml(post.summary)}</p>` : ""}</div>
+        <button class="text-btn" type="button" data-news-edit="${escapeAttr(post.id)}">수정</button>
+      </article>`).join("") : `<div class="admin-empty">등록된 게시글이 없습니다.</div>`;
+    list.querySelectorAll("[data-news-edit]").forEach(button=>button.addEventListener("click",()=>editNewsPost(button.dataset.newsEdit)));
+    hydrateNoticePostOptions(String(appConfig.first_capture_guide_post_id || ""));
+  }
+
+  function resetNewsForm(){
+    if($("#newsPostId")) $("#newsPostId").value="";
+    if($("#newsCategory")) $("#newsCategory").value="NOTICE";
+    if($("#newsPublished")) $("#newsPublished").value="true";
+    if($("#newsPinned")) $("#newsPinned").value="false";
+    if($("#newsTitle")) $("#newsTitle").value="";
+    if($("#newsSummary")) $("#newsSummary").value="";
+    if($("#newsImageUrl")) $("#newsImageUrl").value="";
+    if($("#newsBody")) $("#newsBody").value="";
+    setText("#newsEditorTitle","새 글 작성");
+    $("#newsDeleteBtn")?.classList.add("hidden");
+    setStatusText($("#newsStatus"),"");
+  }
+
+  function editNewsPost(id){
+    const post=newsPosts().find(item=>item.id===String(id || ""));
+    if(!post) return;
+    if($("#newsPostId")) $("#newsPostId").value=post.id;
+    if($("#newsCategory")) $("#newsCategory").value=post.category;
+    if($("#newsPublished")) $("#newsPublished").value=String(post.published);
+    if($("#newsPinned")) $("#newsPinned").value=String(post.pinned);
+    if($("#newsTitle")) $("#newsTitle").value=post.title;
+    if($("#newsSummary")) $("#newsSummary").value=post.summary;
+    if($("#newsImageUrl")) $("#newsImageUrl").value=post.image_url;
+    if($("#newsBody")) $("#newsBody").value=post.body;
+    setText("#newsEditorTitle","게시글 수정");
+    $("#newsDeleteBtn")?.classList.remove("hidden");
+    $("#newsForm")?.scrollIntoView?.({behavior:"smooth",block:"start"});
+  }
+
+  async function saveNewsPost(event){
+    event.preventDefault();
+    const status=$("#newsStatus");
+    const button=event.currentTarget?.querySelector('button[type="submit"]');
+    const currentId=String($("#newsPostId")?.value || "").trim();
+    const category=String($("#newsCategory")?.value || "NOTICE").toUpperCase();
+    const title=String($("#newsTitle")?.value || "").trim().slice(0,100);
+    const summary=String($("#newsSummary")?.value || "").trim().slice(0,180);
+    const imageUrl=String($("#newsImageUrl")?.value || "").trim().slice(0,500);
+    const body=String($("#newsBody")?.value || "").trim().slice(0,12000);
+    if(!title || !body){ setStatusText(status,"제목과 본문을 입력해 주세요."); return; }
+    if(imageUrl){
+      try{ const u=new URL(imageUrl); if(!["http:","https:"].includes(u.protocol)) throw 0; }
+      catch{ setStatusText(status,"대표 이미지는 http:// 또는 https:// 주소로 입력해 주세요."); return; }
+    }
+    if(button) button.disabled=true;
+    setStatusText(status,"저장 중…");
+    try{
+      const {data,error}=await adminRpc("biteboss_admin_news_upsert_v8260",{p_post:{
+        id:currentId || null,
+        category:NEWS_CATEGORIES.has(category) ? category : "NOTICE",
+        title,summary,image_url:imageUrl,body,
+        published:$("#newsPublished")?.value !== "false",
+        pinned:$("#newsPinned")?.value === "true"
+      }});
+      if(error) throw error;
+      const id=String(data?.id || data?.post?.id || currentId || "");
+      await loadNewsAdmin();
+      if(id) editNewsPost(id);
+      setStatusText(status,"저장되었습니다.");
+    }catch(error){ console.warn(error); setStatusText(status,"저장에 실패했습니다."); }
+    finally{ if(button) button.disabled=false; }
+  }
+
+  async function deleteNewsPost(){
+    const id=String($("#newsPostId")?.value || "").trim();
+    if(!id) return;
+    const post=newsPosts().find(item=>item.id===id);
+    if(!post || !confirm(`\"${post.title}\" 게시글을 삭제할까요?`)) return;
+    setStatusText($("#newsStatus"),"삭제 중…");
+    try{
+      const {error}=await adminRpc("biteboss_admin_news_delete_v8260",{p_id:id});
+      if(error) throw error;
+      if(String(appConfig.first_capture_guide_post_id || "")===id){
+        const rows=[{key:"first_capture_guide_post_id",value:""},{key:"first_capture_guide_link_mode",value:"none"}];
+        await secureAdminConfigUpsert(rows);
+        appConfig.first_capture_guide_post_id="";
+        appConfig.first_capture_guide_link_mode="none";
+      }
+      resetNewsForm(); await loadNewsAdmin(); await loadAssets();
+      setStatusText($("#newsStatus"),"삭제되었습니다.");
+    }catch(error){ console.warn(error); setStatusText($("#newsStatus"),"삭제에 실패했습니다."); }
+  }
+
   async function saveFirstCaptureGuide(event){
     event.preventDefault();
     const status=$("#firstCaptureGuideStatus");
@@ -1880,13 +2037,19 @@
     const icon=String($("#firstCaptureGuideIcon")?.value ?? "").trim().slice(0,8);
     const title=String($("#firstCaptureGuideTitle")?.value ?? "").trim().slice(0,40);
     const body=String($("#firstCaptureGuideBody")?.value ?? "").trim().slice(0,100);
-    const linkUrl=String($("#firstCaptureGuideLinkUrl")?.value ?? "").trim().slice(0,500);
+    const linkMode=String($("#firstCaptureGuideLinkMode")?.value || "none");
+    const postId=linkMode === "internal" ? String($("#firstCaptureGuidePostId")?.value || "").trim() : "";
+    const linkUrl=linkMode === "external" ? String($("#firstCaptureGuideLinkUrl")?.value ?? "").trim().slice(0,500) : "";
 
     if(!title){
       if(status) status.textContent="제목은 비워둘 수 없습니다.";
       return;
     }
 
+    if(linkMode === "internal" && !newsPosts().some(post=>post.id===postId && post.published)){
+      if(status) status.textContent="연결할 공개 게시글을 선택해 주세요.";
+      return;
+    }
     if(linkUrl){
       try{
         const parsed=new URL(linkUrl);
@@ -1906,6 +2069,8 @@
       { key:"first_capture_guide_icon", value:icon, updated_by:session.user.id, updated_at:now },
       { key:"first_capture_guide_title", value:title, updated_by:session.user.id, updated_at:now },
       { key:"first_capture_guide_body", value:body, updated_by:session.user.id, updated_at:now },
+      { key:"first_capture_guide_link_mode", value:linkMode, updated_by:session.user.id, updated_at:now },
+      { key:"first_capture_guide_post_id", value:postId, updated_by:session.user.id, updated_at:now },
       { key:"first_capture_guide_link_url", value:linkUrl, updated_by:session.user.id, updated_at:now }
     ];
 

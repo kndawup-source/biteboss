@@ -8,7 +8,7 @@
 <meta content="yes" name="mobile-web-app-capable"/>
 <title>BiteBoss Admin</title>
 <link href="./styles.css?v=82.20" rel="stylesheet"/>
-<link href="./admin.css?v=82.59" rel="stylesheet"/>
+<link href="./admin.css?v=82.60" rel="stylesheet"/>
 <script src="./app-config.js?v=82.20"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -58,6 +58,7 @@
 <button class="admin-section-nav hidden" data-admin="users" data-admin-group="game" type="button">사용자</button>
 <button class="admin-section-nav hidden" data-admin="assets" data-admin-group="settings" type="button">앱 설정</button>
 <button class="admin-section-nav hidden" data-admin="ads" data-admin-group="settings" type="button">광고 관리</button>
+<button class="admin-section-nav hidden" data-admin="news" data-admin-group="settings" type="button">소식</button>
 <button class="admin-section-nav hidden" data-admin="maintenance" data-admin-group="settings" type="button">유지보수</button>
 </nav>
 <div class="admin-side-actions">
@@ -369,7 +370,9 @@
 <label>아이콘<input class="input" id="firstCaptureGuideIcon" maxlength="8" placeholder="💡"/></label>
 <label class="wide">제목<input class="input" id="firstCaptureGuideTitle" maxlength="40" placeholder="첫 점령 가이드" required=""/></label>
 <label class="wide">설명<input class="input" id="firstCaptureGuideBody" maxlength="100" placeholder="가까운 미점령 매장부터 시작해 보세요."/></label>
-<label class="wide">링크 URL<input class="input" id="firstCaptureGuideLinkUrl" inputmode="url" maxlength="500" placeholder="https://example.com"/><small class="field-help">선택 사항 · 입력하면 공지 전체를 눌러 링크를 엽니다.</small></label>
+<label>연결 방식<select class="input" id="firstCaptureGuideLinkMode"><option value="none">연결 없음</option><option value="internal">내부 소식</option><option value="external">외부 URL</option></select></label>
+<label class="wide" id="firstCaptureGuidePostField">연결 게시글<select class="input" id="firstCaptureGuidePostId"><option value="">게시글을 선택하세요</option></select><small class="field-help">소식에서 공개된 게시글을 선택합니다.</small></label>
+<label class="wide" id="firstCaptureGuideUrlField">외부 링크 URL<input class="input" id="firstCaptureGuideLinkUrl" inputmode="url" maxlength="500" placeholder="https://example.com"/><small class="field-help">외부 URL 연결을 선택한 경우에만 사용합니다.</small></label>
 <button class="primary-btn wide" type="submit">앱 공지 저장</button>
 </form>
 <p class="asset-status" id="firstCaptureGuideStatus"></p></div>
@@ -454,6 +457,31 @@
 <div class="admin-ad-guide"><span>캠페인은 기간·대상·위치를 관리하고, 광고 소재는 실제 이미지를 관리합니다.</span><span>성과 확인은 현황 → 광고 성과에서 전체 → 캠페인 → 소재 순으로 확인합니다.</span></div>
 </details>
 </div></section>
+
+<section class="admin-page" id="admin-news">
+<div class="admin-page-head"><div><span class="eyebrow">설정</span><h2>소식</h2><p>공지 배너에서 연결할 공지·이벤트·업데이트·PEOPLE 콘텐츠를 관리합니다.</p></div></div>
+<div class="admin-page-body">
+<section class="admin-section-card">
+<div class="admin-section-title admin-section-title-row"><div><h3>게시글</h3><p>공개된 글은 사용자 앱의 소식 목록과 공지 배너 연결에 사용됩니다.</p></div><button class="secondary-btn admin-small-btn" id="newsNewBtn" type="button">새 글</button></div>
+<div class="admin-news-list" id="newsAdminList"></div>
+</section>
+<section class="admin-section-card">
+<div class="admin-section-title"><div><h3 id="newsEditorTitle">새 글 작성</h3><p>본문은 줄바꿈을 유지해 표시합니다.</p></div></div>
+<form class="form-grid" id="newsForm">
+<input id="newsPostId" type="hidden"/>
+<label>카테고리<select class="input" id="newsCategory"><option value="NOTICE">NOTICE</option><option value="EVENT">EVENT</option><option value="UPDATE">UPDATE</option><option value="PEOPLE">PEOPLE</option></select></label>
+<label>공개 상태<select class="input" id="newsPublished"><option value="true">공개</option><option value="false">비공개</option></select></label>
+<label>상단 고정<select class="input" id="newsPinned"><option value="false">일반</option><option value="true">고정</option></select></label>
+<label class="wide">제목<input class="input" id="newsTitle" maxlength="100" required placeholder="제목"/></label>
+<label class="wide">요약<input class="input" id="newsSummary" maxlength="180" placeholder="목록에 표시할 짧은 설명"/></label>
+<label class="wide">대표 이미지 URL<input class="input" id="newsImageUrl" inputmode="url" maxlength="500" placeholder="https://..."/></label>
+<label class="wide">본문<textarea class="input" id="newsBody" rows="10" maxlength="12000" required placeholder="내용을 입력하세요."></textarea></label>
+<div class="admin-form-actions wide"><button class="primary-btn" type="submit">게시글 저장</button><button class="secondary-btn" id="newsCancelBtn" type="button">취소</button><button class="text-btn danger-text hidden" id="newsDeleteBtn" type="button">삭제</button></div>
+</form>
+<p class="asset-status" id="newsStatus"></p>
+</section>
+</div>
+</section>
 <section class="admin-page" id="admin-maintenance">
 <div class="admin-page-head"><div><span class="eyebrow">설정</span><h2>유지보수</h2><p>초기화처럼 위험도가 높은 작업만 모아둡니다.</p></div></div><div class="admin-page-body">
 <section class="admin-section-card admin-danger-zone">
@@ -687,6 +715,6 @@
 </div>
 </section>
 </div>
-<script src="./admin.js?v=82.59"></script>
+<script src="./admin.js?v=82.60"></script>
 </body>
 </html>
