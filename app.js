@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.61";
+  const BITEBOSS_BUILD = "82.62";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -822,7 +822,7 @@ await handleClaimParam();
     });
     document.addEventListener("keydown", event => {
       if(event.key !== "Escape") return;
-      if(!$("#newsScreen")?.classList.contains("hidden")){
+      if($("#newsScreen")?.classList.contains("active")){
         event.preventDefault();
         closeNewsScreen();
         return;
@@ -833,8 +833,6 @@ await handleClaimParam();
       }
     });
 
-    $("#newsClose")?.addEventListener("click", closeNewsScreen);
-    $("#newsBack")?.addEventListener("click", showNewsList);
     $("#newsMore")?.addEventListener("click", showNewsList);
     $("#newsScreen")?.addEventListener("click", event=>{
       const filter=event.target.closest("[data-news-filter]");
@@ -5517,24 +5515,28 @@ await handleClaimParam();
 
   let activeNewsPostId="";
   let activeNewsCategory="ALL";
+  let previousNewsTab="home";
 
   function openNewsScreen(){
     const screen=$("#newsScreen");
     if(!screen) return;
-    screen.classList.remove("hidden");
-    document.body.classList.add("news-open");
+    const activeNav=$$(".nav-btn").find(btn=>btn.classList.contains("active"));
+    if(activeNav?.dataset?.tab) previousNewsTab=activeNav.dataset.tab;
+    setHomeViewportLocked(false);
+    $$(".page").forEach(page=>page.classList.remove("active"));
+    screen.classList.add("active");
+    window.scrollTo({top:0,left:0,behavior:"auto"});
+    renderNewsPromo();
   }
 
   function closeNewsScreen(){
-    $("#newsScreen")?.classList.add("hidden");
-    document.body.classList.remove("news-open");
     activeNewsPostId="";
+    openTab(previousNewsTab || "home", {historyMode:"replace"});
   }
 
   function showNewsList(){
     activeNewsPostId="";
     openNewsScreen();
-    $("#newsBack")?.classList.add("hidden");
     $("#newsDetail")?.classList.add("hidden");
     $("#newsListView")?.classList.remove("hidden");
     renderNewsList(activeNewsCategory);
@@ -5546,9 +5548,9 @@ await handleClaimParam();
     const list=$("#newsList");
     if(list){
       list.innerHTML=posts.length ? posts.map(post=>`
-        <button class="news-list-row" type="button" data-news-open="${escapeAttr(post.id)}">
-          ${post.image_url ? `<img src="${escapeAttr(post.image_url)}" alt="" loading="lazy"/>` : ""}
-          <span class="news-list-copy"><small>${escapeHtml(post.category)}${post.pinned ? " · PIN" : ""}</small><strong>${escapeHtml(post.title)}</strong>${post.summary ? `<p>${escapeHtml(post.summary)}</p>` : ""}</span>
+        <button class="news-list-card" type="button" data-news-open="${escapeAttr(post.id)}">
+          ${post.image_url ? `<span class="news-list-visual"><img src="${escapeAttr(post.image_url)}" alt="" loading="lazy"/></span>` : ""}
+          <span class="news-list-copy"><small>${escapeHtml(post.category)}${post.pinned ? " · PIN" : ""}</small><strong>${escapeHtml(post.title)}</strong>${post.summary ? `<p>${escapeHtml(post.summary)}</p>` : ""}<i aria-hidden="true">›</i></span>
         </button>`).join("") : `<div class="news-empty">등록된 소식이 없습니다.</div>`;
     }
     $$('[data-news-filter]',$("#newsScreen")).forEach(button=>button.classList.toggle("active",button.dataset.newsFilter===activeNewsCategory));
@@ -5559,19 +5561,20 @@ await handleClaimParam();
     if(!post){ showNewsList(); return; }
     activeNewsPostId=post.id;
     openNewsScreen();
-    $("#newsBack")?.classList.remove("hidden");
     $("#newsListView")?.classList.add("hidden");
     const detail=$("#newsDetail");
     if(detail){
       detail.classList.remove("hidden");
       detail.innerHTML=`
         <article class="news-article">
+          <button class="news-inline-back" type="button" data-news-list aria-label="소식 목록으로">← 소식 목록</button>
           <header><small>${escapeHtml(post.category)}</small><h2>${escapeHtml(post.title)}</h2>${post.summary ? `<p>${escapeHtml(post.summary)}</p>` : ""}</header>
           ${post.image_url ? `<img class="news-cover" src="${escapeAttr(post.image_url)}" alt=""/>` : ""}
           <div class="news-body">${escapeHtml(post.body).replace(/\n/g,"<br>")}</div>
           <button id="newsMore" class="news-more-btn" type="button">소식 더보기</button>
         </article>`;
       $("#newsMore")?.addEventListener("click",showNewsList);
+      $$('[data-news-list]',detail).forEach(button=>button.addEventListener('click',showNewsList));
     }
   }
 
@@ -5656,6 +5659,26 @@ await handleClaimParam();
       const storeId = String(matchedStore?.id || bannerStore?.id || rawStoreId || "").trim();
       if(storeId) openStoreDetail(storeId, { storeFallback:matchedStore || bannerStore || null });
     }));
+  }
+
+
+  function renderNewsPromo(){
+    const box=$("#newsPromo");
+    if(!box) return;
+    const items=[];
+    if(shouldShowFirstCaptureGuide()) items.push(firstCaptureGuideMarkup());
+    const banner=currentPartnerBanner();
+    const partnerMarkup=partnerBannerMarkup(banner);
+    if(partnerMarkup) items.push(partnerMarkup);
+    if(!items.length){
+      box.innerHTML="";
+      box.classList.add("hidden");
+      return;
+    }
+    box.innerHTML=items.join("");
+    box.classList.remove("hidden");
+    bindGamePulseStoreLinks(box);
+    if(banner) void hydratePartnerBannerPhoto(banner);
   }
 
   function paintImmediatePartnerBanner(){
