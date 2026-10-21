@@ -567,24 +567,24 @@ body.biteboss-info-page{min-height:100dvh;background:var(--bg);color:#111}.info-
 .news-featured-copy>strong{display:block;color:#fff;font-size:22px;line-height:1.15;font-weight:900;letter-spacing:-.04em;word-break:keep-all;overflow-wrap:anywhere}
 .news-featured-copy>p{margin:8px 0 0;color:#c1c1c6;font-size:10px;line-height:1.55;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .news-featured-card:active{transform:scale(.997)}
-.news-promo{margin:0 0 16px}
-.news-list{display:grid;gap:22px;border-top:0}
+.news-list{display:grid;gap:0;border-top:0}
 .news-list-card{position:relative;display:block;width:100%;min-width:0;color:inherit;text-align:left;text-decoration:none;font:inherit;box-shadow:none}
-.news-list-card.is-feed{overflow:hidden;border:0;border-radius:14px;background:#fff}
-.news-list-card.is-feed:active{transform:scale(.997)}
-.news-feed-visual{display:block;width:100%;aspect-ratio:16/9;overflow:hidden;background:#e9e9ec}
+.news-list-card.is-feed{overflow:hidden;padding:0 0 24px;margin:0 0 24px;border:0;border-bottom:1px solid #dedee1;border-radius:0;background:transparent}
+.news-list-card.is-feed:last-child{margin-bottom:0}
+.news-list-card.is-feed:active{opacity:.82}
+.news-feed-visual{display:block;width:100%;aspect-ratio:16/9;overflow:hidden;border-radius:12px;background:#e9e9ec}
 .news-feed-visual img{display:block;width:100%;height:100%;object-fit:cover}
-.news-list-card.is-feed .news-list-copy{display:block;min-width:0;padding:13px 1px 0}
+.news-list-card.is-feed .news-list-copy{display:block;min-width:0;padding:14px 1px 0}
 .news-list-meta,.news-article-meta{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0}
 .news-list-meta small,.news-list-meta time,.news-article-meta small,.news-article-meta time{color:#929298;font-size:9px;font-weight:780;line-height:1.2;letter-spacing:0;font-style:normal}
 .news-list-meta small,.news-article-meta small{font-weight:860;color:#6f6f75}
 .news-list-meta time,.news-article-meta time{white-space:nowrap}
-.news-list-card.is-feed .news-list-copy strong{display:block;margin-top:7px;color:#111;font-size:17px;line-height:1.24;font-weight:900;letter-spacing:-.035em;word-break:keep-all;overflow-wrap:anywhere}
-.news-list-card.is-feed .news-list-copy p{margin:6px 0 0;color:#7d7d84;font-size:10px;line-height:1.55;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.news-list-card.is-feed:not(:has(.news-feed-visual)){padding:15px 0 18px;border-top:1px solid #dedee1;border-bottom:1px solid #dedee1;border-radius:0;background:transparent}
+.news-list-card.is-feed .news-list-copy strong{display:block;margin-top:9px;color:#111;font-size:20px;line-height:1.18;font-weight:900;letter-spacing:-.04em;word-break:keep-all;overflow-wrap:anywhere}
+.news-list-card.is-feed .news-list-copy p{margin:8px 0 0;max-width:680px;color:#727278;font-size:11px;line-height:1.58;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.news-list-card.is-feed:not(:has(.news-feed-visual)){padding-top:3px}
 .news-list-card.is-feed:not(:has(.news-feed-visual)) .news-list-copy{padding-top:0}
-.news-list-card.is-feed.is-lead .news-list-copy strong{font-size:20px;line-height:1.18}
-.news-list-card.is-feed.is-lead .news-list-copy p{font-size:10.5px}
+.news-list-card.is-feed.is-lead .news-list-copy strong{font-size:23px;line-height:1.14}
+.news-list-card.is-feed.is-lead .news-list-copy p{font-size:11.5px}
 .news-empty{padding:42px 0;border-top:1px solid #dedee1;color:#99999f;font-size:10px;text-align:center}
 .news-empty.is-after-featured{padding-top:28px}
 .news-pagination{margin-top:16px}
@@ -622,9 +622,11 @@ body.biteboss-info-page{min-height:100dvh;background:var(--bg);color:#111}.info-
   .news-featured-copy{padding:15px 15px 16px}
   .news-featured-copy>strong{font-size:20px}
   .news-list{gap:20px}
+  .news-list-card.is-feed{padding-bottom:20px;margin-bottom:20px}
   .news-list-card.is-feed .news-list-copy{padding-top:12px}
-  .news-list-card.is-feed .news-list-copy strong{font-size:16px}
-  .news-list-card.is-feed.is-lead .news-list-copy strong{font-size:19px}
+  .news-list-card.is-feed .news-list-copy strong{font-size:18px}
+  .news-list-card.is-feed .news-list-copy p{font-size:10.5px}
+  .news-list-card.is-feed.is-lead .news-list-copy strong{font-size:21px}
   .news-article h2{font-size:23px}
 }
 

@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.83";
+  const BITEBOSS_BUILD = "82.84";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -5669,7 +5669,6 @@ await handleClaimParam();
     $$(".nav-btn").forEach(btn=>btn.classList.toggle("active",btn.dataset.tab==="news"));
     screen.classList.add("active");
     if(scrollTop) window.scrollTo({top:0,left:0,behavior:"auto"});
-    renderNewsPromo();
   }
 
   function closeNewsScreen(){
@@ -5779,19 +5778,31 @@ await handleClaimParam();
     try{ return new Intl.DateTimeFormat("ko-KR",{year:"numeric",month:"2-digit",day:"2-digit"}).format(date).replace(/\. /g,".").replace(/\.$/,""); }catch{ return ""; }
   }
 
+  function newsFeedExcerpt(post){
+    const summary=String(post?.summary || "").trim();
+    if(summary) return summary;
+    const body=String(post?.body || "")
+      .replace(/https?:\/\/\S+/gi," ")
+      .replace(/\s+/g," ")
+      .trim();
+    if(!body) return "";
+    return body.length>110 ? `${body.slice(0,110).trim()}…` : body;
+  }
+
   function newsCardMarkup(post,{compact=false,lead=false}={}){
     const date=newsDate(post.updated_at || post.created_at);
     const classes=["news-list-card"];
     if(compact) classes.push("is-related");
     else classes.push("is-feed");
     if(lead) classes.push("is-lead");
+    const excerpt=compact ? String(post.summary || "").trim() : newsFeedExcerpt(post);
     return `
       <a class="${classes.join(" ")}" href="${escapeAttr(newsPostPath(post))}" data-news-open="${escapeAttr(post.slug || post.id)}">
         ${compact ? newsThumbnailMarkup(post,"news-list-visual") : newsThumbnailMarkup(post,"news-feed-visual")}
         <span class="news-list-copy">
           <span class="news-list-meta"><small>${escapeHtml(newsCategoryLabel(post.category))}</small>${date ? `<time>${escapeHtml(date)}</time>` : ""}</span>
           <strong>${escapeHtml(post.title)}</strong>
-          ${post.summary ? `<p>${escapeHtml(post.summary)}</p>` : ""}
+          ${excerpt ? `<p>${escapeHtml(excerpt)}</p>` : ""}
           ${compact ? '<i aria-hidden="true">›</i>' : ""}
         </span>
       </a>`;
@@ -6144,22 +6155,6 @@ await handleClaimParam();
     }));
   }
 
-
-  function renderNewsPromo(){
-    const box=$("#newsPromo");
-    if(!box) return;
-    const banner=currentPartnerBanner();
-    const partnerMarkup=partnerBannerMarkup(banner);
-    if(!partnerMarkup){
-      box.innerHTML="";
-      box.classList.add("hidden");
-      return;
-    }
-    box.innerHTML=partnerMarkup;
-    box.classList.remove("hidden");
-    bindGamePulseStoreLinks(box);
-    void hydratePartnerBannerPhoto(banner);
-  }
 
   function paintImmediatePartnerBanner(){
     const box=$("#gamePulse");
