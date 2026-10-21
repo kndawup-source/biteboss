@@ -593,7 +593,7 @@ body.biteboss-info-page{min-height:100dvh;background:var(--bg);color:#111}.info-
 .news-article h2{margin:9px 0 0;color:#111;font-size:25px;line-height:1.12;font-weight:900;letter-spacing:-.045em;word-break:keep-all}
 .news-article header p{margin:10px 0 0;color:#85858c;font-size:10px;line-height:1.6}
 .news-cover{display:block;width:100%;max-height:560px;object-fit:cover;margin:20px 0 0;border-radius:12px;background:#ececef}
-.news-body{padding:22px 0 4px;color:#2f2f34;font-size:11px;line-height:1.85;word-break:keep-all;overflow-wrap:anywhere}
+.news-body{padding:22px 0 4px;color:#2f2f34;font-size:15px;line-height:1.78;letter-spacing:-.015em;word-break:keep-all;overflow-wrap:anywhere}
 .news-body-text{white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere}
 .news-body-gap{display:block;height:1.85em}
 .news-youtube{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;margin:0;border-radius:12px;background:#111}
