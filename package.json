@@ -1,6 +1,6 @@
 {
   "name": "biteboss",
-  "version": "0.82.81",
+  "version": "0.82.82",
   "private": true,
   "scripts": {
     "check": "node --check app.js && node --check admin.js"

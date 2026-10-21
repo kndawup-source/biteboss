@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.81";
+  const BITEBOSS_BUILD = "82.82";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -5654,6 +5654,8 @@ await handleClaimParam();
 
   let activeNewsPostId="";
   let activeNewsCategory="ALL";
+  let activeNewsPage=1;
+  const NEWS_PAGE_SIZE=8;
   let previousNewsTab="home";
   let newsListScrollY=0;
 
@@ -5683,17 +5685,22 @@ await handleClaimParam();
     paintNewsSeoMeta(null);
     $("#newsDetail")?.classList.add("hidden");
     $("#newsListView")?.classList.remove("hidden");
-    renderNewsList(activeNewsCategory);
+    renderNewsList(activeNewsCategory,{page:activeNewsPage,preservePage:restoreScroll});
     if(restoreScroll){
       requestAnimationFrame(()=>window.scrollTo({top:Math.max(0,newsListScrollY),left:0,behavior:"auto"}));
     }
   }
 
-  function renderNewsList(category="ALL"){
-    activeNewsCategory=String(category || "ALL").toUpperCase();
+  function renderNewsList(category="ALL",{page=1,preservePage=false}={}){
+    const nextCategory=String(category || "ALL").toUpperCase();
+    if(!preservePage || nextCategory!==activeNewsCategory) activeNewsPage=1;
+    activeNewsCategory=nextCategory;
     const allPosts=publicNewsPosts();
-    const featured=allPosts.find(post=>post.featured) || null;
     const filtered=allPosts.filter(post=>activeNewsCategory==="ALL" || post.category===activeNewsCategory);
+    const featured=filtered.find(post=>post.featured) || null;
+    const listPosts=featured ? filtered.filter(post=>post.id!==featured.id) : filtered;
+    const slice=pageSlice(listPosts,page || activeNewsPage,NEWS_PAGE_SIZE);
+    activeNewsPage=slice.page;
     const featuredBox=$("#newsFeatured");
     if(featuredBox){
       featuredBox.innerHTML=featured ? newsFeaturedMarkup(featured) : "";
@@ -5701,10 +5708,15 @@ await handleClaimParam();
     }
     const list=$("#newsList");
     if(list){
-      list.innerHTML=filtered.length
-        ? filtered.map(post=>newsCardMarkup(post)).join("")
-        : `<div class="news-empty">등록된 소식이 없습니다.</div>`;
+      list.innerHTML=slice.rows.length
+        ? slice.rows.map(post=>newsCardMarkup(post)).join("")
+        : `<div class="news-empty${featured ? " is-after-featured" : ""}">${featured ? "이 카테고리의 다른 소식이 없습니다." : "등록된 소식이 없습니다."}</div>`;
     }
+    renderPagination("#newsPagination",activeNewsPage,listPosts.length,NEWS_PAGE_SIZE,nextPage=>{
+      renderNewsList(activeNewsCategory,{page:nextPage,preservePage:true});
+      const top=$("#newsListView")?.getBoundingClientRect?.().top ?? 0;
+      window.scrollTo({top:Math.max(0,(window.scrollY || 0)+top-12),left:0,behavior:"auto"});
+    });
     $$('[data-news-filter]',$('#newsScreen')).forEach(button=>button.classList.toggle("active",button.dataset.newsFilter===activeNewsCategory));
   }
 
@@ -5739,14 +5751,19 @@ await handleClaimParam();
     return `<span class="${escapeAttr(className)}"><img src="${escapeAttr(media.url)}" alt="" loading="${priority}" decoding="async"${priority==="eager" ? ' fetchpriority="high"' : ""}/></span>`;
   }
 
+  function newsCategoryLabel(category){
+    const labels={NOTICE:"공지",EVENT:"이벤트",UPDATE:"업데이트",PEOPLE:"사람들"};
+    return labels[String(category || "").toUpperCase()] || "소식";
+  }
+
   function newsFeaturedMarkup(post){
     const date=newsDate(post.updated_at || post.created_at);
     return `
       <a class="news-featured-card" href="${escapeAttr(newsPostPath(post))}" data-news-open="${escapeAttr(post.slug || post.id)}">
         ${newsThumbnailMarkup(post,"news-featured-visual","eager")}
         <span class="news-featured-copy">
-          <span class="news-featured-label">FEATURED</span>
-          <span class="news-list-meta"><small>${escapeHtml(post.category)}</small>${date ? `<time>${escapeHtml(date)}</time>` : ""}</span>
+          <span class="news-featured-label">대표 소식</span>
+          <span class="news-list-meta"><small>${escapeHtml(newsCategoryLabel(post.category))}</small>${date ? `<time>${escapeHtml(date)}</time>` : ""}</span>
           <strong>${escapeHtml(post.title)}</strong>
           ${post.summary ? `<p>${escapeHtml(post.summary)}</p>` : ""}
         </span>
@@ -5766,9 +5783,9 @@ await handleClaimParam();
     const date=newsDate(post.updated_at || post.created_at);
     return `
       <a class="news-list-card${compact ? " is-related" : ""}" href="${escapeAttr(newsPostPath(post))}" data-news-open="${escapeAttr(post.slug || post.id)}">
-        ${newsThumbnailMarkup(post,"news-list-visual")}
+        ${compact ? newsThumbnailMarkup(post,"news-list-visual") : ""}
         <span class="news-list-copy">
-          <span class="news-list-meta"><small>${escapeHtml(post.category)}${post.pinned ? " · PIN" : ""}</small>${date ? `<time>${escapeHtml(date)}</time>` : ""}</span>
+          <span class="news-list-meta"><small>${escapeHtml(newsCategoryLabel(post.category))}</small>${date ? `<time>${escapeHtml(date)}</time>` : ""}</span>
           <strong>${escapeHtml(post.title)}</strong>
           ${post.summary ? `<p>${escapeHtml(post.summary)}</p>` : ""}
           <i aria-hidden="true">›</i>
@@ -5838,6 +5855,7 @@ await handleClaimParam();
 
   function newsCommentsMarkup(postId){
     return `<section class="store-comments news-comments" data-news-comments="${escapeAttr(postId)}" aria-label="게시글 댓글">
+      <div class="news-comments-head"><h3>한마디</h3></div>
       ${playerSession?.authenticated ? `
         <form class="store-comment-form" data-news-comment-form="${escapeAttr(postId)}">
           <div class="store-comment-input-row">
@@ -6023,7 +6041,7 @@ await handleClaimParam();
         <article class="news-article">
           <button class="news-inline-back" type="button" data-news-list aria-label="소식 목록으로">← 소식 목록</button>
           <header>
-            <span class="news-article-meta"><small>${escapeHtml(post.category)}</small>${date ? `<time>${escapeHtml(date)}</time>` : ""}</span>
+            <span class="news-article-meta"><small>${escapeHtml(newsCategoryLabel(post.category))}</small>${date ? `<time>${escapeHtml(date)}</time>` : ""}</span>
             <h2>${escapeHtml(post.title)}</h2>
             ${post.summary ? `<p>${escapeHtml(post.summary)}</p>` : ""}
           </header>
