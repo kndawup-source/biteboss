@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.79";
+  const BITEBOSS_BUILD = "82.80";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -4753,7 +4753,7 @@ await handleClaimParam();
 
     const [activityResult,reclaimResult] = await Promise.all([
       sb.rpc("biteboss_game_activity", { p_limit:30 }),
-      sb.rpc("biteboss_reclaim_activity_v8277", { p_limit:30 })
+      sb.rpc("biteboss_reclaim_activity_v8280", { p_limit:30 })
     ]);
 
     if(activityResult.error){
@@ -4762,7 +4762,7 @@ await handleClaimParam();
       setRetryState(profileBox, "활동 기록을 불러오지 못했습니다.", loadGameActivity);
       return;
     }
-    if(reclaimResult.error && !String(reclaimResult.error?.message || "").includes("biteboss_reclaim_activity_v8277")){
+    if(reclaimResult.error && !String(reclaimResult.error?.message || "").includes("biteboss_reclaim_activity_v8280")){
       console.warn("BiteBoss reclaim activity:", reclaimResult.error);
     }
 
@@ -5448,14 +5448,14 @@ await handleClaimParam();
   async function pingTakeoverSession(store,pos){
     if(!store?.id || !pos?.coords || !window.sb) return null;
     try{
-      const {data,error}=await sb.rpc("biteboss_takeover_session_ping_v8277",{
+      const {data,error}=await sb.rpc("biteboss_takeover_session_ping_v8280",{
         p_store_id:String(store.id),
         p_lat:Number(pos.coords.latitude),
         p_lng:Number(pos.coords.longitude),
         p_accuracy_m:Number.isFinite(pos.coords.accuracy)?Number(pos.coords.accuracy):null
       });
       if(error){
-        if(!String(error.message||"").includes("biteboss_takeover_session_ping_v8277")) console.warn("BiteBoss takeover session:",error);
+        if(!String(error.message||"").includes("biteboss_takeover_session_ping_v8280")) console.warn("BiteBoss takeover session:",error);
         return null;
       }
       return data||null;
@@ -6462,7 +6462,7 @@ await handleClaimParam();
 
       const hadOrganizationBeforeChallenge = Boolean(String(organization?.id || "").trim());
 
-      const { data, error } = await sb.rpc("biteboss_presence_ping_v8277", {
+      const { data, error } = await sb.rpc("biteboss_presence_ping_v8280", {
         p_store_id:String(nearest.store.id),
         p_lat:pos.coords.latitude,
         p_lng:pos.coords.longitude,
@@ -9017,7 +9017,7 @@ await handleClaimParam();
   async function fetchCanonicalPlayerBattleRecord(userId){
     const targetUserId=String(userId || "").trim();
     if(!targetUserId) return null;
-    const { data, error } = await sb.rpc("biteboss_player_battle_record_v8279", { p_user_id:targetUserId });
+    const { data, error } = await sb.rpc("biteboss_player_battle_record_v8280", { p_user_id:targetUserId });
     if(error){
       if(!isMissingRpcError(error)) console.warn("BiteBoss canonical battle record:", error);
       return null;
@@ -9030,7 +9030,7 @@ await handleClaimParam();
   async function fetchPlayerReclaimActivity(userId, limit=20){
     const targetUserId=String(userId || "").trim();
     if(!targetUserId) return [];
-    const { data, error } = await sb.rpc("biteboss_player_reclaim_activity_v8279", {
+    const { data, error } = await sb.rpc("biteboss_player_reclaim_activity_v8280", {
       p_user_id:targetUserId,
       p_limit:Math.max(1,Math.min(50,Number(limit)||20))
     });
