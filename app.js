@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.85";
+  const BITEBOSS_BUILD = "82.86";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -493,15 +493,26 @@
     return standalone ? "pwa" : "web";
   }
 
+  const STORE_MANAGEMENT_ROLES = new Set(["owner","manager","staff","admin","store_admin","store_owner"]);
+
+  function isManagedStoreRole(row = {}){
+    const role=String(row?.store_role || row?.admin_role || row?.my_store_role || row?.management_role || "").toLowerCase();
+    return Boolean(
+      row?.is_store_owner || row?.is_store_admin || row?.is_manager || row?.is_staff ||
+      row?.can_manage || row?.can_manage_store || row?.is_my_store || STORE_MANAGEMENT_ROLES.has(role)
+    );
+  }
+
+  function isMyManagedStore(storeOrId){
+    const storeId=String(typeof storeOrId === "object" ? storeOrId?.id : storeOrId || "").trim();
+    if(!storeId || !playerSession?.authenticated) return false;
+    return isManagedStoreRole(storeRoleMap.get(storeId) || {});
+  }
+
   function accessTelemetryOwnerContext(){
-    const managementRoles=new Set(["owner","manager","staff","admin","store_admin","store_owner","partner"]);
     const ownerStoreIds=[];
     storeRoleMap.forEach((row,storeId)=>{
-      const role=String(row?.store_role || row?.admin_role || row?.my_store_role || row?.management_role || "").toLowerCase();
-      const canManage=Boolean(
-        row?.is_store_owner || row?.is_store_admin || row?.is_manager || row?.can_manage || row?.can_manage_store || row?.is_my_store || managementRoles.has(role)
-      );
-      if(canManage) ownerStoreIds.push(String(storeId));
+      if(isManagedStoreRole(row)) ownerStoreIds.push(String(storeId));
     });
     if(!ownerStoreIds.length) return {isStoreOwner:false,tier:playerSession?.authenticated?"member":"guest"};
 
@@ -2271,7 +2282,7 @@ await handleClaimParam();
       return;
     }
 
-    const challengeableRows = rows.filter(store => !isMyBossStore(store));
+    const challengeableRows = rows.filter(store => !isMyBossStore(store) && !isMyManagedStore(store));
     const next = challengeableRows[0] || null;
     if(card){
       card.dataset.storeId = next?.id ? String(next.id) : "";
@@ -2308,6 +2319,7 @@ await handleClaimParam();
       store.is_hot,
       role.my_role,
       role.is_my_boss_store,
+      isManagedStoreRole(role),
       role.can_retake
     ]);
   }
@@ -2500,6 +2512,10 @@ await handleClaimParam();
 
   function compareNearbyStores(a,b){
     const ar=storeRoleMap.get(String(a.id))||{}, br=storeRoleMap.get(String(b.id))||{};
+    const aManaged=isManagedStoreRole(ar), bManaged=isManagedStoreRole(br);
+    // A store the signed-in user manages is visible for information/management,
+    // but it is never an active capture target. Keep managed stores below playable stores.
+    if(aManaged!==bManaged) return aManaged ? 1 : -1;
     const aOwned=isMyBossStore(a), bOwned=isMyBossStore(b);
     // Owned stores are reference/history items, not active targets. Keep them at the bottom.
     if(aOwned!==bOwned) return aOwned ? 1 : -1;
@@ -2597,6 +2613,7 @@ await handleClaimParam();
 
   function storeCard(store){
     const roleState = storeRoleMap.get(String(store.id)) || {};
+    const managedByMe = isMyManagedStore(store);
     const ownedByMe = isMyBossStore(store);
     const protectionUntil = latestProtectionUntil(roleState.protected_until, store.protected_until);
     const protectedNow = Boolean(protectionUntil && new Date(protectionUntil).getTime() > Date.now());
@@ -2618,7 +2635,9 @@ await handleClaimParam();
     const reclaimAt = cachedReclaim?.is_boss ? String(cachedReclaim.available_at || "").trim() : "";
 
     let status = "";
-    if(ownedByMe){
+    if(managedByMe){
+      status = "내 관리 매장 · 점령 제외";
+    }else if(ownedByMe){
       // A successful capture starts the player-wide capture cooldown. During that
       // window this store is simply an owned territory; do not surface a reclaim
       // countdown/presence state that implies the user can immediately reclaim it.
@@ -3138,7 +3157,8 @@ await handleClaimParam();
     const myRole = String(game.my_role || "visitor");
     const isBoss = myRole === "boss";
     const isCrew = myRole === "crew";
-    const showStoreManagerCard = shouldShowStoreManagerCard({ isBoss, options });
+    const managedByMe = isMyManagedStore(store);
+    const showStoreManagerCard = shouldShowStoreManagerCard({ isBoss:isBoss && !managedByMe, options });
     const myPower = Math.max(0, Number(game.my_power ?? 0));
     const storeBonus = Math.max(0, Number(game.my_store_bonus ?? growth.store_bonus ?? 0));
     const validVisits = Math.max(0, Number(game.my_valid_visits ?? growth.valid_visits ?? 0));
@@ -3159,7 +3179,7 @@ await handleClaimParam();
     );
 
     const globalCaptureCooldownNow = captureCooldownActive();
-    const canChallenge = game.challengeable !== false && !protectedNow && !cooldownNow && !globalCaptureCooldownNow && !isBoss;
+    const canChallenge = game.challengeable !== false && !protectedNow && !cooldownNow && !globalCaptureCooldownNow && !isBoss && !managedByMe;
 
     const distance = Number.isFinite(Number(store.distance_m)) ? formatDistance(store.distance_m) : "";
     const place = [store.city, store.district].filter(Boolean).join(" ");
@@ -3167,7 +3187,8 @@ await handleClaimParam();
     const detailLine = [categoryLabel(store.category), place, distance].filter(Boolean).join(" · ");
 
     let battleState = "점령 가능";
-    if(isBoss) battleState = "내 점령지";
+    if(managedByMe) battleState = "내 관리 매장";
+    else if(isBoss) battleState = "내 점령지";
     else if(protectedNow) battleState = "보호 중";
     else if(globalCaptureCooldownNow) battleState = "다음 점령 대기";
     else if(cooldownNow) battleState = "재도전 대기";
@@ -3486,7 +3507,16 @@ await handleClaimParam();
       : `다음 +${nextBonus}까지 유효 방문 ${visitsToNextBonus}회`;
 
     const reclaimAvailableAt = reclaim?.is_boss ? reclaim.available_at : null;
-    const ownerStatusHtml = isBoss && bossExists ? `
+    const managedStoreHtml = managedByMe ? `
+      <section class="store-owner-conversion approved" aria-label="내 관리 매장">
+        <span class="store-owner-kicker">매장 관리자</span>
+        <strong>내가 관리하는 매장입니다.</strong>
+        <p>공정한 점령을 위해 이 매장에서는 점령·재점령에 참여할 수 없습니다.</p>
+        <button id="detailManagedStoreAdmin" class="primary-btn" type="button">매장 관리자 열기</button>
+      </section>
+    ` : "";
+
+    const ownerStatusHtml = isBoss && bossExists && !managedByMe ? `
       <section class="owner-store-status" aria-label="내 점령 상태">
         <div class="owner-store-status-grid">
           <article>
@@ -3512,7 +3542,9 @@ await handleClaimParam();
     ` : "";
 
     let action = "";
-    if(isBoss){
+    if(managedByMe){
+      action = "";
+    }else if(isBoss){
       action = "";
     }else if(protectedNow){
       action = `<div class="store-detail-auto"><strong>보호 중</strong><span>${escapeHtml(formatRemaining(protectionUntil))} 후 도전할 수 있습니다.</span></div>`;
@@ -3553,6 +3585,7 @@ await handleClaimParam();
         ${gallery}
         ${videoHtml}
 
+        ${managedStoreHtml}
         ${ownerStatusHtml}
 
         ${noticeHtml}
@@ -3641,6 +3674,7 @@ await handleClaimParam();
     bindStoreDetailPhotoGallery(body);
     bindStoreComments(store.id);
 
+    $("#detailManagedStoreAdmin")?.addEventListener("click", () => { location.href = "./store-admin.html"; });
     if(ownerClaimHtml){
       $("#detailPartnerRequest")?.addEventListener("click", () => {
         openPartnerRequestForm(store);
@@ -5106,7 +5140,7 @@ await handleClaimParam();
   function reconcileTakeoverOwnership(){
     if(!takeoverUi?.storeId) return;
     const activeStore=stores.find(item=>String(item.id)===String(takeoverUi.storeId));
-    if(!activeStore || isMyBossStore(activeStore)) closeTakeoverUi();
+    if(!activeStore || isMyBossStore(activeStore) || isMyManagedStore(activeStore)) closeTakeoverUi();
   }
 
   function currentTakeoverVisualRemaining(){
@@ -5124,6 +5158,7 @@ await handleClaimParam();
 
   function takeoverModeFromStore(store){
     const role=storeRoleMap.get(String(store?.id||""))||{};
+    if(isManagedStoreRole(role)) return "takeover";
     if(role.was_previous_boss || role.can_retake) return "retake";
     if(Number(store?.challenges_24h||0)>=Number(config.hot_store_challenges_24h||5) || store?.is_hot) return "hot";
     const boss=String(store?.current_boss_nickname||"").trim();
@@ -5137,7 +5172,7 @@ await handleClaimParam();
   }
 
   function showTakeoverUi(store,state={}){
-    if(!store?.id || takeoverCancelledLocally) return;
+    if(!store?.id || takeoverCancelledLocally || isMyManagedStore(store)) return;
     const requestedMode=String(state.mode||"");
     if(isMyBossStore(store) && requestedMode!=="reclaim"){
       if(takeoverUi?.storeId===String(store.id)) closeTakeoverUi();
@@ -5404,6 +5439,7 @@ await handleClaimParam();
   }
 
   function openTakeoverChoice(rows){
+    if(Array.isArray(rows)) rows=rows.filter(row=>!isMyManagedStore(row?.store));
     if(takeoverChoiceOpen||!Array.isArray(rows)||rows.length<2) return false;
     const modal=$("#modal");
     if(modal&&!modal.classList.contains("hidden")) return false;
@@ -5451,7 +5487,7 @@ await handleClaimParam();
   }
 
   async function pingTakeoverSession(store,pos){
-    if(!store?.id || !pos?.coords || !window.sb) return null;
+    if(!store?.id || !pos?.coords || !window.sb || isMyManagedStore(store)) return null;
     try{
       const {data,error}=await sb.rpc("biteboss_takeover_session_ping_v8280",{
         p_store_id:String(store.id),
@@ -6222,11 +6258,17 @@ await handleClaimParam();
 
     const retakes=(Array.isArray(data?.retakes)?data.retakes:fallbackRetakes)
       .map(normalizePulseStore).filter(Boolean)
-      .filter(row=>!isMyBossStore(stores.find(store=>String(store.id)===String(row.store_id))||{}));
+      .filter(row=>{
+        const store=stores.find(item=>String(item.id)===String(row.store_id))||{};
+        return !isMyBossStore(store) && !isMyManagedStore(store);
+      });
     const serverHot=(Array.isArray(data?.hot)?data.hot:[]).map(normalizePulseStore).filter(Boolean);
     const localHot=fallbackHot.map(normalizePulseStore).filter(Boolean);
     const hot=nearbyHotRows([...serverHot,...localHot])
-      .filter(row=>!isMyBossStore(stores.find(store=>String(store.id)===String(row.store_id))||{}));
+      .filter(row=>{
+        const store=stores.find(item=>String(item.id)===String(row.store_id))||{};
+        return !isMyBossStore(store) && !isMyManagedStore(store);
+      });
     const showFirstCaptureGuide=shouldShowFirstCaptureGuide();
 
     const items=[];
@@ -6297,6 +6339,7 @@ await handleClaimParam();
       if(!Number.isFinite(Number(store.latitude)) || !Number.isFinite(Number(store.longitude))) return false;
 
       const roleState = storeRoleMap.get(String(store.id)) || {};
+      if(isMyManagedStore(store)) return false;
       const ownedByMe = isMyBossStore(store);
       const protectionUntil = latestProtectionUntil(roleState.protected_until, store.protected_until);
       const protectedNow = Boolean(
@@ -6331,7 +6374,7 @@ await handleClaimParam();
         }));
         if(takeoverUi){
           const activeStore=stores.find(item=>String(item.id)===takeoverUi.storeId)||null;
-          if(!activeStore || isMyBossStore(activeStore)) closeTakeoverUi();
+          if(!activeStore || isMyBossStore(activeStore) || isMyManagedStore(activeStore)) closeTakeoverUi();
           else syncTakeoverUi(activeStore,{status:"low_accuracy",remaining_seconds:currentTakeoverVisualRemaining(),required_seconds:takeoverRequired});
         }
         const activeOwned = candidates.find(store => isMyBossStore(store) && String(store.id) === String(activeStoreDetailId || ""));
@@ -7768,6 +7811,7 @@ await handleClaimParam();
     if(message.includes("PARTNER_ONLY_QR")) return "QR 점령은 제휴 매장에서만 사용할 수 있습니다.";
     if(message.includes("INVALID_QR")) return "유효하지 않거나 만료된 QR입니다.";
     if(message.includes("STORE_NOT_AVAILABLE")) return "현재 점령할 수 없는 매장입니다.";
+    if(message.includes("STORE_OWNER_CANNOT_CLAIM") || message.includes("STORE_MANAGER_CANNOT_CLAIM")) return "내가 관리하는 매장에서는 보스에 도전할 수 없습니다.";
     if(message.includes("STORE_STAFF_CANNOT_CLAIM")) return "이 매장의 직원 계정은 보스에 도전할 수 없습니다.";
     if(message.includes("ADMIN_CANNOT_CLAIM")) return "운영자 계정은 보스 경쟁에서 제외됩니다.";
     if(message.includes("LOCATION_REQUIRED")) return "현재 위치를 확인할 수 없습니다.";
