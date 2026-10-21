@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.80";
+  const BITEBOSS_BUILD = "82.81";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -5292,6 +5292,11 @@ await handleClaimParam();
     }
   }
 
+  function isTakeoverStoreDismissed(storeId){
+    const id=String(storeId||"").trim();
+    return Boolean(id && dismissedTakeoverStores.has(id));
+  }
+
   function dismissTakeoverStore(storeId){
     const id=String(storeId||"").trim();
     if(!id) return;
@@ -6357,13 +6362,13 @@ await handleClaimParam();
       }
 
       const reclaimTarget = ownedInRadius
-        .filter(row => !dismissedTakeoverStores.has(String(row.store.id)) && row.reclaim?.is_boss !== false && (row.reclaim?.eligible === true || Number(row.reclaim?.remaining_seconds || 0) <= 0))
+        .filter(row => !isTakeoverStoreDismissed(row.store.id) && row.reclaim?.is_boss !== false && (row.reclaim?.eligible === true || Number(row.reclaim?.remaining_seconds || 0) <= 0))
         .sort((a,b) => a.distance - b.distance)[0];
 
       const challengeRowsInRadius = distanceRows.filter(row =>
         !row.ownedByMe &&
         row.distance <= radius &&
-        !dismissedTakeoverStores.has(String(row.store.id))
+        !isTakeoverStoreDismissed(row.store.id)
       );
 
       let normalTarget = null;
@@ -6371,7 +6376,7 @@ await handleClaimParam();
         normalTarget = distanceRows.find(row =>
           !row.ownedByMe &&
           String(row.store.id)===preferredTakeoverStoreId &&
-          !dismissedTakeoverStores.has(String(row.store.id))
+          !isTakeoverStoreDismissed(row.store.id)
         ) || null;
       }
 
@@ -6385,7 +6390,7 @@ await handleClaimParam();
       }
 
       const nearest = reclaimTarget || normalTarget || distanceRows.find(row =>
-        row.ownedByMe || !dismissedTakeoverStores.has(String(row.store.id))
+        !isTakeoverStoreDismissed(row.store.id)
       );
 
       if(!nearest) return;
@@ -6523,7 +6528,7 @@ await handleClaimParam();
       // server presence/dwell clock that can actually complete the capture.
       if(ownedByMe){
         syncOwnerReclaimPresence(nearest.store.id, presenceClock);
-        if(!takeoverCancelledLocally && !["boss_visit","boss_reclaim"].includes(presenceClock.status)){
+        if(!takeoverCancelledLocally && !isTakeoverStoreDismissed(nearest.store.id) && !["boss_visit","boss_reclaim"].includes(presenceClock.status)){
           syncTakeoverUi(nearest.store,{...presenceClock,mode:"reclaim"});
         }
       }else if(!takeoverCancelledLocally && !["claimed","crew","boss_visit","boss_reclaim"].includes(presenceClock.status)){

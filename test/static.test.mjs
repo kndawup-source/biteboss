@@ -563,10 +563,13 @@ test('store detail photo gallery shows centered dots only for multiple photos', 
 });
 
 test('nearby takeover chooser respects explicit dismissal and post-capture suppression', () => {
+  assert.match(app, /function isTakeoverStoreDismissed\(storeId\)/);
   assert.match(app, /function dismissVisibleTakeoverChoices\(\)/);
   assert.match(app, /if\(takeoverChoiceOpen\) dismissVisibleTakeoverChoices\(\)/);
   assert.match(app, /function dismissNearbyTakeoverCandidates\(pos, exceptStoreId=""\)/);
   assert.match(app, /dismissNearbyTakeoverCandidates\(pos, nearest\.store\.id\)/);
+  assert.match(app, /const nearest = reclaimTarget \|\| normalTarget \|\| distanceRows\.find\(row =>\s*!isTakeoverStoreDismissed\(row\.store\.id\)\s*\)/);
+  assert.match(app, /!takeoverCancelledLocally && !isTakeoverStoreDismissed\(nearest\.store\.id\)/);
   const closeChoice = blockBetween(app, 'function closeTakeoverChoice()', 'function takeoverChoiceCard');
   assert.match(closeChoice, /takeoverChoiceOpen=false;[\s\S]*closeModal\(\)/);
 });
