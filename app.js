@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.76";
+  const BITEBOSS_BUILD = "82.77";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -1895,6 +1895,56 @@ await handleClaimParam();
   }
 
 
+  function latestProtectionUntil(...values){
+    let latestValue = null;
+    let latestTime = 0;
+    values.forEach(value => {
+      const raw = String(value || "").trim();
+      if(!raw) return;
+      const time = new Date(raw).getTime();
+      if(Number.isFinite(time) && time > latestTime){
+        latestTime = time;
+        latestValue = raw;
+      }
+    });
+    return latestValue;
+  }
+
+  async function applyReclaimProtectionOverlay(list){
+    const source = Array.isArray(list) ? list : [];
+    const ids = [...new Set(source.map(store => String(store?.id || "").trim()).filter(Boolean))];
+    if(!ids.length || !window.sb) return source;
+
+    const { data, error } = await sb.rpc("biteboss_reclaim_protection_states_v8277", {
+      p_store_ids:ids
+    });
+
+    if(error){
+      if(!String(error?.message || "").includes("biteboss_reclaim_protection_states_v8277")){
+        console.warn("BiteBoss reclaim protection:", error);
+      }
+      return source;
+    }
+
+    const protectionByStore = new Map(
+      (Array.isArray(data) ? data : [])
+        .filter(row => row?.store_id && row?.protected_until)
+        .map(row => [String(row.store_id), String(row.protected_until)])
+    );
+
+    source.forEach(store => {
+      const protectedUntil = protectionByStore.get(String(store?.id || ""));
+      if(!protectedUntil) return;
+      store.protected_until = latestProtectionUntil(store.protected_until, protectedUntil);
+      const roleState = storeRoleMap.get(String(store.id));
+      if(roleState){
+        roleState.protected_until = latestProtectionUntil(roleState.protected_until, protectedUntil);
+      }
+    });
+
+    return source;
+  }
+
   async function loadStoreRoles(list){
     const ids = [...new Set(
       (Array.isArray(list) ? list : [])
@@ -1959,6 +2009,7 @@ await handleClaimParam();
     }
 
     stores = Array.isArray(result.data) ? result.data : [];
+    await applyReclaimProtectionOverlay(stores);
     stores.sort(compareNearbyStores);
 
     // Fast first paint: show the nearby RPC result immediately.
@@ -1973,7 +2024,8 @@ await handleClaimParam();
       String(config.auto_store_import_enabled).toLowerCase() !== "false";
 
     const roleTask = loadStoreRoles(stores)
-      .then(() => {
+      .then(async () => {
+        await applyReclaimProtectionOverlay(stores);
         stores.sort(compareNearbyStores);
         renderBaseStoreList({ patch:true });
         void loadGamePulse(false);
@@ -2002,7 +2054,9 @@ await handleClaimParam();
         const beforeIds = stores.map(store => String(store.id)).join("|");
         const afterIds = nextStores.map(store => String(store.id)).join("|");
         stores = nextStores;
+        await applyReclaimProtectionOverlay(stores);
         await loadStoreRoles(stores);
+        await applyReclaimProtectionOverlay(stores);
         void pingAccessTelemetry();
         stores.sort(compareNearbyStores);
 
@@ -2544,7 +2598,7 @@ await handleClaimParam();
   function storeCard(store){
     const roleState = storeRoleMap.get(String(store.id)) || {};
     const ownedByMe = isMyBossStore(store);
-    const protectionUntil = roleState.protected_until || store.protected_until || null;
+    const protectionUntil = latestProtectionUntil(roleState.protected_until, store.protected_until);
     const protectedNow = Boolean(protectionUntil && new Date(protectionUntil).getTime() > Date.now());
 
     const boss = String(store.current_boss_nickname || "").trim();
@@ -3071,7 +3125,7 @@ await handleClaimParam();
       paintPartnerStoreSeoMeta({...data,store:{...store,seo_slug:seoSlug}});
     }
 
-    const protectionUntil = game.protected_until || store.protected_until || null;
+    const protectionUntil = latestProtectionUntil(game.protected_until, store.protected_until);
     const protectedNow = Boolean(game.protected ?? (protectionUntil && new Date(protectionUntil).getTime() > Date.now()));
     const cooldownUntil = game.challenge_cooldown_until || null;
     const cooldownNow = Boolean(cooldownUntil && new Date(cooldownUntil).getTime() > Date.now());
@@ -4694,18 +4748,36 @@ await handleClaimParam();
       return;
     }
 
-    const { data, error } = await sb.rpc("biteboss_game_activity", {
-      p_limit:30
-    });
+    const [activityResult,reclaimResult] = await Promise.all([
+      sb.rpc("biteboss_game_activity", { p_limit:30 }),
+      sb.rpc("biteboss_reclaim_activity_v8277", { p_limit:30 })
+    ]);
 
-    if(error){
-      console.warn("BiteBoss activity:", error);
+    if(activityResult.error){
+      console.warn("BiteBoss activity:", activityResult.error);
       if(homeBox) homeBox.innerHTML = `<div class="activity-empty">활동 기록을 불러오지 못했습니다.</div>`;
       setRetryState(profileBox, "활동 기록을 불러오지 못했습니다.", loadGameActivity);
       return;
     }
+    if(reclaimResult.error && !String(reclaimResult.error?.message || "").includes("biteboss_reclaim_activity_v8277")){
+      console.warn("BiteBoss reclaim activity:", reclaimResult.error);
+    }
 
-    const rows = Array.isArray(data) ? data : [];
+    const baseRows = Array.isArray(activityResult.data) ? activityResult.data : [];
+    const reclaimRows = Array.isArray(reclaimResult.data) ? reclaimResult.data : [];
+    const seenReclaims = new Set();
+    const rows = [...baseRows,...reclaimRows]
+      .sort((a,b) => new Date(b?.created_at || 0).getTime() - new Date(a?.created_at || 0).getTime())
+      .filter(row => {
+        if(String(row?.result || "") !== "boss_reclaim") return true;
+        const createdAt = new Date(row?.created_at || 0).getTime();
+        const bucket = Number.isFinite(createdAt) ? Math.floor(createdAt / 90000) : 0;
+        const key = `${String(row?.store_id || "")}:${bucket}`;
+        if(seenReclaims.has(key)) return false;
+        seenReclaims.add(key);
+        return true;
+      })
+      .slice(0,30);
     profileActivityRows = rows;
 
     if(homeBox){
@@ -4717,7 +4789,7 @@ await handleClaimParam();
 
   function renderActivityRows(rows, compact){
     if(!rows.length){
-      return `<div class="activity-empty">${compact ? "최근 전투 기록이 없습니다." : "아직 전투 기록이 없습니다."}</div>`;
+      return `<div class="activity-empty">${compact ? "최근 활동이 없습니다." : "아직 활동 기록이 없습니다."}</div>`;
     }
 
     return rows.map(row => {
@@ -4745,6 +4817,9 @@ await handleClaimParam();
       }else if(result === "boss_visit"){
         title = "방어 유지";
         detail = actor;
+      }else if(result === "boss_reclaim"){
+        title = "재점령";
+        detail = "매장을 다시 점령했습니다.";
       }
 
       if(compact){
@@ -5370,14 +5445,14 @@ await handleClaimParam();
   async function pingTakeoverSession(store,pos){
     if(!store?.id || !pos?.coords || !window.sb) return null;
     try{
-      const {data,error}=await sb.rpc("biteboss_takeover_session_ping_v7514",{
-        p_store_id:store.id,
+      const {data,error}=await sb.rpc("biteboss_takeover_session_ping_v8277",{
+        p_store_id:String(store.id),
         p_lat:Number(pos.coords.latitude),
         p_lng:Number(pos.coords.longitude),
         p_accuracy_m:Number.isFinite(pos.coords.accuracy)?Number(pos.coords.accuracy):null
       });
       if(error){
-        if(!String(error.message||"").includes("biteboss_takeover_session_ping_v7514")) console.warn("BiteBoss takeover session:",error);
+        if(!String(error.message||"").includes("biteboss_takeover_session_ping_v8277")) console.warn("BiteBoss takeover session:",error);
         return null;
       }
       return data||null;
@@ -6198,7 +6273,7 @@ await handleClaimParam();
 
       const roleState = storeRoleMap.get(String(store.id)) || {};
       const ownedByMe = isMyBossStore(store);
-      const protectionUntil = roleState.protected_until || store.protected_until || null;
+      const protectionUntil = latestProtectionUntil(roleState.protected_until, store.protected_until);
       const protectedNow = Boolean(
         protectionUntil &&
         new Date(protectionUntil).getTime() > Date.now()
@@ -6361,6 +6436,14 @@ await handleClaimParam();
         updateChallengeCommand(stores);
         return;
       }
+      if(takeoverSession?.reason === "STORE_PROTECTED"){
+        nearest.store.protected_until = latestProtectionUntil(nearest.store.protected_until, takeoverSession.protected_until);
+        preferredTakeoverStoreId = "";
+        if(takeoverUi?.storeId===String(nearest.store.id)) closeTakeoverUi();
+        renderBaseStoreList({ patch:true });
+        updateChallengeCommand(stores);
+        return;
+      }
       if(takeoverSession?.ok && takeoverSession.status === "cancelled"){
         presenceState.set(String(nearest.store.id), takeoverSession);
         if(takeoverUi?.storeId===String(nearest.store.id)){
@@ -6376,8 +6459,8 @@ await handleClaimParam();
 
       const hadOrganizationBeforeChallenge = Boolean(String(organization?.id || "").trim());
 
-      const { data, error } = await sb.rpc("biteboss_presence_ping_v7546", {
-        p_store_id:nearest.store.id,
+      const { data, error } = await sb.rpc("biteboss_presence_ping_v8277", {
+        p_store_id:String(nearest.store.id),
         p_lat:pos.coords.latitude,
         p_lng:pos.coords.longitude,
         p_accuracy_m:Number.isFinite(pos.coords.accuracy) ? pos.coords.accuracy : null
@@ -6393,6 +6476,11 @@ await handleClaimParam();
       if(!data?.eligible){
         presenceBlockedReason = String(data?.reason || "");
         if(presenceBlockedReason === "MEMBER_LOGIN_REQUIRED") stopPresenceTracking();
+        if(presenceBlockedReason === "STORE_PROTECTED" && data?.protected_until){
+          nearest.store.protected_until = latestProtectionUntil(nearest.store.protected_until, data.protected_until);
+          preferredTakeoverStoreId = "";
+          if(takeoverUi?.storeId===String(nearest.store.id)) closeTakeoverUi();
+        }
         const blockedPresence = {
           status:data?.status || "blocked",
           mode:ownedByMe ? "reclaim" : String(takeoverSession?.mode || takeoverModeFromStore(nearest.store)),
@@ -6477,6 +6565,7 @@ await handleClaimParam();
           loadCaptureCooldownStatus(true),
           loadStores(),
           loadHome(),
+          loadGameActivity(),
           loadMyOrganization()
         ]);
         // Keep the capture result modal authoritative. Refreshing the store detail
