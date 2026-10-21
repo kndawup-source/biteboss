@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.78";
+  const BITEBOSS_BUILD = "82.79";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -4611,9 +4611,12 @@ await handleClaimParam();
       else title = "점령 실패";
     }else if(result === "boss_visit"){
       title = "방어 유지";
+    }else if(result === "boss_reclaim"){
+      title = "재점령";
     }
     const { storeName } = activityStoreState(row);
-    return { title, storeName };
+    const detail = result === "boss_reclaim" ? "매장을 다시 점령했습니다." : `${title} 기록`;
+    return { title, storeName, detail };
   }
 
   function renderProfileRecentActivity(limit = 5){
@@ -4645,7 +4648,7 @@ await handleClaimParam();
       return `
         <${tag} class="profile-activity-line ${storeDeleted ? "is-deleted-store" : ""}" ${attrs}>
           <span class="profile-activity-kind">${escapeHtml(copy.title)}</span>
-          <span class="profile-activity-copy"><strong>${escapeHtml(copy.storeName)}</strong><small>${escapeHtml(copy.title)} 기록</small></span>
+          <span class="profile-activity-copy"><strong>${escapeHtml(copy.storeName)}</strong><small>${escapeHtml(copy.detail)}</small></span>
           <time>${escapeHtml(formatActivityTime(row.created_at))}</time>
         </${tag}>
       `;
@@ -4702,7 +4705,7 @@ await handleClaimParam();
           const attrs = storeDeleted ? 'role="group"' : `type="button" data-activity-store="${escapeAttr(storeId)}"`;
           return `<${tag} class="profile-activity-line ${storeDeleted ? "is-deleted-store" : ""}" ${attrs}>
             <span class="profile-activity-kind">${escapeHtml(copy.title)}</span>
-            <span class="profile-activity-copy"><strong>${escapeHtml(copy.storeName)}</strong><small>${escapeHtml(copy.title)} 기록</small></span>
+            <span class="profile-activity-copy"><strong>${escapeHtml(copy.storeName)}</strong><small>${escapeHtml(copy.detail)}</small></span>
             <time>${escapeHtml(formatActivityTime(row.created_at))}</time>
           </${tag}>`;
         }).join("") : `<div class="profile-record-empty">아직 활동 기록이 없습니다.</div>`}
@@ -9011,14 +9014,61 @@ await handleClaimParam();
     return { data:null, error:new Error("PLAYER_PROFILE_RPC_MISSING") };
   }
 
+  async function fetchCanonicalPlayerBattleRecord(userId){
+    const targetUserId=String(userId || "").trim();
+    if(!targetUserId) return null;
+    const { data, error } = await sb.rpc("biteboss_player_battle_record_v8279", { p_user_id:targetUserId });
+    if(error){
+      if(!isMissingRpcError(error)) console.warn("BiteBoss canonical battle record:", error);
+      return null;
+    }
+    const row = Array.isArray(data) ? data[0] : data;
+    if(!row || row.ok === false) return null;
+    return row;
+  }
+
+  async function fetchPlayerReclaimActivity(userId, limit=20){
+    const targetUserId=String(userId || "").trim();
+    if(!targetUserId) return [];
+    const { data, error } = await sb.rpc("biteboss_player_reclaim_activity_v8279", {
+      p_user_id:targetUserId,
+      p_limit:Math.max(1,Math.min(50,Number(limit)||20))
+    });
+    if(error){
+      if(!isMissingRpcError(error)) console.warn("BiteBoss player reclaim activity:", error);
+      return [];
+    }
+    return Array.isArray(data) ? data : [];
+  }
+
+  function mergePlayerRecentActivity(baseRows, reclaimRows, limit=20){
+    const seen=new Set();
+    return [...(Array.isArray(baseRows)?baseRows:[]),...(Array.isArray(reclaimRows)?reclaimRows:[])]
+      .sort((a,b)=>new Date(b?.created_at||0).getTime()-new Date(a?.created_at||0).getTime())
+      .filter(row=>{
+        const key=[String(row?.result||""),String(row?.store_id||""),String(row?.created_at||"")].join(":");
+        if(seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0,Math.max(1,Number(limit)||20));
+  }
+
   async function openPlayerProfile(userId, avatarHint = ""){
     openModal("사용자 프로필", `<div class="app-state">사용자 정보를 불러오는 중…</div>`, { type:"player-profile" });
 
     try{
-      const { data, error } = await fetchPlayerProfileData(userId);
+      const [{ data, error }, canonicalRecord, reclaimRows] = await Promise.all([
+        fetchPlayerProfileData(userId),
+        fetchCanonicalPlayerBattleRecord(userId),
+        fetchPlayerReclaimActivity(userId,20)
+      ]);
 
       if(error) throw error;
       if(!data?.ok) throw new Error(data?.error || "PLAYER_LOAD_FAILED");
+
+      if(canonicalRecord) data.canonical_battle_record = canonicalRecord;
+      data.recent_activity = mergePlayerRecentActivity(data.recent_activity,reclaimRows,20);
 
       if(data?.player){
         const sameAsCurrentProfile = Boolean(
@@ -9049,71 +9099,35 @@ await handleClaimParam();
     }
   }
 
-  function isBattleChallenger(row = {}, userId = ""){
-    if(row.as_challenger === true || row.as_challenger === 1 || row.as_challenger === "true") return true;
-    const side = String(row.viewer_side || row.perspective || row.side || "").toLowerCase();
-    if(side === "challenger" || side === "org_challenger") return true;
-    if(side === "defender" || side === "org_defender") return false;
 
-    const targetUserId = String(userId || "").trim();
-    if(!targetUserId) return false;
-    const actorUserId = String(row.actor_user_id || row.challenger_user_id || row.attacker_user_id || "").trim();
-    const defenderUserId = String(row.defender_user_id || row.boss_user_id || "").trim();
-    return actorUserId === targetUserId && defenderUserId !== targetUserId;
+  function normalizeBattleRecord(candidate){
+    if(!candidate || typeof candidate !== "object") return null;
+    const wins=Math.max(0,Number(candidate.wins ?? candidate.win_count ?? candidate.victories ?? 0));
+    const losses=Math.max(0,Number(candidate.losses ?? candidate.loss_count ?? candidate.defeats ?? 0));
+    const explicitTotal=Number(candidate.total ?? candidate.total_battles ?? candidate.matches);
+    const total=Number.isFinite(explicitTotal) ? Math.max(0,explicitTotal) : wins+losses;
+    return { total:Math.max(total,wins+losses), wins, losses };
   }
 
-  function classifyBattleResult(row = {}){
-    const result = String(row.result || row.outcome || row.status || "").toLowerCase();
-    if(["boss_win","claimed","challenger_win","win","victory"].includes(result)) return "win";
-    if(["crew","challenger_loss","boss_defense","defended","loss","lose","defeat","failed"].includes(result)) return "loss";
-    return "";
-  }
-
-  function battleRecordFromActivity(recentActivity, userId = ""){
-    return (Array.isArray(recentActivity) ? recentActivity : []).reduce((record, row) => {
-      if(!isBattleChallenger(row, userId)) return record;
-      const result = classifyBattleResult(row);
-      if(result === "win") record.wins += 1;
-      else if(result === "loss") record.losses += 1;
-      else return record;
-      record.total += 1;
-      return record;
-    }, { total:0, wins:0, losses:0 });
-  }
-
-  function getPlayerBattleRecord(data, recentActivity, userId = ""){
-    const activityRecord = battleRecordFromActivity(recentActivity, userId);
-    const candidates = [
+  function getPlayerBattleRecord(data){
+    const candidates=[
+      data?.canonical_battle_record,
       data?.battle_record,
       data?.record,
       data?.player?.battle_record,
       data?.player?.record
     ];
-
     for(const candidate of candidates){
-      if(!candidate || typeof candidate !== "object") continue;
-      let wins = Math.max(0, Number(candidate.wins ?? candidate.win_count ?? candidate.victories ?? 0));
-      let losses = Math.max(0, Number(candidate.losses ?? candidate.loss_count ?? candidate.defeats ?? 0));
-      const explicitTotal = Number(candidate.total ?? candidate.total_battles ?? candidate.matches);
-      const hasTotal = Number.isFinite(explicitTotal);
-      let total = hasTotal ? Math.max(0, explicitTotal) : wins + losses;
-
-      if(hasTotal && total > wins + losses){
-        losses = Math.max(losses, total - wins);
-      }
-      wins = Math.max(wins, activityRecord.wins);
-      losses = Math.max(losses, activityRecord.losses);
-      total = Math.max(total, wins + losses, activityRecord.total);
-      return { total, wins, losses };
+      const record=normalizeBattleRecord(candidate);
+      if(record) return record;
     }
-
-    return activityRecord;
+    return { total:0,wins:0,losses:0 };
   }
 
   function renderPlayerProfile(data, userId){
     const player = data.player || {};
     const recentAll = Array.isArray(data.recent_activity) ? data.recent_activity : [];
-    const battleRecord = getPlayerBattleRecord(data, recentAll, userId);
+    const battleRecord = getPlayerBattleRecord(data);
     const recent = recentAll.slice(0, 3);
 
     // Modal shell is generic; the nickname is the hero title.
@@ -9129,6 +9143,7 @@ await handleClaimParam();
       if(result === "boss_win") title = row.as_challenger ? "보스 점령" : "보스 상실";
       else if(result === "crew") title = row.as_challenger ? "점령 실패" : "방어 성공";
       else if(result === "boss_visit") title = "보스 활동";
+      else if(result === "boss_reclaim") title = "재점령";
       else if(result === "crew_kicked") title = "크루 강퇴";
       else if(result === "crew_left") title = "크루 탈퇴";
       else if(result === "crew_joined") title = "크루 합류";
@@ -9151,7 +9166,7 @@ await handleClaimParam();
           <time>${escapeHtml(formatActivityTime(row.created_at))}</time>
         </${tag}>
       `;
-    }).join("") || `<div class="app-state player-profile-empty">아직 전투 기록이 없습니다.</div>`;
+    }).join("") || `<div class="app-state player-profile-empty">아직 활동 기록이 없습니다.</div>`;
 
     const body = $("#modalBody");
     if(!body) return;
