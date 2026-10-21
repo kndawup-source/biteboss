@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BITEBOSS_BUILD = "82.82";
+  const BITEBOSS_BUILD = "82.83";
   window.__BITEBOSS_BUILD__ = BITEBOSS_BUILD;
   if(window.__BITEBOSS_APP_BOOTED__) return;
   window.__BITEBOSS_APP_BOOTED__ = true;
@@ -5709,7 +5709,7 @@ await handleClaimParam();
     const list=$("#newsList");
     if(list){
       list.innerHTML=slice.rows.length
-        ? slice.rows.map(post=>newsCardMarkup(post)).join("")
+        ? slice.rows.map((post,index)=>newsCardMarkup(post,{lead:!featured && activeNewsPage===1 && index===0})).join("")
         : `<div class="news-empty${featured ? " is-after-featured" : ""}">${featured ? "이 카테고리의 다른 소식이 없습니다." : "등록된 소식이 없습니다."}</div>`;
     }
     renderPagination("#newsPagination",activeNewsPage,listPosts.length,NEWS_PAGE_SIZE,nextPage=>{
@@ -5779,16 +5779,20 @@ await handleClaimParam();
     try{ return new Intl.DateTimeFormat("ko-KR",{year:"numeric",month:"2-digit",day:"2-digit"}).format(date).replace(/\. /g,".").replace(/\.$/,""); }catch{ return ""; }
   }
 
-  function newsCardMarkup(post,{compact=false}={}){
+  function newsCardMarkup(post,{compact=false,lead=false}={}){
     const date=newsDate(post.updated_at || post.created_at);
+    const classes=["news-list-card"];
+    if(compact) classes.push("is-related");
+    else classes.push("is-feed");
+    if(lead) classes.push("is-lead");
     return `
-      <a class="news-list-card${compact ? " is-related" : ""}" href="${escapeAttr(newsPostPath(post))}" data-news-open="${escapeAttr(post.slug || post.id)}">
-        ${compact ? newsThumbnailMarkup(post,"news-list-visual") : ""}
+      <a class="${classes.join(" ")}" href="${escapeAttr(newsPostPath(post))}" data-news-open="${escapeAttr(post.slug || post.id)}">
+        ${compact ? newsThumbnailMarkup(post,"news-list-visual") : newsThumbnailMarkup(post,"news-feed-visual")}
         <span class="news-list-copy">
           <span class="news-list-meta"><small>${escapeHtml(newsCategoryLabel(post.category))}</small>${date ? `<time>${escapeHtml(date)}</time>` : ""}</span>
           <strong>${escapeHtml(post.title)}</strong>
           ${post.summary ? `<p>${escapeHtml(post.summary)}</p>` : ""}
-          <i aria-hidden="true">›</i>
+          ${compact ? '<i aria-hidden="true">›</i>' : ""}
         </span>
       </a>`;
   }
